@@ -541,42 +541,54 @@ class TileEfficiencyTrainer:
         for suit in suits_dict:
             suits_dict[suit].sort()
         
-        # 尝试所有可能的组合方式
+        # 检查所有可能的组合
+        return self._check_win_combination(suits_dict)
+    
+    def _check_win_combination(self, suits_dict, melds=0, pair_found=False):
+        """递归检查所有可能的胡牌组合"""
+        # 基本情况：已找到4个面子和1个对子
+        if melds == 4 and pair_found:
+            return True
+            
+        # 遍历所有花色
         for suit in SUITS:
             numbers = suits_dict[suit]
             if not numbers:
                 continue
                 
-            # 尝试将三张相同牌作为刻子或对子+单张
-            i = 0
-            while i < len(numbers) - 2:
-                if numbers[i] == numbers[i+1] == numbers[i+2]:
-                    # 尝试作为刻子
-                    temp_numbers = numbers.copy()
-                    del temp_numbers[i:i+3]
-                    if self._check_melds(temp_numbers, 3):
-                        return True
+            # 检查刻子
+            if len(numbers) >= 3 and numbers[0] == numbers[1] == numbers[2]:
+                # 尝试作为刻子
+                new_numbers = numbers[3:]
+                new_suits_dict = suits_dict.copy()
+                new_suits_dict[suit] = new_numbers
+                if self._check_win_combination(new_suits_dict, melds + 1, pair_found):
+                    return True
                     
-                    # 尝试作为对子+单张
-                    temp_numbers = numbers.copy()
-                    del temp_numbers[i+2]
-                    if self._check_melds(temp_numbers, 4):
+            # 检查顺子
+            if len(numbers) >= 3:
+                first = numbers[0]
+                if first + 1 in numbers and first + 2 in numbers:
+                    # 尝试作为顺子
+                    new_numbers = numbers.copy()
+                    new_numbers.remove(first)
+                    new_numbers.remove(first + 1)
+                    new_numbers.remove(first + 2)
+                    new_suits_dict = suits_dict.copy()
+                    new_suits_dict[suit] = new_numbers
+                    if self._check_win_combination(new_suits_dict, melds + 1, pair_found):
                         return True
-                i += 1
-        
-        # 检查标准组合
-        melds = 0
-        pair_found = False
-        for suit in SUITS:
-            numbers = suits_dict[suit]
-            if not numbers:
-                continue
-                
-            melds += self._count_melds(numbers)
-            if not pair_found:
-                pair_found = self._has_pair(numbers)
-        
-        return melds == 4 and pair_found
+                        
+            # 检查对子
+            if not pair_found and len(numbers) >= 2 and numbers[0] == numbers[1]:
+                # 尝试作为对子
+                new_numbers = numbers[2:]
+                new_suits_dict = suits_dict.copy()
+                new_suits_dict[suit] = new_numbers
+                if self._check_win_combination(new_suits_dict, melds, True):
+                    return True
+                    
+        return False
     
     def _check_melds(self, numbers, required_melds):
         """检查剩余牌是否能组成所需数量的面子"""
@@ -1219,6 +1231,11 @@ class SichuanMahjongTrainer:
             mode: 模式名称 ("牌效训练" 或 "AI对战")
             win_type: 胡牌类型
         """
+        # 绘制半透明背景遮罩
+        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))  # 半透明黑色
+        screen.blit(overlay, (0, 0))
+        
         dialog_width, dialog_height = 500, 300
         dialog_x = (WIDTH - dialog_width) // 2
         dialog_y = (HEIGHT - dialog_height) // 2
