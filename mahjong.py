@@ -317,6 +317,7 @@ class TileEfficiencyTrainer:
         self.show_win_dialog = False
         self.win_type = ""
         self.kongs = []  # 存储杠牌 [(suit, number)]
+        self.ready_tiles = []  # 存储听牌状态
         
     def generate_random_hand(self):
         hand = []
@@ -437,6 +438,9 @@ class TileEfficiencyTrainer:
             if self.game_state == "win":
                 self.win_type = "七对子" if self.is_seven_pairs(self.get_tile_count()) else "普通胡牌"
                 self.show_win_dialog = False  # 重置对话框状态
+            
+            # 检查听牌状态
+            self.ready_tiles = self.check_ready_hand()
         else:
             self.message = "错误: 该牌不在手牌中"
             self.message_color = RED
@@ -457,7 +461,7 @@ class TileEfficiencyTrainer:
             return False  # 未缺一门，不能胡牌
         
         # 检查牌数是否合法
-        if len(hand) != 14:
+        if len(hand) + len(self.kongs) * 4 != 14:
             return False
         
         tile_count = self.get_tile_count()
@@ -467,7 +471,9 @@ class TileEfficiencyTrainer:
             return True
         
         # 检查普通胡牌（4个面子+1对将）
-        if self.is_normal_win(tile_count):
+        # 每个杠牌算作一个已完成的面子
+        required_melds = 4 - len(self.kongs)
+        if self.is_normal_win(tile_count, required_melds):
             return True
         
         return False
@@ -513,16 +519,16 @@ class TileEfficiencyTrainer:
         return False
     
     def is_seven_pairs(self, tile_count):
-        """检查是否是七对子胡牌"""
+        """检查是否是七对子胡牌(不能有杠牌)"""
         pairs = 0
         for count in tile_count.values():
             if count == 2:
                 pairs += 1
-            elif count == 4:  # 杠也可以算作两个对子
+            elif count == 4:  # 四张相同的牌算两个对子
                 pairs += 2
-        return pairs == 7
+        return pairs == 7 and len(self.kongs) == 0  # 七对子不能有杠牌
     
-    def is_normal_win(self, tile_count):
+    def is_normal_win(self, tile_count, required_melds=4):
         """检查普通胡牌（4个面子+1对将），考虑多种组合可能"""
         # 将牌统计转换为列表
         tiles = []
@@ -542,12 +548,50 @@ class TileEfficiencyTrainer:
             suits_dict[suit].sort()
         
         # 检查所有可能的组合
-        return self._check_win_combination(suits_dict)
+        return self._check_win_combination(suits_dict, melds=0, pair_found=False, required_melds=required_melds)
     
-    def _check_win_combination(self, suits_dict, melds=0, pair_found=False):
+    def check_ready_hand(self):
+        """检测听牌状态，考虑杠牌作为固定面子"""
+        self.ready_tiles = []
+        fixed_melds = len(self.kongs)  # 杠牌作为固定面子
+        
+        # 尝试每种可能的牌
+        for suit in SUITS:
+            for num in NUMBERS:
+                test_tile = (suit, num)
+                test_hand = self.hand + [test_tile]
+                
+                # 检查是否能胡这张牌
+                if self._check_win_with_fixed_melds(test_hand, fixed_melds):
+                    self.ready_tiles.append(test_tile)
+        
+        return self.ready_tiles
+
+    def _check_win_with_fixed_melds(self, hand, fixed_melds):
+        """检查带固定面子的胡牌条件"""
+        # 检查是否已缺一门
+        suits_in_hand = set(tile[0] for tile in hand)
+        if len(suits_in_hand) == 3:
+            return False
+        
+        # 检查牌数是否合法(14张)
+        if len(hand) + fixed_melds * 4 != 14:
+            return False
+            
+        tile_count = self.get_tile_count(hand)
+        
+        # 检查七对子(不能有杠牌)
+        if fixed_melds == 0 and self.is_seven_pairs(tile_count):
+            return True
+            
+        # 检查普通胡牌(考虑固定面子)
+        required_melds = 4 - fixed_melds
+        return self.is_normal_win(tile_count, required_melds)
+    
+    def _check_win_combination(self, suits_dict, melds=0, pair_found=False, required_melds=4):
         """递归检查所有可能的胡牌组合"""
-        # 基本情况：已找到4个面子和1个对子
-        if melds == 4 and pair_found:
+        # 基本情况：已找到足够的面子和1个对子
+        if melds == required_melds and pair_found:
             return True
             
         # 遍历所有花色
@@ -634,25 +678,20 @@ class TileEfficiencyTrainer:
         return False
     
     def generate_random_tile(self):
-        """生成一张随机牌，但不会与已有牌重复超过4张"""
-        # 统计当前所有牌的数量
-        all_tiles = []
-        for suit in SUITS:
-            for number in NUMBERS:
-                all_tiles.append((suit, number))
-        
-        # 统计每种牌的数量
+        """生成一张随机牌，严格遵循四川麻将108张牌限制"""
+        # 统计当前所有牌的数量(手牌+已打出的牌)
         tile_count = {}
-        for tile in self.hand:
+        for tile in self.hand + [d for d in self.discard_history]:
             key = (tile[0], tile[1])
             tile_count[key] = tile_count.get(key, 0) + 1
         
-        # 移除已经达到4张的牌
-        available_tiles = [tile for tile in all_tiles if tile_count.get(tile, 0) < 4]
+        # 生成所有可能的牌
+        all_tiles = [(suit, num) for suit in SUITS for num in NUMBERS]
         
-        if not available_tiles:
-            return random.choice(all_tiles)
-        return random.choice(available_tiles)
+        # 过滤掉已经达到4张的牌
+        available_tiles = [t for t in all_tiles if tile_count.get(t, 0) < 4]
+        
+        return random.choice(available_tiles) if available_tiles else None
 
 # AI对战模式
 class AIGame:
@@ -998,6 +1037,34 @@ class SichuanMahjongTrainer:
         title = title_font.render("牌效训练", True, HIGHLIGHT)
         screen.blit(title, (WIDTH//2 - title.get_width()//2, 30))
         
+        # 检查并绘制听牌状态
+        ready_tiles = self.efficiency_trainer.ready_tiles
+        if ready_tiles:
+            # 绘制听牌提示背景（更醒目）
+            pygame.draw.rect(screen, (255, 255, 180), (40, 70, WIDTH-80, 100), border_radius=10)
+            pygame.draw.rect(screen, (255, 200, 0), (40, 70, WIDTH-80, 100), width=3, border_radius=10)
+            
+            # 绘制听牌提示文字
+            ready_type = self.efficiency_trainer.get_ready_type()
+            ready_text = title_font.render(f"听牌状态({ready_type})", True, (200, 0, 0))
+            screen.blit(ready_text, (WIDTH//2 - ready_text.get_width()//2, 80))
+            
+            # 绘制"可和以下牌"提示
+            hint_text = font_medium.render("可和以下牌:", True, (0, 0, 0))
+            screen.blit(hint_text, (WIDTH//2 - hint_text.get_width()//2, 120))
+            
+            # 绘制可听的牌（更大更清晰）
+            tile_width, tile_height = 50, 75
+            start_x = WIDTH//2 - (len(ready_tiles) * tile_width) // 2
+            for i, tile in enumerate(ready_tiles):
+                tile_obj = Tile(tile[0], tile[1])
+                tile_obj.width, tile_obj.height = tile_width, tile_height
+                tile_obj.draw(screen, start_x + i * tile_width, 140)
+            
+            # 在右下角添加常驻听牌提示
+            hint = font_small.render("当前已听牌!", True, (255, 0, 0))
+            screen.blit(hint, (WIDTH - hint.get_width() - 20, HEIGHT - 40))
+        
         # 绘制手牌
         hand = [Tile(tile[0], tile[1]) for tile in self.efficiency_trainer.hand]
         for tile in hand:
@@ -1044,22 +1111,11 @@ class SichuanMahjongTrainer:
                 # 使用Tile类统一绘制四张牌
                 tile_width, tile_height = 35, 50
                 
-                # 绘制三张背面朝上的牌
-                for i in range(3):
-                    tile = Tile("", "")  # 创建空白牌用于背面
+                # 绘制四张正面朝上的牌
+                for i in range(4):
+                    tile = Tile(kong_tile[0], kong_tile[1])
                     tile.width, tile.height = tile_width, tile_height
-                    # 绘制背面
-                    pygame.draw.rect(screen, TILE_BACK_COLOR, 
-                                   (kong_start_x + i * 40, kong_y, tile_width, tile_height), 
-                                   border_radius=5)
-                    pygame.draw.rect(screen, TILE_BORDER, 
-                                   (kong_start_x + i * 40, kong_y, tile_width, tile_height), 
-                                   width=2, border_radius=5)
-                
-                # 绘制一张正面朝上的牌
-                tile = Tile(kong_tile[0], kong_tile[1])
-                tile.width, tile.height = tile_width, tile_height
-                tile.draw(screen, kong_start_x + 120, kong_y)
+                    tile.draw(screen, kong_start_x + i * 40, kong_y)
                 
                 kong_start_x += 180
         
