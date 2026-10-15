@@ -1,0 +1,837 @@
+{
+  "schema_version": "0.4",
+  "description": "固定实牌结构 + 单独标记的事件条件；事件资格布尔量必须在完整状态机中核验，不能凭结算手牌独立认证。",
+  "tile_encoding": "m=万 s=条 p=筒; 1-9",
+  "cases": [
+    {
+      "id": "P01_pinghu_0",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p5"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "pinghu",
+        "raw_fan": 0,
+        "effective_fan": 0,
+        "multiplier": 1
+      }
+    },
+    {
+      "id": "P02_missing_declared_suit",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p5"
+      ],
+      "missing_suit": "m",
+      "expect": {
+        "legal": false
+      }
+    },
+    {
+      "id": "P03_missing_three_suits",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "p1",
+        "p2",
+        "p3",
+        "s1",
+        "s2",
+        "s3",
+        "m9",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "expect": {
+        "legal": false
+      }
+    },
+    {
+      "id": "P04_pure_suit",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m2",
+        "m3",
+        "m4",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m5",
+        "m5"
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "pure_suit",
+        "raw_fan": 2
+      }
+    },
+    {
+      "id": "P05_all_pungs",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "m3",
+        "p4",
+        "p4",
+        "p4",
+        "p5",
+        "p5"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "all_pungs",
+        "raw_fan": 1
+      }
+    },
+    {
+      "id": "P06_pure_all_pungs",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "m3",
+        "m4",
+        "m4",
+        "m4",
+        "m5",
+        "m5"
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "pure_all_pungs",
+        "raw_fan": 3
+      }
+    },
+    {
+      "id": "P07_seven_pairs",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "m4",
+        "m4",
+        "p5",
+        "p5",
+        "p6",
+        "p6",
+        "p7",
+        "p7"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "seven_pairs",
+        "raw_fan": 2
+      }
+    },
+    {
+      "id": "P08_dragon_seven_pairs",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "p4",
+        "p4",
+        "p5",
+        "p5",
+        "p6",
+        "p6"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "dragon_seven_pairs",
+        "raw_fan": 3,
+        "bonuses": {}
+      }
+    },
+    {
+      "id": "P09_pure_seven_pairs",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "m4",
+        "m4",
+        "m5",
+        "m5",
+        "m6",
+        "m6",
+        "m7",
+        "m7"
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "pure_seven_pairs",
+        "raw_fan": 4
+      }
+    },
+    {
+      "id": "P10_pure_dragon_seven_pairs",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "m4",
+        "m4",
+        "m5",
+        "m5",
+        "m6",
+        "m6"
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "pure_dragon_seven_pairs",
+        "raw_fan": 5
+      }
+    },
+    {
+      "id": "P11_pure_dragon_second_root",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m1",
+        "m1",
+        "m1",
+        "m2",
+        "m2",
+        "m2",
+        "m2",
+        "m3",
+        "m3",
+        "m4",
+        "m4",
+        "m5",
+        "m5"
+      ],
+      "missing_suit": "p",
+      "cap": 8,
+      "expect": {
+        "legal": true,
+        "main_pattern": "pure_dragon_seven_pairs",
+        "raw_fan": 6,
+        "bonuses": {
+          "roots": 1
+        }
+      }
+    },
+    {
+      "id": "P12_heaven_win",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p5"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "context": {
+        "heaven_win_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "main_pattern": "heaven_win",
+        "raw_fan": 4
+      }
+    },
+    {
+      "id": "P13_earth_win",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p5"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "context": {
+        "earth_win_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "main_pattern": "earth_win",
+        "raw_fan": 4
+      }
+    },
+    {
+      "id": "P14_tian_ting",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "p2",
+        "p3",
+        "p4",
+        "p5",
+        "p5"
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "context": {
+        "tian_ting_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "raw_fan": 2,
+        "combinations": {
+          "tian_ting": 2
+        }
+      }
+    },
+    {
+      "id": "P15_tian_ting_plus_pure",
+      "kind": "score",
+      "concealed": [
+        "m1",
+        "m2",
+        "m3",
+        "m2",
+        "m3",
+        "m4",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "m5",
+        "m5"
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "context": {
+        "tian_ting_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "raw_fan": 4,
+        "combinations": {
+          "tian_ting": 2
+        }
+      }
+    },
+    {
+      "id": "P16_golden_hook",
+      "kind": "score",
+      "concealed": [
+        "p5",
+        "p5"
+      ],
+      "melds": [
+        {
+          "type": "peng",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "p4"
+        }
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "golden_hook": true,
+        "main_pattern": "golden_hook",
+        "raw_fan": 2
+      }
+    },
+    {
+      "id": "P17_golden_hook_plus_pure",
+      "kind": "score",
+      "concealed": [
+        "m5",
+        "m5"
+      ],
+      "melds": [
+        {
+          "type": "peng",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "m4"
+        }
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "golden_hook",
+        "raw_fan": 4,
+        "combinations": {
+          "pure_suit": 2
+        }
+      }
+    },
+    {
+      "id": "P18_golden_hook_plus_tian_ting",
+      "kind": "score",
+      "concealed": [
+        "p5",
+        "p5"
+      ],
+      "melds": [
+        {
+          "type": "peng",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "p4"
+        }
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "context": {
+        "tian_ting_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "raw_fan": 4,
+        "combinations": {
+          "tian_ting": 2
+        }
+      }
+    },
+    {
+      "id": "P19_golden_hook_pure_tian_ting_6",
+      "kind": "score",
+      "concealed": [
+        "m5",
+        "m5"
+      ],
+      "melds": [
+        {
+          "type": "peng",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "m4"
+        }
+      ],
+      "missing_suit": "p",
+      "cap": 6,
+      "context": {
+        "tian_ting_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "raw_fan": 6,
+        "effective_fan": 6,
+        "multiplier": 64,
+        "combinations": {
+          "pure_suit": 2,
+          "tian_ting": 2
+        }
+      }
+    },
+    {
+      "id": "P20_golden_hook_pure_tian_ting_default_cap",
+      "kind": "score",
+      "concealed": [
+        "m5",
+        "m5"
+      ],
+      "melds": [
+        {
+          "type": "peng",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "m4"
+        }
+      ],
+      "missing_suit": "p",
+      "context": {
+        "tian_ting_verified": true
+      },
+      "expect": {
+        "legal": true,
+        "raw_fan": 6,
+        "effective_fan": 3,
+        "multiplier": 8
+      }
+    },
+    {
+      "id": "P21_golden_hook_not_all_pungs_extra",
+      "kind": "score",
+      "concealed": [
+        "p5",
+        "p5"
+      ],
+      "melds": [
+        {
+          "type": "peng",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "p4"
+        }
+      ],
+      "missing_suit": "s",
+      "cap": 6,
+      "expect": {
+        "legal": true,
+        "main_pattern": "golden_hook",
+        "raw_fan": 2
+      }
+    },
+    {
+      "id": "P22_roots_on_golden_with_a_kong",
+      "kind": "score",
+      "concealed": [
+        "m5",
+        "m5"
+      ],
+      "melds": [
+        {
+          "type": "an_gang",
+          "tile": "m1"
+        },
+        {
+          "type": "peng",
+          "tile": "m2"
+        },
+        {
+          "type": "peng",
+          "tile": "m3"
+        },
+        {
+          "type": "peng",
+          "tile": "m4"
+        }
+      ],
+      "missing_suit": "p",
+      "cap": 7,
+      "expect": {
+        "legal": true,
+        "main_pattern": "golden_hook",
+        "raw_fan": 5,
+        "bonuses": {
+          "roots": 1
+        }
+      }
+    },
+    {
+      "id": "P23_original_ready_wait_m9",
+      "kind": "waits",
+      "concealed": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "expect": [
+        "m9"
+      ]
+    },
+    {
+      "id": "P24_tian_ting_peng_kong_not_auto_cancel",
+      "kind": "tian_ting",
+      "starting_13": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "is_dealer": false,
+      "checkpoints": [
+        {
+          "concealed": [
+            "m4",
+            "m4",
+            "m4",
+            "p1",
+            "p1",
+            "p1",
+            "p4",
+            "p4",
+            "p4",
+            "m9"
+          ],
+          "melds": [
+            {
+              "type": "an_gang",
+              "tile": "m1"
+            }
+          ]
+        },
+        {
+          "concealed": [
+            "m9"
+          ],
+          "melds": [
+            {
+              "type": "an_gang",
+              "tile": "m1"
+            },
+            {
+              "type": "an_gang",
+              "tile": "m4"
+            },
+            {
+              "type": "an_gang",
+              "tile": "p1"
+            },
+            {
+              "type": "an_gang",
+              "tile": "p4"
+            }
+          ]
+        }
+      ],
+      "expect": true
+    },
+    {
+      "id": "P25_tian_ting_changes_wait_fails",
+      "kind": "tian_ting",
+      "starting_13": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "is_dealer": false,
+      "checkpoints": [
+        {
+          "concealed": [
+            "m1",
+            "m1",
+            "m1",
+            "m4",
+            "m4",
+            "m4",
+            "p1",
+            "p1",
+            "p1",
+            "p4",
+            "p4",
+            "p4",
+            "m8"
+          ],
+          "melds": []
+        }
+      ],
+      "expect": false
+    },
+    {
+      "id": "P26_tian_ting_dealer_fails",
+      "kind": "tian_ting",
+      "starting_13": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "is_dealer": true,
+      "checkpoints": [],
+      "expect": false
+    }
+  ]
+}
