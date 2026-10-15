@@ -166,42 +166,16 @@ B 的“局部最优”只表示在当前局面、当前规则及训练目标下
 - 收到的计算示例：系数200、自摸3番、三家未胡，赢家+4800、三位各-1600；系数100、自摸2番，赢家+1200、三家各-400；系数100、0番点炮，赢家+100、点炮者-100。以事件账本保证合计收支相抵。
 - 番型基本分只取最高，另加杠上花/杠上炮/抢杠/根；默认封顶3番，但封顶在附加番前后及具体杠分支付规则尚未确认，不能贸然出正式积分。
 
-## 6. 可配置川麻规则
+## 6. 可配置川麻规则：v0.2 优先
 
-采取**规则预设 + 配置字段 + 独立验证器**。现已收到第一套用户自定义血战到底规则，见[规则草案](SICHUAN_BLOOD_BATTLE_RULES_DRAFT_V0.1.md)及[禁用中的 JSON 配置](../configs/rulesets/sichuan_blood_battle_draft.json)；规则仍有重要待确认项，因此暂不能标记 enabled=true。血流成河可作为未来另一独立预设，不能仅修改名称。
+**规则唯一依据**：[当前四川血战到底 v0.2](SICHUAN_BLOOD_BATTLE_RULES_V0.2.md)，[对应 JSON 配置](../configs/rulesets/sichuan_blood_battle_v0.2.draft.json)。旧版规则及配置已由用户作废。
 
-建议字段：
-
-| 配置分类 | 字段示例 | 作用 |
-| --- | --- | --- |
-| 牌集 | `suits`, `copies_per_tile` | 默认万条筒、每种 4 张 |
-| 开局 | `player_count`, `dealer_policy`, `exchange_three`, `dingque` | 四人、庄家、换三张、定缺 |
-| 操作 | `allow_chi`, `allow_peng`, `allow_gang`, `allow_zimo`, `allow_ron` | 决定合法动作与其优先级 |
-| 胡牌 | `enabled_hand_types`, `must_clear_missing_suit`, `multiple_winners` | 判胡标准与限制 |
-| 续局 | `win_flow`, `end_condition`, `wall_exhaustion` | 血战/血流差异与终局 |
-| 算分 | `fan_rules`, `fan_cap`, `base_score`, `gang_payment`, `draw_settlement` | 番种、封顶、杠钱、流局查叫等 |
-| 训练 | `probability_visibility`, `optimization_goal`, `rounds`, `allow_shanten_regression`, `score_awareness` | 概率口径、局部最优切约束、收益分析开关和单局训练次数 |
-
-示意配置（字段设计草案，**不是已验证的任何地区官方规则**）：
-
-```json
-{
-  "id": "training_basic_v0",
-  "deck": { "suits": ["wan", "tiao", "tong"], "copies_per_tile": 4 },
-  "win": { "enabled_hand_types": ["standard", "seven_pairs"], "must_clear_missing_suit": true },
-  "training": {
-    "single_session_draw_discard_rounds": 14,
-    "optimization_goal": "local_optimal_discard",
-    "allow_shanten_regression": false,
-    "local_tiebreaker": "ukeire_count",
-    "score_awareness": "disabled_until_rules_verified",
-    "probability_visibility": "known_tiles_only",
-    "on_win": "offer_finish_or_continue"
-  }
-}
-```
-
-后续真实规则预设应单独以 JSON/YAML 保存，并通过 JSON Schema / Pydantic 等做约束检查；每局固定规则快照与版本，避免修改配置导致旧局回放失真。
+- **已确定**：万/条/筒108张；庄家14、其余各13，余55；每局随机庄家；强制同时换三张（同色三张，顺/逆/对家随机）后定缺；不能吃，不能碰自己缺门；可碰及明杠/暗杠/补杠、杠后尾牌补摸；允许一炮多响；胡牌必须不含选定缺门。
+- **胡牌结构和番型**：普通四面子一将、七对；基本番只取最高；一番对对胡、二番清一色/七对/**天听**、三番清对/龙七对；封顶番型天胡/地胡/清龙七对/**清七对**；杠上花/杠上炮/抢杠/根+1番，龙七对与清龙七对扣1根。平胡0/1番歧义未解决。
+- **杠钱**：明杠由点杠者付2×底分；暗杠由其余活跃玩家每人付2×底分；补杠由其余活跃玩家每人付1×底分；杠上炮和抢杠对应的杠作废。
+- **计分**：倍数=2的有效番数次方，默认最高3番，点炮由点炮者单独付；自摸由其余未胡玩家分别付；一炮多响逐赢家结算。牌墙耗尽需要按条件查花猪、再查大叫。
+- **待确认并锁定不启用**：平胡、花猪精确定义、天听和强制换牌的时点关系、天胡与庄家起手14张、杠钱底分及撤销时点、封顶番型与另加番次序、已有赢家后牌墙耗尽是否查叫、具体 VRF 可证实公平协议等，详见 v0.2 第9节。
+- 训练/对战应固定引用规则 ID/版本与完整规则快照；在歧义解决并有测试用例前保持 `enabled=false`。
 
 ## 7. 共享技术设计（建议，非已决定）
 
