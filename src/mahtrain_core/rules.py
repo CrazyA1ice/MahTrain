@@ -179,13 +179,12 @@ def score_win(
     seven = _seven_pairs(concealed, len(melds))
     dragon = seven and any(v == 4 for v in all_counts.values())
     pure = len({tile[0] for tile in all_counts}) == 1
+    pung_partitions = _pung_partitions_for_validation(concealed, len(melds))
     all_pungs = (
-        not seven and len(melds) <= 4
+        not seven
+        and bool(pung_partitions)  # all([]) is True; no partition means NO all-pungs.
         and all(m["type"] in MELD_KINDS | {"peng"} for m in melds)
-        and all(
-            all(count == 3 for count in part)
-            for part in _pung_partitions_for_validation(concealed, len(melds))
-        )
+        and any(all(count == 3 for count in part) for part in pung_partitions)
     )
     # Four declared pungs/kongs plus a concealed pair is 'golden hook'.
     gold = (
