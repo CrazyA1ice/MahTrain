@@ -14,13 +14,14 @@
 
 ## 设计文档
 
-- [项目初版设计稿 v0.1](docs/PROJECT_DESIGN_V0.1.md) — 功能细分、概率口径、核心架构、接口草案、开发里程碑和待确认问题。
-- [四川血战到底规则说明 v0.2（当前有效）](docs/SICHUAN_BLOOD_BATTLE_RULES_V0.2.md) — 已替代前一版，完整整理强制换三张、定缺、血战流程、番型、杠钱和流局结算。
-- [v0.2 JSON 规则配置草案](configs/rulesets/sichuan_blood_battle_v0.2.draft.json) — draft、enabled=false，规则细节核验前不启用。
-- [作废规则 v0.1 说明](docs/SICHUAN_BLOOD_BATTLE_RULES_DRAFT_V0.1.md) — 历史版本，禁止使用。
+- [项目初版设计稿](docs/PROJECT_DESIGN_V0.1.md) — 训练与人机对战整体功能、牌效算法、里程碑。
+- [**四川血战到底规则 v0.3（当前唯一有效）**](docs/SICHUAN_BLOOD_BATTLE_RULES_V0.3.md) — 完整玩法、天听、金钩钓、复合计番、加番后统一封顶、流局结算。
+- [**v0.3 JSON 配置草案**](configs/rulesets/sichuan_blood_battle_v0.3.draft.json) — 尚待个别边界校验，`draft / enabled=false`。
+- [v0.2 规则说明（已废弃）](docs/SICHUAN_BLOOD_BATTLE_RULES_V0.2.md) — 只作为版本迁移入口；禁止用于实现。
+- [v0.1 规则说明（已废弃）](docs/SICHUAN_BLOOD_BATTLE_RULES_DRAFT_V0.1.md) — 只作为版本迁移入口。
 
 ## 仓库资源
 
 - `assets/tiles/`：已有万、条、筒各 1～9 的牌面图片；页面设计优先复用并确认其许可。
 
-后续实施遵循 **M0 完成 v0.2 血战规则验证 → M1 计算核心 → M2/M3 牌效训练 → M4 人机对战**。当前最新规则明确：庄家14张/其他13张/余牌55张、强制换三张、定缺、禁吃、三类杠计分、天听与清七对等。部分番数与特殊结算边界仍需确认。
+后续实施遵循 **M0 完成 v0.3 血战规则校验 → M1 计算核心 → M2/M3 牌效训练 → M4 人机对战**。已确认平胡0番、天听可复合、金钩钓2番与特定叠番、天胡/地胡/清七对4番、清龙七对5番、所有加番后统一按房间上限（默认3番）封顶；墙尽且≥2活跃玩家查花猪和大叫。细节尚有少量待确认项。
