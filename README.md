@@ -12,16 +12,28 @@
 - **人机对战**：1 人对 3 AI，多种难度、多局积分结算。
 - **可配置玩法**：通过规则预设管理川麻的定缺、换三张、胡牌、续局和算分细则。
 
-## 设计文档
+## 规则与项目文档
 
-- [项目初版设计稿](docs/PROJECT_DESIGN_V0.1.md) — 训练与人机对战整体功能、牌效算法、里程碑。
-- [**四川血战到底规则 v0.3（当前唯一有效）**](docs/SICHUAN_BLOOD_BATTLE_RULES_V0.3.md) — 完整玩法、天听、金钩钓、复合计番、加番后统一封顶、流局结算。
-- [**v0.3 JSON 配置草案**](configs/rulesets/sichuan_blood_battle_v0.3.draft.json) — 尚待个别边界校验，`draft / enabled=false`。
-- [v0.2 规则说明（已废弃）](docs/SICHUAN_BLOOD_BATTLE_RULES_V0.2.md) — 只作为版本迁移入口；禁止用于实现。
-- [v0.1 规则说明（已废弃）](docs/SICHUAN_BLOOD_BATTLE_RULES_DRAFT_V0.1.md) — 只作为版本迁移入口。
+- [项目设计稿](docs/PROJECT_DESIGN_V0.1.md) — 训练、AI对战、局部最优切、开发分期。
+- [**四川血战到底 v0.4 当前规则说明**](docs/SICHUAN_BLOOD_BATTLE_RULES_V0.4.md) — 天听不换听口（碰杠本身不取消）、金钩钓清一色天听三重复合6番。
+- [**v0.4 配置草案**](configs/rulesets/sichuan_blood_battle_v0.4.draft.json) — `draft / enabled=false`，未解决所有边界前不得作为正式对战规则。
+- [固定测试牌例（26例）](tests/fixtures/win_fan_cases_v0.4.json) — 胡牌、定缺、七对/龙七对、金钩钓、天听/听口与封顶计番。
+- v0.1、v0.2、v0.3 规则均已作废，其同名旧配置已标记 `superseded`。
+
+## 已开始的代码
+
+`src/mahtrain_core/rules.py`：纯 Python 标准库第一版计算核心，包括普通胡/七对判断、定缺、听牌集合、金钩钓/部分番型识别、天听原听口校验、原始番数与封顶有效番数。仍**没有**完整向听数/有效进张概率、回合状态机、计分账本、AI和页面。
+
+本地运行固定牌例测试：
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+已添加 `.github/workflows/rules-tests.yml`，用于在推送/Pull Request 时尝试自动运行 Python 3.11 与3.13 的单元测试。
 
 ## 仓库资源
 
 - `assets/tiles/`：已有万、条、筒各 1～9 的牌面图片；页面设计优先复用并确认其许可。
 
-后续实施遵循 **M0 完成 v0.3 血战规则校验 → M1 计算核心 → M2/M3 牌效训练 → M4 人机对战**。已确认平胡0番、天听可复合、金钩钓2番与特定叠番、天胡/地胡/清七对4番、清龙七对5番、所有加番后统一按房间上限（默认3番）封顶；墙尽且≥2活跃玩家查花猪和大叫。细节尚有少量待确认项。
+当前开发顺序：**规则 v0.4 + 牌例校验 → 向听数/有效进张/概率引擎 → 普通与清一色训练 → 四人对战状态机及三档 AI**。仅启用已验证且已确认的规则；复杂番型与结算边界仍按 v0.4 待确认事项逐项完善。
