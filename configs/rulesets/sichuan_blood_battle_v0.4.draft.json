@@ -1,0 +1,328 @@
+{
+  "schema_version": "0.4",
+  "ruleset_id": "sichuan_blood_battle_v0.4",
+  "display_name": "四川麻将·血战到底（规则 v0.4 草案）",
+  "state": "draft",
+  "enabled": false,
+  "replaces_ruleset_id": "sichuan_blood_battle_v0.3",
+  "documentation": "docs/SICHUAN_BLOOD_BATTLE_RULES_V0.4.md",
+  "deck": {
+    "suits": [
+      "wan",
+      "tiao",
+      "tong"
+    ],
+    "ranks_per_suit": 9,
+    "copies_per_tile": 4,
+    "total_tiles": 108,
+    "flowers": false,
+    "honor_tiles": false
+  },
+  "seats": {
+    "count": 4,
+    "human": 1,
+    "ai": 3,
+    "random_dealer_each_hand": true,
+    "dealer_starting_tiles": 14,
+    "non_dealer_starting_tiles": 13,
+    "initial_wall_tiles": 55,
+    "dealer_first_action": "discard_after_exchange_and_dingque"
+  },
+  "fair_randomness": {
+    "require_verifiable_fairness": true,
+    "requested_method": "VRF_plus_provably_fair",
+    "protocol_specification": null,
+    "seed_audit_required": true
+  },
+  "starting_phase": {
+    "exchange_three": {
+      "required": true,
+      "simultaneous_selection": true,
+      "tiles_per_player": 3,
+      "must_be_same_suit": true,
+      "direction_random_each_hand": true,
+      "directions": [
+        "clockwise",
+        "counterclockwise",
+        "across"
+      ],
+      "selection_visibility": "hidden_until_all_submitted"
+    },
+    "declare_missing_suit": {
+      "required": true,
+      "occurs_after_exchange": true,
+      "suit_choices": [
+        "wan",
+        "tiao",
+        "tong"
+      ],
+      "fixed_for_hand": true
+    }
+  },
+  "moves": {
+    "chi": false,
+    "peng": true,
+    "peng_disallowed_for_missing_suit": true,
+    "kong": true,
+    "kong_disallowed_for_missing_suit": null,
+    "self_draw": true,
+    "ron": true,
+    "multi_ron": true,
+    "claimed_priority": [
+      "hu_all_claimants",
+      "kong",
+      "peng",
+      "next_draw"
+    ],
+    "on_peng": "discard_without_extra_draw"
+  },
+  "winning": {
+    "format": [
+      "four_melds_one_pair",
+      "seven_pairs"
+    ],
+    "must_not_contain_declared_missing_suit": true,
+    "max_suits_in_winning_hand": 2,
+    "seven_pairs_open_melds_allowed": false,
+    "basic_fan_combination": "highest_structural_fan_plus_explicit_legal_combinations",
+    "pairwise_non_stacking": "structural_patterns_max_only_except_explicit_allowed_stack",
+    "explicit_stack_rules": {
+      "heavenly_ready_tenting": "add_2_to_eligible_other_pattern",
+      "golden_hook_plus_pure_suit": "2+2=4_before_cap",
+      "golden_hook_plus_heavenly_ready_tenting": "2+2=4_before_cap",
+      "golden_hook_plus_all_pungs": "forbidden",
+      "golden_hook_plus_pure_all_pungs": "forbidden",
+      "golden_hook_pure_suit_heavenly_ready_triple": "2+2+2=6_before_root_bonuses_and_room_cap"
+    }
+  },
+  "basic_fan": {
+    "pinghu": {
+      "fan": 0,
+      "category": "zero_fan",
+      "note": "confirmed: 0番 = 1倍底分"
+    },
+    "all_pungs": {
+      "fan": 1
+    },
+    "pure_suit": {
+      "fan": 2
+    },
+    "seven_pairs": {
+      "fan": 2
+    },
+    "heavenly_ready_tenting": {
+      "fan": 2,
+      "only_non_dealer": true,
+      "start_after_exchange": true,
+      "can_stack_with_other_hand_types": true,
+      "no_hand_change_definition": "keep_exact_same_full_wait_tile_set_as_post_exchange_initial_13_tiles_throughout_draw_discard_decisions",
+      "note": "换三张之后13张即听; 保持条件需详细定义, 不得假定与碰杠兼容",
+      "peng_kong_revoke_eligibility_automatically": false,
+      "check_wait_set_at_stable_13_effective_tile_states": true,
+      "first_wait_set_captured": "after_exchange_three_before_dealer_first_discard",
+      "required_proof": "verified_action_trace_not_user_boolean"
+    },
+    "pure_all_pungs": {
+      "fan": 3
+    },
+    "dragon_seven_pairs": {
+      "fan": 3,
+      "base_seven_pairs_not_added": true,
+      "subtract_one_root": true
+    },
+    "heavenly_win": {
+      "fan": 4,
+      "trigger": "dealer_has_legal_win_with_starting_14_before_first_discard",
+      "exact_timing_relative_to_exchange": null
+    },
+    "earth_win": {
+      "fan": 4,
+      "trigger": "non_dealer_wins_on_dealer_first_discard"
+    },
+    "pure_dragon_seven_pairs": {
+      "fan": 5,
+      "subtract_one_root": true
+    },
+    "pure_seven_pairs": {
+      "fan": 4
+    },
+    "golden_hook": {
+      "fan": 2,
+      "requirement": "exactly_four_exposed_peng_or_kong_melds_and_one_concealed_tile_waiting_for_pair",
+      "win_methods": [
+        "self_draw",
+        "ron"
+      ],
+      "stack_allowed_with": [
+        "pure_suit",
+        "heavenly_ready_tenting"
+      ],
+      "stack_forbidden_with": [
+        "all_pungs",
+        "pure_all_pungs"
+      ],
+      "pairwise_stack_with_pure_suit_raw_fan": 4,
+      "pairwise_stack_with_heavenly_ready_raw_fan": 4,
+      "triple_stack_decision": true,
+      "note": "复合番采用明确例外; 避免以对对胡/清对再次重复计分",
+      "triple_stack_golden_hook_pure_suit_tian_ting_raw_fan": 6
+    }
+  },
+  "extra_fan": {
+    "kong_bloom": 1,
+    "kong_discard_ron": 1,
+    "rob_added_kong": 1,
+    "per_root": 1,
+    "special_dragon_root_deduction": 1,
+    "fan_cap_after_extra_fan": true
+  },
+  "scoring": {
+    "fan_multiplier_formula": "2 ** effective_fan",
+    "configurable_fan_cap": true,
+    "default_fan_cap": 3,
+    "room_coefficient": null,
+    "kong_base_equal_room_coefficient": null,
+    "payment_per_player": "room_coefficient * 2 ** effective_fan",
+    "ron": {
+      "payer": "discarder",
+      "payee": "each_winner_individually"
+    },
+    "multi_ron": {
+      "independent_payments": true
+    },
+    "self_draw": {
+      "payers": "other_unwon_active_players",
+      "payee": "winner",
+      "payer_count_decreases_after_wins": true
+    },
+    "kongs": {
+      "open_kong": {
+        "payer": "discarder",
+        "multiples_of_base": 2
+      },
+      "concealed_kong": {
+        "payers": "other_active_players",
+        "multiples_of_base_per_payer": 2
+      },
+      "added_kong": {
+        "payers": "other_active_players",
+        "multiples_of_base_per_payer": 1
+      },
+      "replacement_draw_from": "wall_tail",
+      "kong_discard_ron": {
+        "bonus_fan_to_winner": 1,
+        "kong_invalidated": true,
+        "refund_timing": null
+      },
+      "rob_added_kong": {
+        "bonus_fan_to_winner": 1,
+        "kong_invalidated": true,
+        "payment_rule": null
+      }
+    },
+    "quoted_total_extremes": {
+      "winner_multiples": 48,
+      "loser_multiples": 40,
+      "is_hard_cap": null
+    },
+    "fan_cap_pipeline": {
+      "raw_total_fan": "select highest legal structural combination plus explicitly stackable patterns plus all applicable extra_fan",
+      "effective_fan": "min(raw_total_fan, default_fan_cap or room_configured_cap)",
+      "multiplier": "2 ** effective_fan",
+      "apply_cap_after_extra_fan": true
+    },
+    "examples_untruncated_raw_fan": {
+      "golden_hook_plus_pure_suit": 4,
+      "golden_hook_plus_heavenly_ready": 4,
+      "heavenly_win": 4,
+      "earth_win": 4,
+      "pure_seven_pairs": 4,
+      "pure_dragon_seven_pairs": 5,
+      "golden_hook_plus_pure_suit_plus_heavenly_ready": 6
+    },
+    "examples_with_default_three_fan_cap": {
+      "golden_hook_pure_suit": {
+        "raw": 4,
+        "effective": 3,
+        "multiplier": 8
+      },
+      "pure_dragon_seven_pairs": {
+        "raw": 5,
+        "effective": 3,
+        "multiplier": 8
+      },
+      "golden_hook_pure_suit_tian_ting": {
+        "raw": 6,
+        "effective": 3,
+        "multiplier": 8
+      }
+    }
+  },
+  "gameplay": {
+    "type": "blood_battle",
+    "winners_leave_play": true,
+    "max_number_of_winners": 3,
+    "ends_if_winners_count_gte": 3,
+    "ends_on_wall_exhausted": true,
+    "draw_if_previous_winners_exist": true
+  },
+  "draw_settlement": {
+    "process_order": [
+      "flower_pig",
+      "maximum_tenpai"
+    ],
+    "enabled_when_no_winners_and_wall_exhausted": true,
+    "enabled_when_some_winners_and_wall_exhausted": true,
+    "flower_pig": {
+      "three_suits_condition": false,
+      "missing_suit_tile_also_qualifies": true,
+      "include_exposed_melds": null,
+      "payment_multiples_of_room_coefficient": 8,
+      "each_flower_pig_pays_each_non_flower_pig": true,
+      "flower_pigs_excluded_from_maximum_tenpai": true,
+      "condition": "player_still_has_any_tile_of_their_declared_missing_suit"
+    },
+    "maximum_tenpai": {
+      "non_flower_pig_non_tenpai_pays_tenpai": true,
+      "receiver_basis": "their_maximum_possible_legal_fan",
+      "fan_cap": 3,
+      "count_previously_won_players": null,
+      "probability_aware_tile_availability": null,
+      "bonus_fan_included_in_max_possible": null,
+      "fan_cap_uses_room_setting": true
+    },
+    "trigger": {
+      "on_wall_exhausted": true,
+      "require_active_unwon_players_at_least": 2,
+      "prior_wins_do_not_prevent_draw_checks": true
+    }
+  },
+  "training": {
+    "optimization_goal": "local_optimal_discard",
+    "disallow_shanten_regression": true,
+    "sort_then_by": "effective_tile_count",
+    "score_awareness": "only_after_rules_confirmed",
+    "single_session_draw_discard_rounds": 14,
+    "no_cheating_hidden_info": true,
+    "question_assumes_exchange_and_dingque_already_complete": null
+  },
+  "confirmation_required": [
+    "settlement_eligibility_of_previous_winners",
+    "flower_pig_scope_including_exposed_melds",
+    "concrete_heavenly_win_timing_relative_to_exchange",
+    "kong_base_equals_room_coefficient_and_refund_method",
+    "missing_suit_kong_and_forced_missing_suit_discard",
+    "rob_added_kong_payment",
+    "root_count_for_multiple_dragons",
+    "maximum_possible_fan_on_draw",
+    "win_loss_extremes_hard_or_descriptive",
+    "VRF_fairness_protocol",
+    "tian_ting_stable_checkpoint_timing_during_complex_call_reaction_state"
+  ],
+  "validation": {
+    "fixtures": "tests/fixtures/win_fan_cases_v0.4.json",
+    "test_command": "python -m unittest discover -s tests -v",
+    "kernel": "src/mahtrain_core/rules.py",
+    "scope": "win_waits_and_selected_scoring_only"
+  }
+}
