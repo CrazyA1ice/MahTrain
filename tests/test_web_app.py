@@ -431,7 +431,12 @@ class WebUI(unittest.TestCase):
                 data=self.post({"action":"quiz_new","mode":mode,
                     "difficulty":"basic","focus":focus})
                 question=data["question"]
-                self.assertEqual(question["focus"],focus)
+                public=("win_decision" if focus in ("missed_win",
+                       "false_win") else focus)
+                self.assertEqual(question["focus"],public)
+                if public=="win_decision":
+                    self.assertNotIn("missed_win",json.dumps(question))
+                    self.assertNotIn("false_win",json.dumps(question))
                 self.assertNotIn("seed",question)
                 self.assertNotIn("best_actions",question)
                 self.assertNotIn("correct_tiles",question)
