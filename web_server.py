@@ -29,6 +29,7 @@ _STATIC = {
     "/": ROOT / "web" / "index.html",
     "/app.css": ROOT / "web" / "app.css",
     "/app.js": ROOT / "web" / "app.js",
+    "/review.js": ROOT / "web" / "review.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
