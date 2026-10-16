@@ -115,6 +115,8 @@
           <label>试验局种子 <input id="match-seed" type="number" min="0" max="4294967295" value="42"/></label>
           <label>房间系数 <input id="match-coefficient" type="number" min="1" max="1000000" value="100"/></label>
           <label>番数封顶 <input id="match-fan-cap" type="number" min="0" max="12" value="3"/></label>
+          <label class="match-kong-toggle"><input id="match-enable-kong" type="checkbox"/> 启用独立杠钱模拟</label>
+          <label>杠钱底分 <input id="match-kong-base" type="number" min="1" max="1000000" value="100" disabled/></label>
           <button id="match-new" type="button" class="primary">开始响应试验</button>
         </div>
         <p id="match-error" class="review-attention" aria-live="polite"></p>
