@@ -238,6 +238,8 @@ class FourPlayerClaimsTests(unittest.TestCase):
         self.assertEqual(g._effective(d),14)
         self.assertEqual(g.private_view(d)["own_melds"][0]["tile"],"m9")
         self.assertIsNone(g.public_state()["melds"][d][0]["tile"])
+        self.assertNotIn("tile",next(e for e in g.public_state()["events"]
+                            if e["type"]=="an_gang"))
         self.assertIn(old_tail,g.private_view(d)["hand"])
         self.assertEqual(g.public_state()["wall_count"],54)
         self.assertEqual(g.debug_tile_counts()["total"],108)
