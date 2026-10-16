@@ -126,6 +126,38 @@ def _take_action(game: FourPlayerOpening, agents: dict[int, MahjongAgent],
     raise RuntimeError("unexpected phase in multi-agent trial: "+str(phase))
 
 
+
+def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict[str, Any]:
+    """Capture PUBLIC board after this action. No seat-private effective draws.
+
+    The trace still retains post-game metrics for aggregate benchmarking, but
+    browser replay explicitly excludes opponent shanten and claim options.
+    """
+    state=game.public_state()
+    visible_action={
+        k:v for k,v in action.items()
+        if k in ("phase","seat","level","action","tile","source","suit","count")
+    }
+    # Even when a concealed kong's server-side trace gains a tile later,
+    # its public replay may never reveal the tile.
+    if action.get("action")=="an_gang":
+        visible_action.pop("tile",None)
+    return {
+        "action":visible_action,
+        "board":{
+            "phase":state["phase"],"turn":state["turn"],
+            "dealer":state["dealer"],"wall_count":state["wall_count"],
+            "hand_counts":state["hand_counts"],"missing_suits":state["missing_suits"],
+            "won":state["won"],"melds":state["melds"],
+            "discards":state["discards"],
+            "winners":[
+                {"seat":w["seat"],"source":w["source"],"kind":w["kind"]}
+                for w in state["winners"]
+            ],
+        },
+    }
+
+
 def simulate_match(seed: int, rotation: int = 0,
                    *, max_actions: int = 800) -> dict[str, Any]:
     if type(seed) is not int or not 0 <= seed < 2**32:
@@ -137,6 +169,7 @@ def simulate_match(seed: int, rotation: int = 0,
     agents={seat:MahjongAgent(assignment[seat],seed=seed,seat=seat)
             for seat in range(4)}
     trace=[]
+    frames=[]
     durations=defaultdict(list)
     for seat in range(4):
         proposed=agents[seat].exchange(game.private_view(seat))
@@ -144,16 +177,19 @@ def simulate_match(seed: int, rotation: int = 0,
         trace.append({"phase":"exchange_select","seat":seat,
                       "level":assignment[seat],"action":"exchange_three",
                       "count":3})
+        frames.append(public_replay_frame(game,trace[-1]))
     for seat in range(4):
         suit=agents[seat].missing(game.private_view(seat))
         game.select_missing(seat,suit)
         trace.append({"phase":"missing_select","seat":seat,
                       "level":assignment[seat],"action":"declare_missing",
                       "suit":suit})
+        frames.append(public_replay_frame(game,trace[-1]))
     for _ in range(max_actions):
         if game.phase in ("wall_exhausted","finished"):
             break
         _take_action(game,agents,trace,durations)
+        frames.append(public_replay_frame(game,trace[-1]))
     else:
         raise RuntimeError(
             f"trial exceeded {max_actions} actions, seed={seed}, rotation={rotation}"
@@ -187,6 +223,7 @@ def simulate_match(seed: int, rotation: int = 0,
         ),
         "public_events":board["events"],
         "trace":trace,
+        "public_replay":frames,
         "timings_ms":{level:round(mean(values),4)
                       for level,values in durations.items() if values},
         "physical_count":conservation["total"],
@@ -194,11 +231,16 @@ def simulate_match(seed: int, rotation: int = 0,
 
 
 def tournament(seed_start: int = 0, seeds: int = 2,
-               *, include_traces: bool = True) -> dict[str, Any]:
+               *, include_traces: bool = True,
+               on_match: Any = None) -> dict[str, Any]:
     _validate(seed_start,seeds)
-    games=[simulate_match(seed,rotation)
-           for seed in range(seed_start,seed_start+seeds)
-           for rotation in range(3)]
+    games=[]
+    for seed in range(seed_start,seed_start+seeds):
+        for rotation in range(3):
+            game=simulate_match(seed,rotation)
+            games.append(game)
+            if on_match is not None:
+                on_match(len(games),seeds*3)
     by_level={}
     for level in AI_LEVELS:
         seats=[(game,seat) for game in games
@@ -268,7 +310,8 @@ def tournament(seed_start: int = 0, seeds: int = 2,
         ],
         "levels":by_level,
         "matches":games if include_traces else [
-            {k:v for k,v in g.items() if k not in ("trace","public_events")}
+            {k:v for k,v in g.items()
+             if k not in ("trace","public_events","public_replay")}
             for g in games
         ],
     }
