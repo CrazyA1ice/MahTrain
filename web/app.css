@@ -261,3 +261,20 @@
 @media(max-width:600px){.quiz-history-metric{padding:10px}
 .quiz-history-metric strong{font-size:16px}
 .quiz-history-entry{padding:9px}}
+
+
+/* M2.8: evidence-based misplay taxonomy and focus selectors. */
+.quiz-weaknesses{background:#f5faf6;border:1px solid #d8e5da;
+  border-radius:13px;padding:16px;margin:12px 0 21px}
+.quiz-weaknesses h4{font-size:16px;color:#294f3a;margin:0 0 7px}
+.quiz-weakness-grid{display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin:12px 0}
+.quiz-weakness-item{display:flex;flex-direction:column;gap:5px;
+  border:1px solid #dce7dd;border-radius:10px;padding:11px;background:#fff}
+.quiz-weakness-item strong{font-size:13px;color:#345943}
+.quiz-weakness-item span{font-size:12px;color:#728776}
+.quiz-weakness-item button{margin-top:auto}
+.quiz-focus-tag{font-size:13px;background:#e3f2e5;color:#28573e;
+  border-radius:8px;border:1px solid #c6dfcd;padding:9px 12px;font-weight:700}
+.quiz-focus-error{font-size:13px;color:#a25e28;background:#fff2de;
+  border:1px solid #ead5b2;padding:9px 12px;border-radius:8px}
