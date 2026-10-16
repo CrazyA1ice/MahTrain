@@ -10,7 +10,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mahtrain_core import analyze_discards  # noqa: E402
+from mahtrain_core import analyze_discards, format_hand, sort_hand  # noqa: E402
 
 LABEL = {"m": "万", "s": "条", "p": "筒"}
 
@@ -28,7 +28,7 @@ def main() -> None:
         + ["m9", "p9"]
     )
     missing_suit = "s"  # 当前玩家定缺条
-    print("手牌:", " ".join(chinese(x) for x in hand))
+    print("理牌:", format_hand(hand))
     print("定缺:", LABEL[missing_suit])
     result = analyze_discards(hand, missing_suit=missing_suit)
     if result["status"] == "already_winning":
@@ -39,14 +39,14 @@ def main() -> None:
         probability = f"{row['next_draw_probability']:.2%}"
         effective = ",".join(
             f"{chinese(item['tile'])}×{item['remaining']}"
-            for item in row["effective_details"]
+            for item in sorted(row["effective_details"], key=lambda item: (("m", "s", "p").index(item["tile"][0]), -int(item["tile"][1:])))
         ) or "无"
         print(
             f"{chinese(row['discard']):4} | {row['shanten']:4} | "
             f"{row['effective_tile_count']:4}张 ({effective}) | "
             f"{probability:>8} | {'是' if row['local_optimal'] else '否'}"
         )
-    print("局部最优切:", "、".join(chinese(t) for t in result["best_discards"]))
+    print("局部最优切:", "、".join(chinese(t) for t in sort_hand(result["best_discards"])))
 
 
 if __name__ == "__main__":
