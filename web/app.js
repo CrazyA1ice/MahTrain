@@ -232,6 +232,7 @@ function renderFeedback(feedback) {
 
 function renderReport(report) {
   window.MahTrainReview.render(report, tileName);
+  window.MahTrainRetry.render(report);
 }
 
 function render(state,feedback=null,report=null) {
@@ -297,3 +298,6 @@ $("#sound-toggle").addEventListener("click",()=>{
   if(next)playSound("draw");
 });
 
+
+// Controlled view helpers for the independent mistake-replay panel.
+window.MahTrainUI = {getToken:()=>token, tileElement, tileName};
