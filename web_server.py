@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from mahtrain_core import SoloTrainingSession, FourPlayerOpening  # noqa: E402
+from mahtrain_core.ai import MahjongAgent, AI_LEVELS  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
 from mahtrain_core.training_levels import DIFFICULTIES
 from mahtrain_core.error_focus import (
@@ -37,6 +38,7 @@ _SESSIONS: dict[str, SoloTrainingSession] = {}
 _QUIZZES: dict[str, dict] = {}
 _TABLE_DEMOS: dict[str, FourPlayerOpening] = {}
 _MATCH_SESSIONS: dict[str, FourPlayerOpening] = {}
+_MATCH_AGENTS: dict[str, dict[int, MahjongAgent]] = {}
 _LOCK = threading.RLock()
 _MAX_SESSIONS = 32
 _STATIC = {
@@ -108,15 +110,29 @@ def _demo_auto_until_human(game: FourPlayerOpening) -> None:
     raise RuntimeError("demo autoplay failed to reach human turn")
 
 
-def _match_script_until_human(game: FourPlayerOpening) -> None:
-    """Three transparently scripted seats. Human is seat 0 only.
+def _match_private_view(game: FourPlayerOpening,
+                        agents: dict[int, MahjongAgent]) -> dict:
+    """Send seat 0 ONLY: published AI level/strategy, never AI hidden cards."""
+    view = game.private_view(0)
+    view["ai_opponents"] = [
+        {"seat": seat, "difficulty": agents[seat].level,
+         "description": agents[seat].policy_description()}
+        for seat in (1, 2, 3)
+    ]
+    return view
 
-    Script responds with legal HU > gang > peng. It never reads hidden data
-    to decide the human's response; only own private state is inspected.
-    The human's optional HU/peng/ming_gang/rob response is never skipped.
+
+def _match_script_until_human(
+    game: FourPlayerOpening, agents: dict[int, MahjongAgent],
+) -> None:
+    """Run three fair-visibility heuristic opponents until seat zero can act.
+
+    Rule engine alone can adjudicate all legal claims and response priority;
+    each bot chooses from its OWN seat-authorized private view and public
+    state, never hidden wall, other hands or opponents' secret W0.
     """
     for _ in range(512):
-        phase=game.phase
+        phase = game.phase
         if phase in ("exchange_select", "missing_select",
                      "finished", "wall_exhausted"):
             return
@@ -124,35 +140,27 @@ def _match_script_until_human(game: FourPlayerOpening) -> None:
             for seat in range(4):
                 if game._won[seat]:
                     continue
+                source = (game._pending_discard["seat"] if phase=="claim_window"
+                          else game._pending_kong["seat"])
+                if seat==source or seat in game._responses:
+                    continue
+                view=game.private_view(seat)
+                options = (view["claim_options"] if phase=="claim_window"
+                           else view["rob_options"])
+                if seat==0 and len(options)>1:
+                    return  # Human must decide; no implicit missed HU.
+                selection=("pass" if seat==0 else
+                           agents[seat].response(view,
+                               rob=(phase=="rob_kong_window")))
                 if phase=="claim_window":
-                    if game._pending_discard["seat"]==seat:
-                        continue
-                    if seat in game._responses:
-                        continue
-                    available=game.claim_options(seat)
+                    game.respond_discard(seat,selection)
                 else:
-                    if game._pending_kong["seat"]==seat:
-                        continue
-                    if seat in game._responses:
-                        continue
-                    available=game.rob_options(seat)
-                if seat==0 and len(available)>1:
-                    return  # show human an actual yes/no response prompt
-                if seat==0:
-                    pick="pass"
-                else:
-                    pick=next((x for x in ("hu","ming_gang","peng")
-                               if x in available),"pass")
-                if phase=="claim_window":
-                    game.respond_discard(seat,pick)
-                else:
-                    game.respond_rob_kong(seat,pick)
+                    game.respond_rob_kong(seat,selection)
                 if game.phase!=phase:
                     break
             else:
-                # Window still open (e.g. no eligible human) cannot spin.
                 if game.phase==phase:
-                    raise RuntimeError("scripted responses did not settle")
+                    raise RuntimeError("AI response arbitration did not settle")
             continue
         if phase=="await_draw":
             game.draw(game.turn)
@@ -161,21 +169,19 @@ def _match_script_until_human(game: FourPlayerOpening) -> None:
             if game.turn==0:
                 return
             seat=game.turn
-            if game.private_view(seat)["can_self_draw_win"]:
+            view=game.private_view(seat)
+            agent=agents[seat]
+            if view["can_self_draw_win"]:
                 game.declare_self_win(seat)
                 continue
-            kongs=game.kong_options(seat)
-            if kongs:
-                choice=kongs[0]
-                game.declare_kong(seat,choice["type"],choice["tile"])
+            chosen_kong=agent.kong(view)
+            if chosen_kong is not None:
+                game.declare_kong(seat, chosen_kong["type"],chosen_kong["tile"])
                 continue
-            hand=game.private_view(seat)["hand"]
-            missing=game.missing_suits[seat]
-            tile=next((t for t in hand if t.startswith(missing)),hand[0])
-            game.discard(seat,tile)
+            game.discard(seat,agent.discard(view))
             continue
-        raise RuntimeError("unexpected M3.1 match phase: "+str(phase))
-    raise RuntimeError("M3.1 script exceeded 512 transitions")
+        raise RuntimeError("unexpected AI match phase: "+str(phase))
+    raise RuntimeError("AI script exceeded 512 transitions")
 
 
 def _process(action: str, payload: dict) -> dict:
@@ -184,54 +190,67 @@ def _process(action: str, payload: dict) -> dict:
             seed=payload.get("seed",42)
             if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
                 raise ValueError("M3.1 四人试验局种子须为0至2^32-1")
+            levels=payload.get("ai_levels",["basic","advanced","challenge"])
+            if (type(levels) is not list or len(levels)!=3 or
+                any(type(level) is not str or level not in AI_LEVELS
+                    for level in levels)):
+                raise ValueError("三位AI必须分别选择入门、进阶或挑战难度")
             game=FourPlayerOpening(
                 seed,
                 room_coefficient=payload.get("room_coefficient",100),
                 fan_cap=payload.get("fan_cap",3),
                 kong_base=payload.get("kong_base"),
             )
+            agents={
+                seat: MahjongAgent(levels[seat-1],seed=seed,seat=seat)
+                for seat in (1,2,3)
+            }
             token=secrets.token_urlsafe(24)
             if len(_MATCH_SESSIONS)>=32:
-                _MATCH_SESSIONS.pop(next(iter(_MATCH_SESSIONS)))
+                stale=next(iter(_MATCH_SESSIONS))
+                _MATCH_SESSIONS.pop(stale)
+                _MATCH_AGENTS.pop(stale,None)
             _MATCH_SESSIONS[token]=game
-            return {"match_token":token,"match":game.private_view(0)}
+            _MATCH_AGENTS[token]=agents
+            return {"match_token":token,
+                    "match":_match_private_view(game,agents)}
         if action in ("match_exchange","match_missing","match_discard",
                       "match_claim","match_kong","match_rob","match_win"):
             token=payload.get("match_token")
             game=(_MATCH_SESSIONS.get(token) if type(token) is str else None)
             if game is None:
                 raise ValueError("试验对局不存在，请重新开局")
+            agents=_MATCH_AGENTS.get(token)
+            if agents is None:
+                raise ValueError("试验对局AI未初始化，请重新开局")
             if action=="match_exchange":
                 game.select_exchange(0,payload.get("tiles"))
                 for s in (1,2,3):
-                    game.select_exchange(s,_demo_exchange_choice(
-                        game.private_view(s)["hand"]))
+                    game.select_exchange(
+                        s,agents[s].exchange(game.private_view(s)))
             elif action=="match_missing":
                 game.select_missing(0,payload.get("suit"))
                 for s in (1,2,3):
-                    cards=game.private_view(s)["hand"]
-                    suit=min(("m","s","p"),key=lambda x:(
-                        sum(t.startswith(x) for t in cards),
-                        ("m","s","p").index(x)
-                    ))
-                    game.select_missing(s,suit)
-                _match_script_until_human(game)
+                    game.select_missing(
+                        s,agents[s].missing(game.private_view(s)))
+                _match_script_until_human(game,agents)
             elif action=="match_discard":
                 game.discard(0,payload.get("tile"))
-                _match_script_until_human(game)
+                _match_script_until_human(game,agents)
             elif action=="match_claim":
                 game.respond_discard(0,payload.get("choice"))
-                _match_script_until_human(game)
+                _match_script_until_human(game,agents)
             elif action=="match_rob":
                 game.respond_rob_kong(0,payload.get("choice"))
-                _match_script_until_human(game)
+                _match_script_until_human(game,agents)
             elif action=="match_kong":
                 game.declare_kong(0,payload.get("kind"),payload.get("tile"))
-                _match_script_until_human(game)
+                _match_script_until_human(game,agents)
             elif action=="match_win":
                 game.declare_self_win(0)
-                _match_script_until_human(game)
-            return {"match_token":token,"match":game.private_view(0)}
+                _match_script_until_human(game,agents)
+            return {"match_token":token,
+                    "match":_match_private_view(game,agents)}
         if action == "table_new":
             seed = payload.get("seed", 42)
             if type(seed) is not int or not 0 <= seed <= 2**32-1:
