@@ -101,6 +101,19 @@ jobs:
             /tmp/mahtrain-ai-independent.json
             /tmp/mahtrain-ai-independent.csv
           if-no-files-found: warn
+      - name: Smoke-test M3.10 controlled challenge ablations
+        run: |
+          python examples/benchmark_ai_ablation.py --seed-start 11 --seeds 1 --json-out /tmp/mahtrain-ai-ablation.json --csv-out /tmp/mahtrain-ai-ablation.csv
+          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-ablation.json',encoding='utf8')); assert d['games']==8; assert d['independent_shuffle_seeds']==1; assert all(all(s['exposures']==4 for s in c['levels'].values()) for c in d['cohorts'].values()); assert all(c['intervals'] is None for c in d['cohorts'].values())"
+      - name: Archive M3.10 controlled ablation summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-ablation-python-${{ matrix.python-version }}
+          path: |
+            /tmp/mahtrain-ai-ablation.json
+            /tmp/mahtrain-ai-ablation.csv
+          if-no-files-found: warn
       - name: Smoke-test deterministic four-seat opening
         run: |
           python examples/four_player_opening_demo.py --seed 42 --turns 8
