@@ -69,7 +69,7 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"sound-toggle", html)
         atlas, atlas_kind = self.get("/assets/tiles/640x420.jpeg")
         self.assertEqual(atlas_kind, "image/jpeg")
-        self.assertTrue(atlas.startswith(b"\\xff\\xd8\\xff"))
+        self.assertTrue(atlas.startswith(b"\xff\xd8\xff"))
         self.assertIn(b"atlasFace", code)
         self.assertIn(b"backgroundPosition", code)
         self.assertIn(b"showDealtPreview", code)
