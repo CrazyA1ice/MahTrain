@@ -596,6 +596,7 @@ class FourPlayerOpening:
             "prototype_limitations":{
                 "win_payments_only":True,
                 "kong_simulation_optional":True,
+                "kong_payments_pending":self.kong_ledger.base is None,
                 "exhaustive_draw_payments_posted":False,
                 "ai":False,"tian_ting_tracking":True,
                 "exhaustive_draw_settlement":False,
