@@ -59,7 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     print("说明：同花色9→1降序；每种牌最多4张；未知墙牌不会用于推断有效进张。")
     while not session.finished:
         state = session.draw_next()
-        print(f"\\n第{state['current_round']}轮 · 摸到 {name(state['drawn_tile'])}")
+        print(f"\n第{state['current_round']}轮 · 摸到 {name(state['drawn_tile'])}")
         print("理牌：", format_hand(state["hand"]))
         print("已打出的牌：", format_hand(state["discard_history"]) or "（无）")
         print("可选动作：", " ".join(
@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 choice = input("请选择要打的牌（m9/s8/p7）或输入win胡牌：").strip()
             except (EOFError, KeyboardInterrupt):
-                print("\\n已退出，未提交本轮。")
+                print("\n已退出，未提交本轮。")
                 return 1
         try:
             feedback = session.submit(choice)
@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
                 except ValueError as retry_err:
                     print("输入无效：", retry_err)
                 except (EOFError, KeyboardInterrupt):
-                    print("\\n已退出，未提交本轮。")
+                    print("\n已退出，未提交本轮。")
                     return 1
         print(
             "判定：", "正确" if feedback["correct"] else "需改进",
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         print("解析：", feedback["explanation"])
 
     report = session.report()
-    print("\\n===== 连续训练总结 =====")
+    print("\n===== 连续训练总结 =====")
     print("结束原因：", report["finished_reason"])
     print("训练轮数：", report["completed_rounds"])
     print("正确轮数：", report["correct_rounds"])
