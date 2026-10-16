@@ -22,6 +22,13 @@ MahTrain 是一个面向川麻爱好者的本地优先训练/对战产品：
 
 已实现两项计算核心：`src/mahtrain_core/rules.py`（判胡、听牌、特殊番型与天听历史判定）和 `src/mahtrain_core/efficiency.py`（13有效张向听数、有效进张枚数与下一摸概率、14有效张局部最优切及并列排名），配套[29个固定规则/事件测试牌例](../tests/fixtures/win_fan_cases_v0.4.json)、`tests/test_rule_cases.py`、`tests/test_efficiency.py` 和 CI。**尚未实现连续多摸真实胡牌概率、完整对局状态机、计分账本与页面**。天听、天胡、地胡资格必须由游戏事件历史验证，不能仅凭手牌冒充。
 
+### M2.6：单题训练中心与结构难度（2026-10-16）
+
+- **四种单题网页版已接入**：一向听何切、听牌何切、清一色听口多选、清一色何切/已胡，复用完整麻将原图，支持点击牌面提交，服务端隐藏私有种子与标准答案直到提交。
+- **基础/进阶/挑战**：`src/mahtrain_core/training_levels.py` 构造旧版刻子/孤张、新增顺子/双搭子/两面边张嵌张、七对听牌与七对竞争等候选牌形；必须由完整 `shanten_13`、`winning_tiles` 等内核复核真实类别，失败重生成。难度是**结构分级**而非机器学习估计难度。
+- `web/quiz.js` 可交互单题；`web_server.py` 的 `quiz_new/quiz_answer` 将题目随机种子保存在可信服务器并严格限制一次有效提交；详见[单题难度与题型 v0.8](TRAINING_LEVELS_V0.8.md)。
+- **保留未实现项**：单题练习答题记录尚未并入 SQLite 错题本；未对难度进行玩家行为校准；四人换三张/碰杠血战及AI对战仍处于设计阶段。
+
 ### M2.5：本地持久化训练历史（2026-10-16）
 
 - 已新增 `src/mahtrain_core/history.py`，采用Python标准库sqlite3将**已结束训练**（逐轮切牌分析、成绩、判题结果）和重练尝试保存在本机 `data/mahtrain_history.sqlite3`；不保存未完成回合的牌墙或种子。
