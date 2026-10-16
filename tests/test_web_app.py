@@ -61,8 +61,9 @@ class WebUI(unittest.TestCase):
         css, kind = self.get("/app.css")
         self.assertIn(b".kong-area", css)
         art, kind = self.get("/assets/tiles/%E4%B8%871.png")
-        self.assertTrue(art.startswith(b"\x89PNG"))
-        self.assertEqual(kind, "image/png")
+        # Files in this repository use .png names but JPEG signatures.
+        self.assertTrue(art.startswith(b"\xff\xd8\xff"))
+        self.assertEqual(kind, "image/jpeg")
 
     def test_invalid_paths_not_readable(self):
         for route in (
