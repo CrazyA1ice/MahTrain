@@ -146,6 +146,25 @@ def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict
     # revealing each submission as it happens breaks simultaneous disclosure.
     if action.get("action")=="declare_missing":
         visible_action.pop("suit",None)
+    if action.get("phase") in ("claim_window","rob_kong_window"):
+        # Claims/rob decisions are private until arbitration. A player's
+        # "hu", "peng", or "pass" cannot appear as a live public replay action
+        # while other seats have yet to respond.
+        settled=state["phase"]!=action["phase"]
+        visible_action["action"]=(
+            "response_resolved" if settled else "response_submitted"
+        )
+        if settled:
+            public_types={
+                "ron","multi_ron","peng","ming_gang","all_pass",
+                "rob_kong","bu_gang",
+            }
+            public_result=next((
+                e["type"] for e in reversed(state["events"])
+                if e["type"] in public_types
+            ),None)
+            if public_result:
+                visible_action["resolution"]=public_result
     return {
         "action":visible_action,
         "board":{
