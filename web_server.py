@@ -106,7 +106,9 @@ def _process(action: str, payload: dict) -> dict:
         return {
             "state": game.public_state(),
             "feedback": feedback if reveal else None,
-            "report": game.report() if game.finished else None,
+            # Historical answers can be shown once submitted; pending answers
+            # and wall order are never returned.
+            "report": game.report() if game.report()["completed_rounds"] else None,
         }
 
 
@@ -141,7 +143,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._json(200, {
                         "state": game.public_state(),
-                        "report": game.report() if game.finished else None,
+                        "report": game.report() if game.report()["completed_rounds"] else None,
                     })
             return
         asset = _asset_path(path)
