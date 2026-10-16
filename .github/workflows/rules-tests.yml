@@ -38,3 +38,7 @@ jobs:
           python examples/training_quiz.py --mode tenpai_discard --seed 42 --print-only
           python examples/training_quiz.py --mode pure_suit_waits --seed 42 --print-only
           python examples/training_quiz.py --mode pure_suit_discard --seed 0 --print-only
+      - name: Smoke-test continuous solo training
+        run: |
+          python examples/solo_14_rounds.py --seed 17 --rounds 2 --auto
+          python examples/solo_14_rounds.py --seed 17 --rounds 14 --auto
