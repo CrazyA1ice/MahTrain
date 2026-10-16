@@ -96,7 +96,7 @@ def _draw_candidates(
     return choices
 
 
-def _make_hand(mode: str, rng: random.Random) -> tuple[list[str], str]:
+def _make_hand(mode: str, rng: random.Random, force_winning: bool = False) -> tuple[list[str], str]:
     if mode == "pure_suit_waits":
         for _ in range(MAX_ATTEMPTS):
             hand, missing, _ = _pure_ready(rng)
@@ -116,7 +116,7 @@ def _make_hand(mode: str, rng: random.Random) -> tuple[list[str], str]:
             if mode == "pure_suit_discard":
                 # Include already-won situations so the learner must recognize
                 # an immediate legal win, as requested for 清一色何切.
-                if rng.randrange(5) == 0:
+                if force_winning:
                     candidates = winning_tiles(base, missing_suit=missing)
                     if candidates:
                         hand = [*base, rng.choice(candidates)]
@@ -150,7 +150,9 @@ def generate_question(mode: str, seed: int) -> dict[str, Any]:
     the seed to the learner in a real online session.
     """
     _check_args(mode, seed)
-    hand, missing = _make_hand(mode, random.Random(seed))
+    hand, missing = _make_hand(
+        mode, random.Random(seed), force_winning=(mode == "pure_suit_discard" and seed % 5 == 0)
+    )
     choices = (
         [tile for tile in TILES if tile[0] == hand[0][0]]
         if mode == "pure_suit_waits"
