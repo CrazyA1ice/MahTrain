@@ -75,8 +75,8 @@ jobs:
           if-no-files-found: warn
       - name: Smoke-test complete closed-loop AI tournament
         run: |
-          python examples/tournament_ai.py --seed-start 11 --seeds 2 --json-out /tmp/mahtrain-ai-selfplay.json --csv-out /tmp/mahtrain-ai-selfplay.csv
-          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-selfplay.json',encoding='utf8')); assert d['games']==6; assert all(d['levels'][k]['seat_exposures']==8 for k in ('basic','advanced','challenge')); assert all(x['physical_count']==108 for x in d['matches'])"
+          python examples/tournament_ai.py --seed-start 11 --seeds 2 --json-out /tmp/mahtrain-ai-selfplay.json --csv-out /tmp/mahtrain-ai-selfplay.csv --seed-csv-out /tmp/mahtrain-ai-seed-clusters.csv
+          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-selfplay.json',encoding='utf8')); assert d['games']==6; assert all(d['levels'][k]['seat_exposures']==8 for k in ('basic','advanced','challenge')); assert all(x['physical_count']==108 for x in d['matches']); assert d['seed_analysis']['distinct_seed_count']==2; assert d['seed_analysis']['intervals'] is None"
       - name: Archive complete AI self-play logs and metrics
         if: always()
         uses: actions/upload-artifact@v4
@@ -85,6 +85,7 @@ jobs:
           path: |
             /tmp/mahtrain-ai-selfplay.json
             /tmp/mahtrain-ai-selfplay.csv
+            /tmp/mahtrain-ai-seed-clusters.csv
           if-no-files-found: warn
       - name: Smoke-test deterministic four-seat opening
         run: |
