@@ -25,6 +25,60 @@
     p.append(el("b","",label),document.createTextNode(" "+value));
     parent.append(p);
   }
+  const focusTargets={
+    shanten_regression:"one_shanten",
+    ukeire_loss:"tenpai_discard",
+    missed_win:"pure_suit_discard",
+  };
+  function startFocus(type){
+    const mode=focusTargets[type];
+    if(!mode||!window.MahTrainQuiz?.focus)return;
+    const select=$("quiz-mode");
+    if(select.value!==mode){
+      select.value=mode;
+      select.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+    window.MahTrainQuiz.focus(type);
+    $("quiz-center").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  function showErrors(report){
+    const data=report.error_summary;
+    if(!data)return null;
+    const block=el("section","solo-error-summary");
+    block.append(el("h4","","整局错因分析与针对性训练"));
+    block.append(el("p","review-intro","已完成"+
+      report.completed_rounds+"轮，其中"+
+      data.error_rounds+"轮非最优。按本轮原始评分判断，不按跨轮进张变化推断错误。"));
+    const grid=el("div","solo-error-grid");
+    for(const type of ["missed_win","shanten_regression","ukeire_loss","other_error"]){
+      const item=data.counts[type];
+      if(!item)continue;
+      const box=el("div","solo-error-item");
+      box.append(el("strong","",item.label),el("span","",
+        item.count+"轮"+(item.rounds.length?" · 第"+item.rounds.join("、")+"轮":"")));
+      const target=data.recommendations.find(r=>r.error_type===type);
+      if(target&&item.count){
+        const button=el("button","review-control","练习这一弱项");
+        button.type="button";
+        button.addEventListener("click",()=>startFocus(type));
+        box.append(button);
+      }
+      grid.append(box);
+    }
+    block.append(grid);
+    if(data.primary_label){
+      block.append(el("p","review-attention",
+        "本局最突出错因："+data.primary_label+
+        "。可选择有记录的专项练习，或先对错题重新作答。"));
+    }else{
+      block.append(el("p","review-intro","本局已提交的动作全部达到局部最优，继续保持。"));
+    }
+    block.append(el("p","review-footnote",
+      "专项训练会切换到与该错因相适配的单题模式；两类训练各自独立，"+
+      "不会改动原14轮牌墙、分数和历史报告。放弃已提示胡牌只记为错过胡牌。"));
+    return block;
+  }
+
   function barChart(rows){
     const frame=el("div","review-chart");
     frame.append(el("h4","", "切后有效进张走势（张）"));
@@ -86,6 +140,9 @@
         }else line(panel,"有效牌明细：","无剩余可改善进张");
       }
       if(round.hand_before?.length)line(panel,"当轮14有效张暗手：",round.hand_before.map(displayTile).join("、"));
+      if(round.error_labels?.length){
+        line(panel,"该轮错因：",round.error_labels.join("、"));
+      }
       line(panel,"判题解析：",round.explanation||"—");
       entry.append(summary,panel);
       container.append(entry);
@@ -94,7 +151,7 @@
   }
   function downloadCsv(report,tileName){
     const header=["回合","摸牌","动作","是否最优","本轮最优动作","切后向听",
-      "有效进张枚数","下一摸模型概率","较上轮向听变化","较上轮进张变化","判题解析"];
+      "有效进张枚数","下一摸模型概率","较上轮向听变化","较上轮进张变化","错因分类","判题解析"];
     const formatTile=t=>t==="win"?"胡牌":tileName(t);
     const values=(report.round_review||[]).map(r=>{
       const delta=r.change_from_previous_discard;
@@ -104,7 +161,7 @@
         r.best_actions.map(formatTile).join(" / "),
         r.shanten??"",r.effective_tile_count??"",
         r.next_draw_probability??"",delta?.shanten??"",
-        delta?.effective_tile_count??"",r.explanation,
+        delta?.effective_tile_count??"",(r.error_labels||[]).join(" / "),r.explanation,
       ];
     });
     const quote=v=>{
@@ -172,6 +229,8 @@
     if(summary.missed_win_rounds)trend.append(el("p","review-attention",
       "注意：曾 "+summary.missed_win_rounds+" 次放弃已提示的合法胡牌。"));
     root.append(trend);
+    const errorView=showErrors(report);
+    if(errorView)root.append(errorView);
     root.append(barChart(report.round_review||[]));
     const title=el("div","review-table-title");
     title.append(el("h4","","逐轮切牌复盘"));
@@ -198,5 +257,5 @@
         ?"训练因自摸胡牌提前结束，所有已完成轮次均已纳入复盘。"
         :"本次训练已结束，所有已完成轮次均已纳入复盘。"));
   }
-  window.MahTrainReview={render};
+  window.MahTrainReview={render,startFocus};
 })();
