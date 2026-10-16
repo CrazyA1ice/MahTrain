@@ -305,6 +305,15 @@ class FourPlayerOpening:
         winners = [s for s, action in self._responses.items() if action == "hu"]
         if winners:
             winners.sort(key=lambda s: (s - source) % 4)
+            # A kong which immediately produced this discard is void when
+            # that discard is won. We do not undo cash: no kong cash was
+            # ever posted. Mark the unpriced event explicitly as void.
+            if entry.get("after_kong"):
+                for kong in reversed(self._settlement_pending):
+                    if kong["seat"]==source and kong["status"]=="unpriced":
+                        kong["status"]="voided"
+                        kong["reason"]="杠后炮：原杠作废；尚未计价，无款项可撤销"
+                        break
             last["won_by"] = list(winners)
             for seat in winners:
                 points=self._win_score(
@@ -361,7 +370,7 @@ class FourPlayerOpening:
     def _pending_kong_price(self, seat: int, kind: str,
                             source: int | None = None) -> None:
         self._settlement_pending.append({
-            "type":kind,"seat":seat,"source":source,
+            "type":kind,"seat":seat,"source":source,"status":"unpriced",
             "reason":"杠钱底分和杠作废撤销规则尚未最终确认；不计入胡牌余额",
         })
 
