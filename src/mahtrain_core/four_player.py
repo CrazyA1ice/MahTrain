@@ -307,9 +307,18 @@ class FourPlayerOpening:
             winners.sort(key=lambda s: (s - source) % 4)
             last["won_by"] = list(winners)
             for seat in winners:
+                points=self._win_score(
+                    seat,[*self._hands[seat],tile],
+                    earth=(len(self._discards)==1 and source==self.dealer),
+                    kong_discard=bool(entry.get("after_kong")),
+                )
+                payment=self._post_win(
+                    seat,source=source,tile=tile,kind="ron",score=points,
+                )
                 self._won[seat] = True
                 self._winners.append({
-                    "seat": seat, "source": source, "tile": tile, "kind": "ron"
+                    "seat": seat, "source": source, "tile": tile, "kind": "ron",
+                    "score":payment,
                 })
             self._events.append({"type": "multi_ron" if len(winners)>1 else "ron",
                                  "seats": list(winners), "source": source,
@@ -339,6 +348,7 @@ class FourPlayerOpening:
             self._events.append({"type": action, "seat": seat,
                                  "source": source, "tile": tile})
             if action == "ming_gang":
+                self._pending_kong_price(seat,"ming_gang",source)
                 self._supplement(seat)
             else:
                 self.phase = "await_discard"
@@ -347,6 +357,13 @@ class FourPlayerOpening:
         self._responses.clear()
         self._continue_after(source)
         self._events.append({"type": "all_pass", "next_turn": self.turn})
+
+    def _pending_kong_price(self, seat: int, kind: str,
+                            source: int | None = None) -> None:
+        self._settlement_pending.append({
+            "type":kind,"seat":seat,"source":source,
+            "reason":"杠钱底分和杠作废撤销规则尚未最终确认；不计入胡牌余额",
+        })
 
     def _supplement(self, seat: int) -> None:
         if not self._wall:
@@ -389,6 +406,7 @@ class FourPlayerOpening:
                 self._hands[seat].remove(tile)
             self._melds[seat].append({"type":"an_gang","tile":tile})
             self._events.append({"type":"an_gang","seat":seat,"tile":tile})
+            self._pending_kong_price(seat,"an_gang")
             self._supplement(seat)
         else:
             # Robbing the added fourth tile MUST be resolved before upgrade.
@@ -436,9 +454,16 @@ class FourPlayerOpening:
                                    "index":len(self._discards)+1,
                                    "rob_kong":True,"won_by":list(winners)})
             for seat in winners:
+                points=self._win_score(
+                    seat,[*self._hands[seat],tile],rob_kong=True,
+                )
+                payment=self._post_win(
+                    seat,source=source,tile=tile,kind="rob_kong",score=points,
+                )
                 self._won[seat]=True
                 self._winners.append({"seat":seat,"source":source,
-                                      "tile":tile,"kind":"rob_kong"})
+                                      "tile":tile,"kind":"rob_kong",
+                                      "score":payment})
             self._events.append({"type":"rob_kong",
                                  "seats":list(winners),
                                  "seat":source,"tile":tile})
@@ -452,6 +477,7 @@ class FourPlayerOpening:
             meld["type"]="bu_gang"
             self._events.append({"type":"bu_gang",
                                  "seat":source,"tile":tile})
+            self._pending_kong_price(source,"bu_gang")
             self._pending_kong=None
             self._responses.clear()
             self._supplement(source)
@@ -462,9 +488,19 @@ class FourPlayerOpening:
         self._check_turn(seat)
         if not self._self_win(seat):
             raise ValueError("not a legal win or missing suit not cleared")
+        tile=self._hands[seat][-1]
+        points=self._win_score(
+            seat,list(self._hands[seat]),
+            heaven=(seat==self.dealer and len(self._discards)==0
+                    and not self._melds[seat]),
+            kong_bloom=self._kong_draw[seat],
+        )
+        payment=self._post_win(
+            seat,source=seat,tile=tile,kind="self_draw",score=points,
+        )
         self._won[seat] = True
         self._winners.append({"seat":seat,"source":seat,
-                              "kind":"self_draw"})
+                              "kind":"self_draw","score":payment})
         self._events.append({"type":"self_draw_win","seat":seat})
         self._continue_after(seat)
         self._assert_physical_tiles()
@@ -508,6 +544,8 @@ class FourPlayerOpening:
             ] for groups in self._melds],
             "won":list(self._won),
             "winners":[dict(w) for w in self._winners],
+            "win_ledger":self.ledger.public_state(),
+            "pending_kong_payments":[dict(item) for item in self._settlement_pending],
             "wall_count":len(self._wall),
             "turn":self.turn,
             "pending_discard":(dict(self._pending_discard)
@@ -523,7 +561,8 @@ class FourPlayerOpening:
                 if event["type"]=="an_gang" else dict(event)
             ) for event in self._events],
             "prototype_limitations":{
-                "payments":False,"ai":False,"tian_ting_tracking":False,
+                "win_payments_only":True,"kong_payments_pending":True,
+                "ai":False,"tian_ting_tracking":True,
                 "exhaustive_draw_settlement":False,
             },
         }
@@ -536,6 +575,7 @@ class FourPlayerOpening:
             "seat":seat,
             "hand":sort_hand(self._hands[seat]),
             "own_melds":[dict(m) for m in self._melds[seat]],
+            "tian_ting":dict(self._tian_ting[seat]),
             "sealed_exchange":list(self._exchange_offers[seat])
                 if seat in self._exchange_offers else None,
             "sealed_missing":self._missing_offers.get(seat),
