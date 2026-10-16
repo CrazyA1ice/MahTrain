@@ -73,6 +73,25 @@ class ErrorDiagnosisTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             select_focused_question("pure_suit_waits","basic","missed_win",0)
 
+    def test_discard_focused_questions_are_genuinely_diagnostic(self):
+        # Exercises full shanten/ukeire ranking, not a heuristic label.
+        for mode,focus in (
+            ("one_shanten","shanten_regression"),
+            ("tenpai_discard","ukeire_loss"),
+        ):
+            with self.subTest(mode=mode,focus=focus):
+                seed,question=select_focused_question(
+                    mode,"basic",focus,3
+                )
+                self.assertTrue(question_has_focus(question,focus))
+                self.assertNotIn("analysis",question)
+                self.assertNotIn("best_actions",question)
+                self.assertEqual(question["focus"],focus)
+                self.assertEqual(
+                    generate_question(mode,seed)["question_id"],
+                    question["question_id"],
+                )
+
     def test_database_weakness_counts_only_original_wrong_answers(self):
         with tempfile.TemporaryDirectory() as folder:
             db=HistoryStore(Path(folder)/"history.sqlite3")
