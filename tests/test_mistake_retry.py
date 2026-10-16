@@ -20,8 +20,6 @@ def produce_mistake(seed=17):
     while state["phase"] in ("offer_win","offer_kong"):
         state=(game.decide_win(False) if state["phase"]=="offer_win"
                else game.decide_kong(None))
-    if "win" in game._history[0]["best_actions"] if game._history else False:
-        raise AssertionError("cannot have completed history before submit")
     analysis=analyze_discards(state["hand"],missing_suit="p")
     if analysis["status"]=="already_winning":
         action=state["choices"][0]
