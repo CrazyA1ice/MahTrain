@@ -452,8 +452,7 @@ class WebUI(unittest.TestCase):
             "difficulty":"basic","focus":"auto"})
         q=data["question"]
         self.assertEqual(q["training_strategy"],"adaptive_weakness")
-        self.assertFalse(q["focus_applied"] if "focus" not in q
-                         else not q["focus_applied"])
+        self.assertEqual(q["focus_applied"],"focus" in q)
         self.assertNotIn("seed",q)
         page,_=self.get("/")
         code,_=self.get("/quiz_history.js")
