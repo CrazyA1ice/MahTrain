@@ -142,6 +142,10 @@ def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict
     # its public replay may never reveal the tile.
     if action.get("action")=="an_gang":
         visible_action.pop("tile",None)
+    # Four sealed dingque selections become public ONLY after all are in;
+    # revealing each submission as it happens breaks simultaneous disclosure.
+    if action.get("action")=="declare_missing":
+        visible_action.pop("suit",None)
     return {
         "action":visible_action,
         "board":{
