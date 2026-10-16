@@ -42,6 +42,8 @@ def _asset_path(url_path: str) -> Path | None:
     if not url_path.startswith(prefix):
         return None
     filename = unquote(url_path[len(prefix):])
+    if filename == "640x420.jpeg":
+        return ROOT / "assets" / "tiles" / filename
     if (
         len(filename) == len("万1.png")
         and filename[0] in _SUITS
@@ -54,13 +56,28 @@ def _asset_path(url_path: str) -> Path | None:
 
 def _process(action: str, payload: dict) -> dict:
     with _LOCK:
-        if action == "new":
+        if action in ("preview", "new"):
             seed = payload.get("seed", 17)
             if type(seed) is not int or seed < 0 or seed > 2**32 - 1:
                 raise ValueError("种子必须是0至2^32-1的整数")
+            if action == "preview":
+                # Deal the 13 visible tiles without declaring dingque yet.
+                preview = SoloTrainingSession(seed, missing_suit=None,
+                                              rounds=payload.get("rounds", 14))
+                cards = preview.public_state()["hand"]
+                counts = {s: sum(t[0] == s for t in cards) for s in ("m", "s", "p")}
+                absent = [s for s, count in counts.items() if count == 0]
+                return {
+                    "initial_hand": cards,
+                    "suit_counts": counts,
+                    "tianque": len(absent) > 0,
+                    "absent_suits": absent,
+                    "stage": "deal_before_declaring_missing_suit",
+                    "note": "单人练习暂无换三张；正式四人玩法为换三张后一起定缺",
+                }
             missing = payload.get("missing_suit")
-            if missing == "":
-                missing = None
+            if missing not in ("m", "s", "p"):
+                raise ValueError("请先查看发好的牌，并明确选择万/条/筒作为定缺")
             game = SoloTrainingSession(seed, missing_suit=missing,
                                        rounds=payload.get("rounds", 14))
             token = secrets.token_urlsafe(24)
