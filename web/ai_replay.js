@@ -8,6 +8,7 @@
     draw:"摸牌（牌种保密）",discard:"出牌",pass:"过",
     peng:"申请碰",ming_gang:"申请明杠",an_gang:"暗杠",
     bu_gang:"补杠",hu:"申请胡牌",self_draw_win:"自摸胡牌",
+    response_submitted:"密封响应已提交",response_resolved:"碰杠胡响应裁决完成",
   };
   const SUITS={m:"万",s:"条",p:"筒"};
   let token=null,generation=0,overview=null,current=null,currentIndex=0,stepIndex=0;
@@ -98,6 +99,14 @@
     if(action.suit)suffix=" · 缺"+SUITS[action.suit];
     if(action.source!==undefined)suffix+=" · 来自"+action.source+"号";
     if(action.action==="an_gang")suffix=" · 牌面保密";
+    if(action.resolution){
+      const resolved={
+        ron:"点炮胡",multi_ron:"一炮多响",peng:"碰",
+        ming_gang:"明杠",all_pass:"全体过牌",
+        rob_kong:"抢杠胡",bu_gang:"补杠成立",
+      };
+      suffix+=" · 裁决："+(resolved[action.resolution]||action.resolution);
+    }
     $("ai-replay-step-title").textContent=
       "动作 "+(n+1)+"/"+total+"："+
       seat+"号（"+LABEL[current.assignment[seat]]+"）"+actionText+suffix;
