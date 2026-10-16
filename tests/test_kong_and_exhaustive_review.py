@@ -89,6 +89,48 @@ class KongLedgerTests(unittest.TestCase):
         self.assertIsNone(st["melds"][dealer][0]["tile"])
         self.assertTrue(st["kong_ledger"]["zero_sum"])
 
+    def test_real_an_gang_then_two_rons_exactly_reverses_that_kong(self):
+        game=FourPlayerOpening(42)
+        d=game.dealer
+        s1,s2,s3=[(d+i)%4 for i in (1,2,3)]
+        ready1=["m1"]*3+["m4"]*3+["s1"]*3+["s4"]*3+["s9"]
+        ready2=["p1"]*3+["p4"]*3+["s2"]*3+["s5"]*3+["s9"]
+        dealer_hand=["m9"]*4+["s9"]
+        remaining=Counter({t:4 for t in TILES})
+        for t in ready1+ready2+dealer_hand:
+            remaining[t]-=1
+            self.assertGreaterEqual(remaining[t],0)
+        for tile in TILES:
+            while remaining[tile] and len(dealer_hand)<14:
+                dealer_hand.append(tile)
+                remaining[tile]-=1
+        g=staged_game({d:dealer_hand,s1:ready1,s2:ready2},
+                      {d:"p",s1:"p",s2:"m",s3:"m"})
+        g.kong_ledger=KongLedger(25)
+        g.declare_kong(d,"an_gang","m9")
+        before=g.public_state()
+        self.assertEqual(before["kong_ledger"]["balances"][d],150)
+        self.assertEqual(before["kong_ledger"]["balances"].count(-50),3)
+        self.assertEqual(before["kong_ledger"]["events"][0]["status"],"posted")
+        self.assertEqual(g._effective(d),14)
+        self.assertIn("s9",g.private_view(d)["hand"])
+        g.discard(d,"s9")
+        self.assertTrue(g.public_state()["pending_discard"]["after_kong"])
+        for seat in (s1,s2,s3):
+            g.respond_discard(seat,"hu" if seat in (s1,s2) else "pass")
+        st=g.public_state()
+        self.assertEqual(st["kong_ledger"]["balances"],[0]*4)
+        self.assertEqual(st["kong_ledger"]["events"][0]["status"],"voided")
+        self.assertEqual(
+            [e["kind"] for e in st["kong_ledger"]["entries"]],
+            ["charge"]*3+["reversal"]*3,
+        )
+        self.assertEqual(len(st["win_ledger"]["wins"]),2)
+        self.assertEqual(st["combined_balances"],st["win_ledger"]["balances"])
+        self.assertTrue(st["kong_ledger"]["zero_sum"])
+        self.assertTrue(st["win_ledger"]["zero_sum"])
+        self.assertEqual(g.debug_tile_counts()["total"],108)
+
     def test_identified_kong_void_does_not_void_an_older_different_kong(self):
         k=KongLedger(10)
         older=k.declare(kind="an_gang",winner=0,payers=[1,2,3])
