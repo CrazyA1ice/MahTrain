@@ -663,6 +663,38 @@ class WebUI(unittest.TestCase):
             with self.subTest(bad=bad),self.assertRaises(HTTPError):
                 self.post({"action":"match_new","seed":bad})
 
+    def test_m314_live_match_four_sided_table_markup_and_privacy(self):
+        page,_=self.get("/")
+        css,_=self.get("/app.css")
+        js,_=self.get("/match.js")
+        for seat in range(4):
+            self.assertEqual(page.count(
+                ('id="match-seat-%d"' % seat).encode()), 1)
+            self.assertEqual(page.count(
+                ('id="match-river-%d"' % seat).encode()), 1)
+        for landmark in ("match-board", "match-wall",
+                         "match-wall-count", "match-self-status",
+                         "match-self-melds", "match-controls",
+                         "match-public", "match-hand"):
+            self.assertEqual(
+                page.count(('id="%s"' % landmark).encode()),1)
+        self.assertIn(b".match-seat--top",css)
+        self.assertIn(b".match-seat--bottom",css)
+        self.assertIn(b".match-river--left",css)
+        self.assertIn(b".match-river--right",css)
+        self.assertIn(b".match-board-scroll",css)
+        self.assertIn(b"renderBoard()",js)
+        self.assertIn(b"state.discards.map",js)
+        self.assertIn(b"state.hand_counts[seat]",js)
+        self.assertIn(b"meld.tile===null",js)
+        self.assertIn(b"match_discard",js)
+        self.assertIn(b"match_exchange",js)
+        self.assertIn(b"match_missing",js)
+        self.assertIn(b"match_rob",js)
+        self.assertIn(b"match_claim",js)
+        self.assertIn(b"match_win",js)
+        self.assertIn(b"match_kong",js)
+
     def test_m32_hu_ledger_and_tian_ting_visible_only_for_own_seat(self):
         started=self.post({"action":"match_new","seed":42,
                            "room_coefficient":200,"fan_cap":3})
