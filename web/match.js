@@ -1,6 +1,6 @@
 "use strict";
-/* M3.2 LOCAL rule-state experimental match. Seat zero only; three scripted
-   opponents, no AI skill, payment, flower-pig or end-wall settlement.
+/* M3.4 LOCAL trial: seat zero versus three information-limited heuristic
+   opponents (not machine-learned). Draw-end payments unposted.
 */
 (function(){
   const $=id=>document.getElementById(id);
@@ -125,15 +125,26 @@
           }));
       }
       controls.append(el("p","review-intro",
-        "请点击自己的麻将切牌。其他三家是固定脚本，不是智能AI；合法胡牌将即时记录部分积分流水。"));
+        "请点击自己的麻将切牌。其他三家由各自策略AI操作，合法胡牌将即时计入部分积分。"));
     }else{
       controls.append(el("p","review-intro",
-        "本局摸切已结束。胡牌部分已计算，杠钱撤销及流局赔付尚未计入完整结算。可以重新开一局。"));
+        "本局摸切已结束。胡牌部分已入账，杠钱仅按可选模拟底分计入，流局赔付仍需确认。可以重新开一局。"));
     }
     const publicInfo=$("match-public");publicInfo.replaceChildren();
     if(state.missing_suits){
       publicInfo.append(el("p","review-intro",
         "四家定缺："+state.missing_suits.map((s,i)=>i+"号缺"+names[s]).join(" · ")));
+    }
+    if(state.ai_opponents){
+      const levels={basic:"入门",advanced:"进阶",challenge:"挑战"};
+      const ai=el("section","match-ai-info");
+      ai.append(el("strong","","本局三名策略AI（仅自家暗牌 + 公开信息）"));
+      for(const agent of state.ai_opponents){
+        ai.append(el("p","review-footnote",
+          agent.seat+"号 · "+(levels[agent.difficulty]||agent.difficulty)+
+          "："+agent.description));
+      }
+      publicInfo.append(ai);
     }
     publicInfo.append(el("p","review-intro",
       "各家暗手牌张数："+state.hand_counts.map((v,i)=>
@@ -320,6 +331,7 @@
       action("match_new",{seed,
         room_coefficient:Number($("match-coefficient").value),
         fan_cap:Number($("match-fan-cap").value),
+        ai_levels:[1,2,3].map(n=>$("match-ai-"+n).value),
         kong_base:$("match-enable-kong").checked
           ?Number($("match-kong-base").value):null,
       });
