@@ -1,0 +1,109 @@
+"""M3.6 full-turn AI self-play regression and paired-seat fairness."""
+from __future__ import annotations
+
+import json
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
+
+from mahtrain_core.ai_tournament import seat_assignment, simulate_match, tournament
+
+
+class FourAgentTrialTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.result=tournament(seed_start=11,seeds=1)
+
+    def test_all_rotations_balance_each_level_in_every_seat(self):
+        result=self.result
+        self.assertEqual(result["protocol"],"seat_rotated_closed_loop_v1")
+        self.assertEqual(result["games"],3)
+        self.assertEqual(
+            {seat:sorted(seat_assignment(r)[seat] for r in range(3))
+             for seat in range(4)},
+            {seat:["advanced","basic","challenge"] for seat in range(4)},
+        )
+        for level in ("basic","advanced","challenge"):
+            self.assertEqual(result["levels"][level]["seat_exposures"],4)
+
+    def test_closed_loop_finishes_legally_without_demo_claim_skips(self):
+        for match in self.result["matches"]:
+            self.assertIn(match["terminal_phase"],("finished","wall_exhausted"))
+            self.assertEqual(match["physical_count"],108)
+            self.assertGreater(match["actions"],8)
+            self.assertLess(match["actions"],800)
+            self.assertEqual(sum(match["partial_win_balances"]),0)
+            self.assertTrue(match["exhaustive_preview_not_posted"]
+                            if match["terminal_phase"]=="wall_exhausted"
+                            else not match["exhaustive_preview_not_posted"])
+            self.assertFalse(any(e["type"]=="demo_no_claims"
+                                 for e in match["public_events"]))
+            discarded=sum(e["action"]=="discard" for e in match["trace"])
+            self.assertGreater(discarded,0)
+            for record in match["trace"]:
+                self.assertIn("phase",record)
+                self.assertNotIn("opponent_hands",record)
+                self.assertNotIn("wall",record)
+                self.assertNotIn("future_wall",record)
+                if record["action"]=="an_gang":
+                    self.assertIsNone(record["tile"])
+                if record["action"]=="discard":
+                    self.assertGreaterEqual(record["shanten_regret"],0)
+            for event in match["public_events"]:
+                if event["type"]=="an_gang":
+                    self.assertNotIn("tile",event)
+            if match["terminal_phase"]=="finished":
+                self.assertEqual(len(match["winners"]),3)
+            else:
+                self.assertEqual(match["wall_remaining"],0)
+
+    def test_level_summary_matches_explicit_per_match_counts(self):
+        for level,stat in self.result["levels"].items():
+            self.assertEqual(stat["win_events"],sum(
+                x["level"]==level for m in self.result["matches"]
+                for x in m["winners"]))
+            self.assertEqual(stat["discards"],sum(
+                x.get("level")==level and x["action"]=="discard"
+                for m in self.result["matches"] for x in m["trace"]))
+            if stat["discards"]:
+                self.assertTrue(0<=stat["discard_min_shanten_fraction"]<=1)
+                self.assertTrue(0<=stat["discard_local_optimal_fraction"]<=1)
+                self.assertGreaterEqual(stat["mean_shanten_regret"],0)
+
+    def test_reproducible_actions_without_timing_leak(self):
+        first=self.result["matches"][0]
+        second=simulate_match(11,rotation=0)
+        self.assertEqual(first["assignment"],second["assignment"])
+        self.assertEqual(first["terminal_phase"],second["terminal_phase"])
+        self.assertEqual(first["winners"],second["winners"])
+        self.assertEqual(first["public_events"],second["public_events"])
+        self.assertEqual(first["trace"],second["trace"])
+        self.assertEqual(first["partial_win_balances"],
+                         second["partial_win_balances"])
+
+    def test_json_and_sanitized_summary(self):
+        output=json.dumps(self.result,ensure_ascii=False)
+        self.assertIn("unpriced",output)
+        compact=tournament(seed_start=11,seeds=1,include_traces=False)
+        self.assertEqual(compact["levels"],self.result["levels"])
+        self.assertNotIn("trace",compact["matches"][0])
+        self.assertNotIn("public_events",compact["matches"][0])
+
+    def test_bad_seed_and_rotation_do_not_run(self):
+        for value in (-1,True,2**32,"2"):
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                simulate_match(value)
+        for rotation in (-1,3,True,"1"):
+            with self.subTest(rotation=rotation),self.assertRaises(ValueError):
+                seat_assignment(rotation)
+        for value in (0,-1,101,True,"2"):
+            with self.subTest(seeds=value),self.assertRaises(ValueError):
+                tournament(seeds=value)
+        with self.assertRaises(ValueError):
+            simulate_match(11,max_actions=5)
+
+
+if __name__=="__main__":
+    unittest.main()
