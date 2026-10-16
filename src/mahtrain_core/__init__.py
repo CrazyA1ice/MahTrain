@@ -5,6 +5,7 @@ from .efficiency import analyze_discards, effective_draws, shanten_13
 from .training import MODES, generate_question, grade_answer
 from .presentation import sort_hand, grouped_hand, format_hand
 from .session import SoloTrainingSession
+from .four_player import FourPlayerOpening
 
 __all__ = [
     "is_legal_win",
@@ -21,4 +22,5 @@ __all__ = [
     "grouped_hand",
     "format_hand",
     "SoloTrainingSession",
+    "FourPlayerOpening",
 ]
