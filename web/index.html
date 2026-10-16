@@ -12,6 +12,7 @@
   <script src="/history.js" defer></script>
   <script src="/quiz.js" defer></script>
   <script src="/quiz_history.js" defer></script>
+  <script src="/four_player.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -102,6 +103,25 @@
         </div>
         <section id="report-panel" class="panel report-panel" hidden><div class="panel-title"><h3 id="report-title">逐轮切牌复盘与牌效总结</h3><small id="report-subtitle">已完成的回合实时记录</small></div><div id="report" aria-live="polite"></div></section>
         <section id="retry-panel" class="panel retry-panel" hidden><div class="panel-title"><h3>错题重练 · 再做一次</h3><small>仅复习本局答错的回合，不影响原牌墙和成绩</small></div><div id="retry-board" aria-live="polite"></div></section>
+      </section>
+      <section id="four-player-demo" class="panel table-demo">
+        <div class="panel-title">
+          <h3>四人血战 · 开局规则演示（M3预览）</h3>
+          <small>先发牌换三张，再盖牌定缺；非完整人机对战</small>
+        </div>
+        <p class="review-intro">你操作0号座位；另外三家只使用固定脚本模拟选择与切牌，不是策略AI。碰、杠、点炮胡等响应尚未开发，演示轮转时会明确跳过，不能据此作为真实血战战绩。</p>
+        <div class="table-demo-toolbar">
+          <label>开局种子 <input id="table-seed" type="number" min="0" max="4294967295" value="42"/></label>
+          <button id="table-new" class="primary" type="button">开始四人开局演示</button>
+        </div>
+        <p id="table-error" class="review-attention" aria-live="polite"></p>
+        <div id="table-stage" hidden>
+          <h4 id="table-stage-title"></h4>
+          <p id="table-topline" class="review-footnote"></p>
+          <div id="table-hand" class="retry-hand"></div>
+          <div id="table-controls" class="table-controls"></div>
+          <div id="table-public" class="table-public"></div>
+        </div>
       </section>
       <section id="history-panel" class="panel history-panel">
         <div class="panel-title"><h3>本地历史训练与错题本</h3><button id="history-refresh" type="button" class="review-control">刷新历史</button></div>
