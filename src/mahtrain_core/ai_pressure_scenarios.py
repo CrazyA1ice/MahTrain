@@ -53,7 +53,9 @@ def pressure_scenario_view(name: str) -> dict[str, Any]:
         "hand": sorted(HAND, key=TILE_INDEX.__getitem__),
         "own_melds": [],
         # The exposed pungs are not of the opponent's declared missing suit.
-        "missing_suits": ["p", "s", "p", "p"],
+        "missing_suits": ["p",
+                          "m" if name == "two_pungs_in_lower_priority_suit"
+                          else "s", "p", "p"],
         "discards": [],
         "melds": melds,
         "won": [False, name == "two_pungs_owner_already_won", False, False],
