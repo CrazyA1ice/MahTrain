@@ -18,6 +18,7 @@ from .ai_baseline import ShapeBaselineAgent
 from .efficiency import analyze_discards
 from .four_player import FourPlayerOpening
 from .ai_seed_stats import analyze_seed_clusters
+from .ai_pressure_diagnostics import diagnose_pressure_tiebreak
 
 
 def _validate(seed_start: int, seeds: int) -> None:
@@ -115,7 +116,7 @@ def _take_action(game: FourPlayerOpening, agents: dict[int, Any],
         if tile not in options:
             raise RuntimeError("AI chose an illegal discard")
         row=options[tile]
-        trace.append({
+        event={
             "phase":phase,"seat":seat,"level":level,
             "action":"discard","tile":tile,
             "shanten_after":row["shanten"],
@@ -123,7 +124,14 @@ def _take_action(game: FourPlayerOpening, agents: dict[int, Any],
             "shanten_regret":row["shanten"]-oracle["minimum_shanten"],
             "effective_copies":row["effective_tile_count"],
             "locally_optimal":bool(row["local_optimal"]),
-        })
+        }
+        if level in ("challenge", "challenge_no_pressure"):
+            # Private, aggregate-only instrumentation. The unplayed shadow
+            # tile never enters the trace, public replay or network result.
+            event["pressure_probe"]=diagnose_pressure_tiebreak(
+                view, oracle, tile, policy=level
+            )
+        trace.append(event)
         game.discard(seat,tile)
         return
     raise RuntimeError("unexpected phase in multi-agent trial: "+str(phase))

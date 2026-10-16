@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"src"))
 from mahtrain_core.ai_ablation_benchmark import ablation_benchmark  # noqa: E402
 from mahtrain_core.ai_ablation_report import render_ablation_html  # noqa: E402
+from mahtrain_core.ai_ablation_benchmark import PRESSURE_FIELDS  # noqa: E402
 
 NAMES = {
     "baseline": "独立牌形基线",
@@ -29,6 +30,8 @@ def main() -> None:
     parser.add_argument("--csv-out", type=Path)
     parser.add_argument("--contrast-csv-out", type=Path,
                         help="按独立种子输出每个策略差值（单位：百分点）")
+    parser.add_argument("--pressure-csv-out", type=Path,
+                        help="按种子汇总启停弱风险规则实际是否改变切牌，不输出暗手")
     parser.add_argument("--html-out", type=Path,
                         help="单文件离线图表，无脚本、无暗手或未来牌墙")
     args = parser.parse_args()
@@ -50,6 +53,15 @@ def main() -> None:
     for key, value in report["paired_differences"].items():
         print(key, value)
     print("区间状态：", report["interval_status"])
+    if "pressure_diagnostics" in report:
+        print("M3.12 弱风险规则触发诊断（同局面影子比较）：")
+        for policy, row in report["pressure_diagnostics"].items():
+            print(policy, "切牌",row["decisions"],
+                  "进张并列",row["effective_ties"],
+                  "压力区分",row["pressure_discriminates"],
+                  "切牌可能不同",row["would_change"],
+                  "当前策略实际不同",row["actual_changed"])
+        print("说明：同局面比较不会改变真实牌墙或给出替代切牌带来的胜负。")
     analysis = report["seed_analysis"]
     print("独立种子：", analysis["distinct_seed_count"],
           "；统计单位：", analysis["unit"])
@@ -94,6 +106,19 @@ def main() -> None:
                             for metric in metrics},
                     })
         print("逐种子策略差值 CSV：", args.contrast_csv_out)
+    if args.pressure_csv_out:
+        args.pressure_csv_out.parent.mkdir(parents=True,exist_ok=True)
+        columns = ["seed","policy",*PRESSURE_FIELDS]
+        with args.pressure_csv_out.open(
+                "w",newline="",encoding="utf-8-sig") as fh:
+            writer=csv.DictWriter(fh,fieldnames=columns)
+            writer.writeheader()
+            for group in report["per_seed"]:
+                for policy,row in group["pressure_diagnostics"].items():
+                    writer.writerow({
+                        "seed":group["seed"],"policy":policy,**row,
+                    })
+        print("弱风险规则触发 CSV：",args.pressure_csv_out)
     if args.html_out:
         args.html_out.parent.mkdir(parents=True, exist_ok=True)
         args.html_out.write_text(render_ablation_html(report), encoding="utf-8")

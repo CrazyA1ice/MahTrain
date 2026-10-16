@@ -133,6 +133,49 @@ def _stability(report: dict[str, Any]) -> str:
     )
 
 
+def _pressure_panel(report: dict[str, Any]) -> str:
+    """Only anonymized counts. The unplayed shadow tile stays concealed."""
+    stats = report.get("pressure_diagnostics")
+    if stats is None:
+        return ""
+    names = {
+        "challenge": "完整挑战",
+        "challenge_no_pressure": "关闭弱风险平局",
+    }
+    columns = (
+        ("decisions", "切牌决策"),
+        ("effective_ties", "进张并列"),
+        ("pressure_present", "存在副露压力"),
+        ("pressure_discriminates", "压力分数区分候选"),
+        ("would_change", "启停规则会改变切牌"),
+        ("actual_changed", "本策略实际受规则改变"),
+        ("games_with_would_change", "至少一次改变的对局"),
+        ("wins_in_changed_games", "这些对局中的胡牌事件"),
+        ("deal_ins_in_changed_games", "这些对局中的放铳责任"),
+    )
+    heading = "".join(
+        "<th scope=\"col\">"+escape(label)+"</th>"
+        for _,label in columns
+    )
+    rows = []
+    for policy in ("challenge","challenge_no_pressure"):
+        row = stats[policy]
+        rows.append(
+            "<tr><th scope=\"row\">"+escape(names[policy])+"</th>"
+            + "".join("<td>"+str(row[key])+"</td>" for key,_ in columns)
+            + "</tr>"
+        )
+    return (
+        '<section class="panel"><h2>M3.12 · 公开副露弱风险规则触发诊断</h2>'
+        '<p class="hint">对同一个真实切牌局面，同时计算启用与关闭弱风险平局规则的候选选择。'
+        '只有实际两个切牌不同才记录为“会改变”；从不将未出牌的候选牌公布。'
+        '“这些对局中的胡牌/放铳”只是相关性分组，不是该规则造成的收益或损失。</p>'
+        '<div class="table-scroll"><table><thead><tr><th scope="col">策略</th>'
+        + heading+'</tr></thead><tbody>'+''.join(rows)
+        +'</tbody></table></div></section>'
+    )
+
+
 def render_ablation_html(report: dict[str, Any]) -> str:
     """Render a self-contained dashboard from M3.11 aggregate JSON.
 
@@ -198,6 +241,7 @@ def render_ablation_html(report: dict[str, Any]) -> str:
         + _heatmap(report, "win_event_fraction", "逐种子 · 胡牌事件差值")
         + _heatmap(report, "local_optimal_fraction", "逐种子 · 局部最优差值")
         + _stability(report)
+        + _pressure_panel(report)
         + '<footer>仅使用汇总统计生成 · 不包含对手暗手、牌墙与密封响应 '
           '· 请勿将探索性区间解释为正式获胜概率。</footer>'
         '</main></body></html>\n'

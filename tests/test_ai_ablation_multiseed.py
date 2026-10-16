@@ -123,6 +123,7 @@ class MultiSeedReportTests(unittest.TestCase):
         self.assertIn('<svg role="img"',page)
         self.assertIn("逐种子",page)
         self.assertIn("留一种子",page)
+        self.assertIn("公开副露弱风险规则触发诊断",page)
         self.assertIn("M3.11",page)
         self.assertNotIn("<script",page)
         self.assertNotIn('src="http',page)
@@ -148,6 +149,7 @@ class MultiSeedReportTests(unittest.TestCase):
                     "--json-out", str(root/"report.json"),
                     "--csv-out", str(root/"policy.csv"),
                     "--contrast-csv-out", str(root/"contrasts.csv"),
+                    "--pressure-csv-out", str(root/"pressure.csv"),
                     "--html-out", str(root/"report.html")]
             with (patch.object(benchmark_ablation_ai, "ablation_benchmark",
                                return_value=self.report),
@@ -159,6 +161,12 @@ class MultiSeedReportTests(unittest.TestCase):
                 rows = list(csv.DictReader(fh))
             self.assertEqual(len(rows),5*len(CONTRASTS))
             self.assertEqual(rows[0]["seed"],"30")
+            with (root/"pressure.csv").open(
+                    encoding="utf-8-sig",newline="") as fh:
+                pressure_rows=list(csv.DictReader(fh))
+            self.assertEqual(len(pressure_rows),5*2)
+            self.assertIn("would_change",pressure_rows[0])
+            self.assertIn("games_with_would_change",pressure_rows[0])
             self.assertIn("win_event_fraction_delta_pp",rows[0])
             self.assertIn("M3.11", (root/"report.html").read_text(
                 encoding="utf-8"))
