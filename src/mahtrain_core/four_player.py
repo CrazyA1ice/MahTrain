@@ -15,7 +15,8 @@ from collections import Counter
 from typing import Any, Sequence
 
 from .presentation import sort_hand
-from .rules import SUITS, TILES, is_legal_win
+from .rules import SUITS, TILES, is_legal_win, winning_tiles, score_win
+from .settlement import WinLedger
 
 EXCHANGE_OFFSETS = {"clockwise": 1, "counterclockwise": 3, "opposite": 2}
 SEAT_COUNT = 4
@@ -23,9 +24,11 @@ _KONG_TYPES = ("ming_gang", "an_gang", "bu_gang")
 
 
 class FourPlayerOpening:
-    def __init__(self, seed: int) -> None:
+    def __init__(self, seed: int, *, room_coefficient: int = 100,
+                 fan_cap: int = 3) -> None:
         if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
             raise ValueError("seed must be an integer from 0 to 2^64 - 1")
+        self.ledger = WinLedger(room_coefficient, fan_cap)
         rng = random.Random(seed)
         deck = [tile for tile in TILES for _ in range(4)]
         rng.shuffle(deck)
@@ -46,6 +49,12 @@ class FourPlayerOpening:
         self._missing_offers: dict[int, str] = {}
         self.missing_suits: list[str | None] = [None] * 4
         self._tianque = [False] * 4
+        self._tian_ting: list[dict[str, Any]] = [
+            {"eligible":False,"initial_waits":[],"reason":"not_initialized",
+             "checkpoints":0} for _ in range(4)
+        ]
+        self._kong_draw: list[bool] = [False] * 4
+        self._settlement_pending: list[dict[str, Any]] = []
         self.phase = "exchange_select"
         self.turn: int | None = None
         self._pending_discard: dict[str, Any] | None = None
@@ -121,9 +130,81 @@ class FourPlayerOpening:
             self._missing_offers.clear()
             self.phase = "dealer_discard"
             self.turn = self.dealer
+            self._initialize_tian_ting()
             self._events.append({"type": "missing_suits_revealed",
                                  "missing_suits": list(self.missing_suits)})
         self._assert_physical_tiles()
+
+    def _initialize_tian_ting(self) -> None:
+        """Capture immutable W0 only after exchange + four sealed dingque."""
+        for seat in range(4):
+            if seat == self.dealer:
+                self._tian_ting[seat] = {
+                    "eligible": False, "initial_waits": [],
+                    "reason": "dealer_not_eligible", "checkpoints": 0,
+                }
+                continue
+            waits = winning_tiles(self._hands[seat],self._melds[seat],
+                                  self.missing_suits[seat])
+            self._tian_ting[seat] = {
+                "eligible": bool(waits), "initial_waits": list(waits),
+                "reason": "active" if waits else "not_initially_listening",
+                "checkpoints": 0,
+            }
+
+    def _cancel_tian_ting(self, seat: int, why: str) -> None:
+        status=self._tian_ting[seat]
+        if status["eligible"]:
+            status["eligible"]=False
+            status["reason"]=why
+            self._events.append({
+                "type":"tian_ting_lost","seat":seat,"reason":why,
+            })
+
+    def _verify_tian_ting_checkpoint(self, seat: int) -> None:
+        """Compare only stable 13-effective hands, after discard or call."""
+        status=self._tian_ting[seat]
+        if not status["eligible"]:
+            return
+        if self._effective(seat) != 13:
+            raise RuntimeError("tian ting checkpoint requires 13 effective tiles")
+        actual=winning_tiles(self._hands[seat],self._melds[seat],
+                             self.missing_suits[seat])
+        status["checkpoints"]+=1
+        if set(actual)!=set(status["initial_waits"]):
+            self._cancel_tian_ting(seat,"waiting_set_changed")
+
+    def _win_score(self, seat: int, concealed: list[str], *,
+                   heaven: bool = False, earth: bool = False,
+                   kong_bloom: bool = False,
+                   kong_discard: bool = False,
+                   rob_kong: bool = False) -> dict[str, Any]:
+        ctx={
+            "tian_ting_verified":self._tian_ting[seat]["eligible"],
+            "heaven_win_verified":heaven,
+            "earth_win_verified":earth,
+            "kong_bloom":kong_bloom,
+            "kong_discard_ron":kong_discard,
+            "rob_added_kong":rob_kong,
+        }
+        result=score_win(concealed,self._melds[seat],
+                         self.missing_suits[seat],
+                         cap=self.ledger.fan_cap,context=ctx)
+        if not result.get("legal"):
+            raise ValueError("illegal win cannot be posted")
+        return result
+
+    def _post_win(self, seat: int, *, source: int, tile: str,
+                  kind: str, score: dict[str, Any]) -> dict[str, Any]:
+        payers=([s for s in range(4) if s!=seat and not self._won[s]]
+                if kind=="self_draw" else [source])
+        posted=self.ledger.pay_win(winner=seat,payers=payers,score=score,
+                                   kind=kind,source=source,tile=tile)
+        self._events.append({"type":"win_settlement","seat":seat,
+                             "source":source,"kind":kind,
+                             "amount":posted["total_received"],
+                             "effective_fan":posted["effective_fan"]})
+        return posted
 
     def _active(self, seat: int) -> bool:
         return not self._won[seat]
@@ -167,7 +248,12 @@ class FourPlayerOpening:
         if self._effective(seat) != 14:
             raise RuntimeError("discard requires 14 effective tiles")
         self._hands[seat].remove(tile)
+        self._verify_tian_ting_checkpoint(seat)
+        after_kong=self._kong_draw[seat]
+        self._kong_draw[seat]=False
         entry = {"seat": seat, "tile": tile, "index": len(self._discards) + 1}
+        if after_kong:
+            entry["after_kong"]=True
         self._discards.append(entry)
         self._pending_discard = dict(entry)
         self._responses.clear()
@@ -244,6 +330,8 @@ class FourPlayerOpening:
             for _ in range(count):
                 self._hands[seat].remove(tile)
             self._melds[seat].append({"type": action, "tile": tile})
+            if action=="peng":
+                self._cancel_tian_ting(seat,"peng_called")
             last["claimed_by"] = seat
             self.turn = seat
             self._pending_discard = None
@@ -267,6 +355,7 @@ class FourPlayerOpening:
         self._hands[seat].append(tile)
         self.turn = seat
         self.phase = "await_discard"
+        self._kong_draw[seat]=True
         self._events.append({"type": "kong_supplement", "seat": seat})
         # Tail tile remains private to the acting player.
 
@@ -396,6 +485,7 @@ class FourPlayerOpening:
             raise RuntimeError("no legal front-wall draw")
         tile = self._wall.pop(0)
         self._hands[seat].append(tile)
+        self._kong_draw[seat]=False
         self.phase="await_discard"
         self._events.append({"type":"draw","seat":seat})
         self._assert_physical_tiles()
