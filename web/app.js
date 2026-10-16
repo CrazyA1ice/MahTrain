@@ -5,6 +5,8 @@ const names = {m:"万", s:"条", p:"筒"};
 let token = null;
 let currentState = null;
 let busy = false;
+let vectorArt = true;
+const playSound = (event) => window.MahTrainSound?.play(event);
 const tileName = (tile) => tile.slice(1) + names[tile[0]];
 const tileUrl = (tile) => "/assets/tiles/" + encodeURIComponent(names[tile[0]] + tile.slice(1) + ".png");
 
@@ -14,15 +16,20 @@ function node(tag, className, text) {
   if (text !== undefined) element.textContent = String(text);
   return element;
 }
-function tileElement(tile, {small=false, selectable=false, drawn=false, onClick=null}={}) {
-  const button = node("button", "tile" + (small?" mini":"") + (selectable?" selectable":""));
+function tileElement(tile, {small=false, selectable=false, drawn=false, missing=false, onClick=null}={}) {
+  const button = node("button", "tile" + (small?" mini":"") + (selectable?" selectable":"") + (missing?" missing-tile":""));
   button.type = "button";
   button.title = tileName(tile);
   button.setAttribute("aria-label", tileName(tile) + (selectable ? "，点击打出" : ""));
-  const img = node("img");
-  img.src = tileUrl(tile);
-  img.alt = tileName(tile);
-  button.append(img);
+  const svg = vectorArt ? window.MahTrainTiles?.render(tile) : null;
+  if (svg) button.append(svg);
+  else {
+    const img = node("img");
+    img.src = tileUrl(tile);
+    img.alt = tileName(tile);
+    img.decoding = "async";
+    button.append(img);
+  }
   if (drawn) button.append(node("span", "drawn", "本轮摸牌"));
   if (selectable && onClick) button.addEventListener("click", onClick);
   else button.disabled = true;
@@ -38,6 +45,7 @@ function clearToast() { $("#toast").hidden = true; }
 async function request(action, extras={}) {
   if (busy) return;
   busy = true;
+  window.MahTrainSound?.unlock();
   clearToast();
   try {
     const response = await fetch("/api/action", {
@@ -51,9 +59,40 @@ async function request(action, extras={}) {
     if (result.state) {
       currentState = result.state;
       render(currentState, result.feedback, result.report);
+      if (action === "draw") playSound("draw");
+      else if (action === "discard") playSound("discard");
+      else if (action === "win" && extras.accept === true) playSound("win");
+      else if (action === "kong" && extras.tile) {
+        playSound("kong");
+        setTimeout(() => playSound("draw"), 390);
+      }
     }
   } catch (error) { toast(error.message); }
   finally { busy = false; }
+}
+
+function renderWinDiagnosis(state) {
+  const panel = $("#win-diagnosis");
+  const result = state.win_status;
+  if (!result) {
+    panel.textContent = "尚未进行胡牌结构判断。";
+    panel.className = "win-diagnosis";
+    return;
+  }
+  const missing = result.missing_suit_tile_count;
+  const suit = names[state.missing_suit];
+  if (missing > 0) {
+    panel.className = "win-diagnosis blocked";
+    panel.textContent = result.structural_win
+      ? "牌型结构已经成胡，但仍有 " + missing + " 张定缺「" + suit + "」！川麻须先打光定缺牌，暂时不能胡牌。"
+      : "定缺提醒：手中还有 " + missing + " 张「" + suit + "」，须先打光该花色才能胡牌。";
+  } else if (result.legal_win) {
+    panel.className = "win-diagnosis ready";
+    panel.textContent = "胡牌判断通过：已打光定缺且满足胡牌结构，系统正在提示是否胡牌。";
+  } else {
+    panel.className = "win-diagnosis clear";
+    panel.textContent = "已打光定缺「" + suit + "」，但当前手牌尚未满足胡牌结构。";
+  }
 }
 
 function renderHand(state) {
@@ -61,15 +100,19 @@ function renderHand(state) {
   list.replaceChildren();
   if (state.hand.length === 0) list.append(node("span", "placeholder", "暗手牌已全部移出"));
   let previousSuit = null;
+  let markedDraw = false;
   for (const tile of state.hand) {
     if (previousSuit !== null && previousSuit !== tile[0]) list.append(node("div", "suit-spacer"));
     previousSuit = tile[0];
     list.append(tileElement(tile, {
       selectable:state.phase === "await_discard",
-      drawn:tile === state.drawn_tile && state.phase === "await_discard",
+      drawn:!markedDraw && tile === state.drawn_tile && state.phase === "await_discard",
+      missing:tile[0] === state.missing_suit,
       onClick:()=>request("discard", {tile}),
     }));
+    if (tile === state.drawn_tile && state.phase === "await_discard") markedDraw = true;
   }
+  renderWinDiagnosis(state);
   const kong = $("#kong-area");
   kong.replaceChildren();
   if (!state.exposed_kongs.length) kong.append(node("span","placeholder","暂无开杠"));
@@ -207,3 +250,18 @@ $("#start-form").addEventListener("submit",(event)=>{
   });
 });
 $("#draw-button").addEventListener("click",()=>request("draw"));
+$("#sound-toggle").addEventListener("click",()=>{
+  const current = window.MahTrainSound?.getEnabled() ?? false;
+  const next = window.MahTrainSound?.setEnabled(!current) ?? false;
+  const button=$("#sound-toggle");
+  button.textContent=next?"🔊 音效开启":"🔇 音效关闭";
+  button.setAttribute("aria-pressed",String(next));
+  if(next)playSound("draw");
+});
+$("#art-toggle").addEventListener("click",()=>{
+  vectorArt=!vectorArt;
+  const button=$("#art-toggle");
+  button.textContent=vectorArt?"高清矢量牌面":"经典原始牌图";
+  button.setAttribute("aria-pressed",String(vectorArt));
+  if(currentState)renderHand(currentState);
+});
