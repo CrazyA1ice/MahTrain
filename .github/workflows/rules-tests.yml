@@ -33,7 +33,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Check website JavaScript syntax
-        run: node --check web/app.js
+        run: |
+          node --check web/tile_art.js
+          node --check web/sound.js
+          node --check web/app.js
       - name: Run no-dependency unit tests
         run: python -m unittest discover -s tests -v
       - name: Smoke-test Chinese discard demo
