@@ -825,6 +825,7 @@ class WebUI(unittest.TestCase):
         frame={
             "action":{"phase":"dealer_discard","seat":0,
                       "level":"basic","action":"discard","tile":"m1"},
+            "explanation":{"code":"discard_missing","text":"只使用公开的定缺信息","scope":"public_policy_only"},
             "board":{
                 "phase":"claim_window","turn":0,"dealer":0,
                 "wall_count":54,"hand_counts":[13,13,13,13],
@@ -855,6 +856,12 @@ class WebUI(unittest.TestCase):
                 "mean_shanten_regret":0,
             } for level in ("basic","advanced","challenge")},
             "limitations":["non-final settlement"],
+            "seed_analysis":{
+                "distinct_seed_count":1,
+                "interval_status":"insufficient_distinct_seeds_need_5",
+                "intervals":None,
+                "per_seed":[{"seed":11,"games":3,"levels":{}}],
+            },
             "matches":[{**example,"rotation":n} for n in range(3)],
         }
         def cheap_tournament(start,count,*,on_match=None):
@@ -878,6 +885,7 @@ class WebUI(unittest.TestCase):
             self.assertEqual(latest["status"],"done")
         self.assertEqual(latest["overview"]["games"],3)
         self.assertEqual(len(latest["overview"]["matches"]),3)
+        self.assertEqual(latest["overview"]["seed_analysis"]["distinct_seed_count"],1)
         self.assertNotIn("trace",str(latest))
         response=self.post({"action":"ai_replay_match",
                             "replay_token":token,"match_index":0})
@@ -906,13 +914,18 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"ai_replay_status",js)
         self.assertIn(b"ai_replay_match",js)
         self.assertIn(b".ai-replay-board",css)
+        self.assertIn(b'id="ai-replay-clusters"',html)
+        self.assertIn(b'id="ai-replay-explanation-text"',html)
+        self.assertIn(b"value=\"5\"",html)
+        self.assertIn(b"paired_challenge_differences",js)
+        self.assertIn(b"ai-replay-cluster-download",js)
         self.assertIn("javascript",mime)
 
     def test_m37_replay_parameters_and_capacity(self):
         for bad in (
             {"seed_start":-1},{"seed_start":True},
             {"seed_start":2**32},{"seed_start":"11"},
-            {"seeds":0},{"seeds":3},{"seeds":True},
+            {"seeds":0},{"seeds":6},{"seeds":True},
             {"seed_start":2**32-1,"seeds":2},
         ):
             with self.subTest(payload=bad),self.assertRaises(HTTPError):
