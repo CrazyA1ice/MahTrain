@@ -426,7 +426,12 @@ class FourPlayerOpening:
                                  if self._pending_kong else None),
             "claim_submitted":sorted(self._responses),
             "discards":[dict(e) for e in self._discards],
-            "events":[dict(e) for e in self._events],
+            # An-gang tiles must not leak via public event logs even though
+            # the trusted internal event keeps the actual tile.
+            "events":[(
+                {k:v for k,v in event.items() if k!="tile"}
+                if event["type"]=="an_gang" else dict(event)
+            ) for event in self._events],
             "prototype_limitations":{
                 "payments":False,"ai":False,"tian_ting_tracking":False,
                 "exhaustive_draw_settlement":False,
