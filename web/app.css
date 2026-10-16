@@ -229,3 +229,35 @@
 .quiz-feedback h4{font-size:17px;color:#285b42;margin:3px 0 9px}
 @media(max-width:620px){.quiz-center{padding:18px 13px}
 .quiz-toolbar{padding:11px}.quiz-options .tile{width:46px;height:62px}}
+
+
+/* v0.9: local scored single-question history / opt-in difficulty advice. */
+.quiz-history-section{margin-top:22px;padding-top:20px;border-top:1px solid #e2eae3}
+.quiz-history-section .panel-title h3{font-size:17px}
+.quiz-history-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.quiz-history-metric{background:#f0f6f1;border:1px solid #dceadf;
+  border-radius:11px;padding:13px;display:grid;gap:5px}
+.quiz-history-metric span{font-size:12px;color:#61806a}
+.quiz-history-metric strong{font-size:20px;color:#315e44}
+.quiz-history-metric small{font-size:11px;color:#77927e}
+.quiz-recommendation{background:#f7faf2;border:1px solid #e0eaca;border-radius:12px;
+  padding:14px 16px;margin:15px 0 20px;line-height:1.6}
+.quiz-recommendation strong{color:#36593c;font-size:14px}
+.quiz-recommendation p{font-size:12px;color:#63775e;margin:5px 0}
+.quiz-recommendation .review-control{margin-top:9px}
+.quiz-attempt-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.quiz-history-entry{border:1px solid #e0e9e0;border-radius:10px;background:#fdfefd;
+  padding:12px;display:flex;justify-content:space-between;align-items:center;gap:9px}
+.quiz-history-caption{display:grid;gap:4px}
+.quiz-history-caption strong{font-size:13px;color:#355541}
+.quiz-history-caption span{font-size:11px;color:#819687}
+.quiz-history-detail{margin-top:14px}
+.quiz-history-detail:empty{display:none}
+.quiz-history-detail h4{font-size:17px;color:#2a503c}
+.quiz-history-detail .retry-hand{margin:10px 0}
+.quiz-history-detail .retry-hand .tile{width:57px;height:75px}
+.quiz-history-detail .quiz-options{margin:10px 0}
+.quiz-history-detail .quiz-option.chosen{outline:3px solid #e0ad61;outline-offset:2px}
+@media(max-width:600px){.quiz-history-metric{padding:10px}
+.quiz-history-metric strong{font-size:16px}
+.quiz-history-entry{padding:9px}}
