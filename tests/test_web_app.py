@@ -357,6 +357,68 @@ class WebUI(unittest.TestCase):
         css,_=self.get("/app.css")
         self.assertIn(b".quiz-center",css)
 
+    def test_quiz_scores_are_saved_and_recommended_from_sqlite(self):
+        # The old solo SQLite store used by these HTTP tests is reused.
+        question=self.post({"action":"quiz_new",
+            "mode":"pure_suit_discard","difficulty":"basic"})
+        token=question["quiz_token"]
+        before=self.post({"action":"quiz_progress",
+            "mode":"pure_suit_discard","difficulty":"basic"})["progress"]
+        count=before["level_totals"]["basic"]["total"]
+        with self.assertRaises(HTTPError) as exc:
+            self.post({"action":"quiz_answer","quiz_token":token,
+                "selection":"invalid"})
+        self.assertEqual(exc.exception.code,400)
+        after_invalid=self.post({"action":"quiz_progress",
+            "mode":"pure_suit_discard","difficulty":"basic"})["progress"]
+        self.assertEqual(after_invalid["level_totals"]["basic"]["total"],count)
+        selection=question["question"]["choices"][0]
+        submitted=self.post({"action":"quiz_answer",
+            "quiz_token":token,"selection":selection})
+        self.assertIn("answer_id",submitted)
+        self.assertEqual(
+            submitted["progress"]["level_totals"]["basic"]["total"],count+1)
+        key=submitted["answer_id"]
+        self.assertNotIn("seed",submitted)
+        self.assertNotIn("seed",submitted["progress"])
+        original=self.post({"action":"quiz_detail","answer_id":key})["detail"]
+        self.assertEqual(original["question"],question["question"])
+        self.assertNotIn("seed",original["question"])
+        self.assertEqual(original["selection"],selection)
+        web_server._HISTORY=HistoryStore(self._history_path)
+        stored=self.post({"action":"quiz_detail","answer_id":key})["detail"]
+        self.assertEqual(stored["result"],submitted["result"])
+        with self.assertRaises(HTTPError) as exc:
+            self.post({"action":"quiz_answer","quiz_token":token,
+                "selection":selection})
+        self.assertEqual(exc.exception.code,400)
+        self.assertEqual(
+            self.post({"action":"quiz_progress",
+              "mode":"pure_suit_discard","difficulty":"basic"}
+            )["progress"]["level_totals"]["basic"]["total"],count+1)
+        if not submitted["result"]["correct"]:
+            safe=self.post({"action":"quiz_retry_question","answer_id":key})["question"]
+            self.assertNotIn("best_actions",safe)
+            self.assertNotIn("correct_tiles",safe)
+            right=submitted["result"]["best_actions"][0]
+            retried=self.post({"action":"quiz_retry_answer",
+                "answer_id":key,"selection":right})
+            self.assertTrue(retried["result"]["correct"])
+            self.assertEqual(retried["retry"]["attempts"],1)
+        deleted=self.post({"action":"quiz_delete","answer_id":key})
+        self.assertTrue(deleted["deleted"])
+
+    def test_quiz_history_js_is_exposed_and_has_manual_recommendation_button(self):
+        page,_=self.get("/")
+        code,mime=self.get("/quiz_history.js")
+        self.assertIn("javascript",mime)
+        self.assertIn(b"quiz-history-stats",page)
+        self.assertIn(b"quiz-recommendation",page)
+        self.assertIn(b"quiz-attempt-list",page)
+        self.assertIn(b"quiz_retry_answer",code)
+        self.assertIn("采用推荐".encode(),code)
+        self.assertIn(b"MahTrainQuizHistory",code)
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
