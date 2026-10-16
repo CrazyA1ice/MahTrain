@@ -148,6 +148,45 @@ class M32SettlementTests(unittest.TestCase):
         self.assertFalse(g._tian_ting[target]["eligible"])
         self.assertEqual(g.debug_tile_counts()["total"],108)
 
+    def test_kong_bloom_records_event_bonus_before_cap(self):
+        g=FourPlayerOpening(19)
+        dealer=g.dealer
+        # One concealed dark kong, three triplets and a singleton; the tail
+        # supplement completes the pair for an authentic kong-bloom win.
+        hand=["m1"]*4+["m2"]*3+["s2"]*3+["s5"]*3+["s9"]
+        g=staged_game({dealer:hand},{dealer:"p"},seed=19)
+        self.assertIn("s9",g._wall)
+        g._wall.remove("s9")
+        g._wall.append("s9")
+        g.declare_kong(dealer,"an_gang","m1")
+        self.assertTrue(g.private_view(dealer)["can_self_draw_win"])
+        self.assertEqual(g._kong_draw[dealer],True)
+        self.assertEqual(g.debug_tile_counts()["total"],108)
+        g.declare_self_win(dealer)
+        info=g.public_state()["win_ledger"]["wins"][0]
+        self.assertEqual(info["bonuses"]["kong_bloom"],1)
+        self.assertEqual(info["bonuses"]["roots"],1)
+        self.assertEqual(info["raw_fan"],3)
+        self.assertEqual(info["effective_fan"],3)
+        self.assertEqual(info["total_received"],2400)
+        self.assertEqual(g.public_state()["win_ledger"]["balances"][dealer],2400)
+
+    def test_kong_discard_ron_bonus_is_derived_from_source_draw_event(self):
+        g=deal_for_ron()
+        dealer=g.dealer
+        s1,s2,s3=[(dealer+i)%4 for i in (1,2,3)]
+        # This starts at a deliberately staged "just supplemented" state;
+        # the normal discard method records the causal event itself.
+        g._kong_draw[dealer]=True
+        g.discard(dealer,"s9")
+        self.assertTrue(g.public_state()["pending_discard"]["after_kong"])
+        for seat in (s1,s2,s3):
+            g.respond_discard(seat,"hu" if seat in (s1,s2) else "pass")
+        for item in g.public_state()["win_ledger"]["wins"]:
+            self.assertEqual(item["bonuses"]["kong_discard_ron"],1)
+            self.assertEqual(item["raw_fan"],5)
+            self.assertEqual(item["effective_fan"],3)
+
     def test_ledger_rejects_invalid_amounts_and_requires_zero_sum(self):
         game=WinLedger(200,3)
         valid={"legal":True,"raw_fan":4,"effective_fan":3,"multiplier":8,
