@@ -94,6 +94,54 @@ class FourPlayerClaimsTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             g.draw(s1)
 
+    def test_hu_claim_preempts_peng_even_when_both_are_legal(self):
+        g=FourPlayerOpening(42)
+        d=g.dealer
+        peng_seat=(d+1)%4
+        hu_seat=(d+2)%4
+        # A valid wait without holding m9: m7+m8 finishes the fourth meld.
+        ready=["m1"]*3+["m4"]*3+["s1"]*3+["s4"]*2+["m7","m8"]
+        deck=Counter({tile:4 for tile in TILES})
+        for t in ready:deck[t]-=1
+        deck["m9"]-=3  # source discard + peng claimant 2
+        source=["m9"]
+        claimant=["m9","m9"]
+        for hand,length in ((source,14),(claimant,13)):
+            for t in TILES:
+                while deck[t] and len(hand)<length:
+                    hand.append(t);deck[t]-=1
+        g=staged_game({d:source,peng_seat:claimant,hu_seat:ready},
+                      {d:"p",peng_seat:"p",hu_seat:"p"})
+        g.discard(d,"m9")
+        self.assertIn("peng",g.claim_options(peng_seat))
+        self.assertIn("hu",g.claim_options(hu_seat))
+        for seat in range(4):
+            if seat==d:continue
+            action=("peng" if seat==peng_seat else
+                    "hu" if seat==hu_seat else "pass")
+            g.respond_discard(seat,action)
+        self.assertEqual(g.public_state()["winners"][0]["seat"],hu_seat)
+        self.assertEqual(g.private_view(peng_seat)["own_melds"],[])
+        self.assertEqual(g.debug_tile_counts()["total"],108)
+
+    def test_three_winners_end_without_another_draw(self):
+        g=FourPlayerOpening(42)
+        d=g.dealer
+        winning=["m1"]*3+["m4"]*3+["s1"]*3+["s4"]*3+["s9"]*2
+        g=staged_game({d:winning},{d:"p"})
+        others=[s for s in range(4) if s!=d]
+        g._won[others[0]]=True
+        g._won[others[1]]=True
+        wall_before=g.public_state()["wall_count"]
+        g.declare_self_win(d)
+        self.assertEqual(g.phase,"finished")
+        self.assertIsNone(g.turn)
+        self.assertEqual(g.public_state()["wall_count"],wall_before)
+        self.assertEqual(g.public_state()["won"].count(True),3)
+        with self.assertRaises(ValueError):
+            g.draw(others[2])
+        self.assertEqual(g.debug_tile_counts()["total"],108)
+
     def test_illegal_ron_and_duplicate_response_do_not_corrupt_deck(self):
         g=deal_for_ron()
         d=g.dealer
