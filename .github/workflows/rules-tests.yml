@@ -72,6 +72,19 @@ jobs:
             /tmp/mahtrain-ai-benchmark.json
             /tmp/mahtrain-ai-benchmark.csv
           if-no-files-found: warn
+      - name: Smoke-test complete closed-loop AI tournament
+        run: |
+          python examples/tournament_ai.py --seed-start 11 --seeds 2 --json-out /tmp/mahtrain-ai-selfplay.json --csv-out /tmp/mahtrain-ai-selfplay.csv
+          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-selfplay.json',encoding='utf8')); assert d['games']==6; assert all(d['levels'][k]['seat_exposures']==8 for k in ('basic','advanced','challenge')); assert all(x['physical_count']==108 for x in d['matches'])"
+      - name: Archive complete AI self-play logs and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-selfplay-python-${{ matrix.python-version }}
+          path: |
+            /tmp/mahtrain-ai-selfplay.json
+            /tmp/mahtrain-ai-selfplay.csv
+          if-no-files-found: warn
       - name: Smoke-test deterministic four-seat opening
         run: |
           python examples/four_player_opening_demo.py --seed 42 --turns 8
