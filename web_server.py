@@ -21,6 +21,12 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from mahtrain_core import SoloTrainingSession  # noqa: E402
+from mahtrain_core.history import HistoryStore  # noqa: E402
+
+# Override MAHTRAIN_HISTORY_DB to relocate the local, single-user SQLite file.
+import os
+_HISTORY = HistoryStore(Path(os.environ.get("MAHTRAIN_HISTORY_DB",
+                                     str(ROOT / "data" / "mahtrain_history.sqlite3"))))
 
 _SESSIONS: dict[str, SoloTrainingSession] = {}
 _LOCK = threading.RLock()
@@ -31,6 +37,7 @@ _STATIC = {
     "/app.js": ROOT / "web" / "app.js",
     "/review.js": ROOT / "web" / "review.js",
     "/retry.js": ROOT / "web" / "retry.js",
+    "/history.js": ROOT / "web" / "history.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
@@ -87,17 +94,38 @@ def _process(action: str, payload: dict) -> dict:
                 _SESSIONS.pop(next(iter(_SESSIONS)))
             _SESSIONS[token] = game
             return {"token": token, "state": game.public_state()}
+        if action == "history_retry_question":
+            return {"question": _HISTORY.retry_question(
+                payload.get("archive_id"), payload.get("round")
+            )}
+        if action == "history_retry_submit":
+            return _HISTORY.retry_submit(
+                payload.get("archive_id"), payload.get("round"),
+                payload.get("tile"),
+            )
+        if action == "history_delete":
+            _HISTORY.delete_history(payload.get("archive_id"))
+            return {"deleted": True}
         token = payload.get("token")
         if not isinstance(token, str) or token not in _SESSIONS:
             raise ValueError("训练会话不存在，请重新开始")
         game = _SESSIONS[token]
         if action == "retry_list":
-            return {"retry": game.retry_list()}
+            if not game.finished:
+                raise ValueError("训练尚未结束，暂不能重练")
+            return {"retry": _HISTORY.retry_list(game._archive_id)}
         if action == "retry_question":
-            return {"question": game.retry_question(payload.get("round"))}
+            if not game.finished:
+                raise ValueError("训练尚未结束，暂不能重练")
+            return {"question": _HISTORY.retry_question(
+                game._archive_id, payload.get("round")
+            )}
         if action == "retry_submit":
-            answer = game.retry_submit(payload.get("round"), payload.get("tile"))
-            return {"result": answer, "retry": game.retry_list()}
+            if not game.finished:
+                raise ValueError("训练尚未结束，暂不能重练")
+            return _HISTORY.retry_submit(
+                game._archive_id, payload.get("round"), payload.get("tile")
+            )
         feedback = None
         if action == "draw":
             game.draw_next()
@@ -110,10 +138,14 @@ def _process(action: str, payload: dict) -> dict:
             feedback = game.submit(payload.get("tile"))
         else:
             raise ValueError("无效操作")
+        if game.finished and not hasattr(game, "_archive_id"):
+            # Unique per PLAYTHROUGH, even when the user repeats the same seed.
+            game._archive_id = _HISTORY.save_finished(game)
         # Only completed actions expose answer feedback.
         reveal = action == "discard" or (action == "win" and payload.get("accept"))
         return {
             "state": game.public_state(),
+            "archive_id": getattr(game, "_archive_id", None),
             "feedback": feedback if reveal else None,
             # Historical answers can be shown once submitted; pending answers
             # and wall order are never returned.
@@ -143,6 +175,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         url = urlparse(self.path)
         path = unquote(url.path)
+        if path == "/api/history":
+            query = parse_qs(url.query)
+            try:
+                with _LOCK:
+                    if "archive_id" in query:
+                        detail = _HISTORY.detail(query["archive_id"][0])
+                        self._json(200, detail)
+                    else:
+                        limit = int(query.get("limit", ["30"])[0])
+                        self._json(200, _HISTORY.list_history(limit))
+            except (ValueError, TypeError) as exc:
+                self._json(400, {"error": str(exc)})
+            return
         if path == "/api/state":
             token = parse_qs(url.query).get("token", [None])[0]
             with _LOCK:
@@ -152,6 +197,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self._json(200, {
                         "state": game.public_state(),
+                        "archive_id": getattr(game, "_archive_id", None),
                         "report": game.report() if game.report()["completed_rounds"] else None,
                     })
             return
