@@ -22,6 +22,14 @@ MahTrain 是一个面向川麻爱好者的本地优先训练/对战产品：
 
 已实现两项计算核心：`src/mahtrain_core/rules.py`（判胡、听牌、特殊番型与天听历史判定）和 `src/mahtrain_core/efficiency.py`（13有效张向听数、有效进张枚数与下一摸概率、14有效张局部最优切及并列排名），配套[29个固定规则/事件测试牌例](../tests/fixtures/win_fan_cases_v0.4.json)、`tests/test_rule_cases.py`、`tests/test_efficiency.py` 和 CI。**尚未实现连续多摸真实胡牌概率、完整对局状态机、计分账本与页面**。天听、天胡、地胡资格必须由游戏事件历史验证，不能仅凭手牌冒充。
 
+### M3.9：独立规则基线 AI 与四策略座位均衡实验（2026-10-16）
+
+- `src/mahtrain_core/ai_baseline.py` 新增与原三档AI独立实现的 `ShapeBaselineAgent`：只根据本家暗手的同张、对子及邻张联系判断较孤立牌，不调用本项目的 `shanten_13`、`analyze_discards` 或未来墙/他家隐藏手；换三张、定缺、碰杠胡均走相同四人状态机合法接口。它是**独立规则策略基线，不是独立外部模型，也非正式第四难度**。
+- `src/mahtrain_core/ai_tournament.py` 接受显式四种不同策略的座位布局并保持原 M3.8 三档赛制完全兼容；`src/mahtrain_core/ai_independent_benchmark.py` 每种子循环4轮，让基线、入门、进阶、挑战各出现在四个座位一次，合并为**同一种子下的一组关联实验**。
+- 四人真实摸切和合法响应一直到三家胡牌或墙尽，诊断记录总胡牌事件、放铳、向听/局部最优切率；牌效指标仍采用内部评估器，明确报告其同源偏差。>=5个种子才给固定随机抽样的**探索性配对区间**，1/2种子不生成区间。
+- 网页新增独立任务 `ai_baseline_start`、`ai_baseline_status`，与原四AI复盘共用本地单任务并发限制；仅发送聚合数据，不泄漏逐步私有牌例，能显示四档卡片和相对基线差值，导出独立种子CSV。CLI `examples/benchmark_independent_ai.py` 支持最多50个种子及 JSON/CSV 输出。
+- `tests/test_ai_independent_benchmark.py` 和 `tests/test_web_app.py` 覆盖不同策略完全座位曝光、108牌守恒、违规输入、算法独立性、密封信息与令牌隔离；GitHub Actions新增四局M3.9实际冒烟和原始报告附件。见[独立基线 v0.21](AI_INDEPENDENT_BASELINE_V0.21.md)。
+
 ### M3.8：公开AI策略解释及按洗牌种子成组统计（2026-10-16）
 
 - `src/mahtrain_core/ai_tournament.py` 的公开回放新增 `explain_public_action`：仅根据**脱敏公开行动、此刻公开牌桌和已知的AI难度策略**给出规则级解释，包括定缺切牌、进阶最小向听原则、挑战有效进张与公开副露弱风险原则、密封换牌/胡碰杠响应与最终裁决。绝不输出实际私有向听枚数、隐藏摸牌/换牌种类、别家暗手或密封期间的选择。
