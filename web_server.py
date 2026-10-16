@@ -233,6 +233,7 @@ def _replay_summary(job: dict) -> dict:
             "games":result["games"],
             "terminal_phase_counts":result["terminal_phase_counts"],
             "levels":result["levels"],
+            "seed_analysis":result.get("seed_analysis"),
             "limitations":result["limitations"],
             "matches":[{
                 "index":i,"seed":m["seed"],"rotation":m["rotation"],
@@ -252,9 +253,9 @@ def _process(action: str, payload: dict) -> dict:
             seeds=payload.get("seeds",1)
             if (type(seed_start) is not int or
                 not 0 <= seed_start < 2**32 or
-                type(seeds) is not int or not 1 <= seeds <= 2 or
+                type(seeds) is not int or not 1 <= seeds <= 5 or
                 seed_start+seeds > 2**32):
-                raise ValueError("AI复盘种子需在uint32范围、独立种子数1至2")
+                raise ValueError("AI复盘种子需在uint32范围、独立种子数1至5")
             active=sum(
                 job["status"]=="running" for job in _AI_REPLAY_JOBS.values()
             )
