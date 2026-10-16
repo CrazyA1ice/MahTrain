@@ -129,10 +129,17 @@ class Handler(BaseHTTPRequestHandler):
         if asset is None or not asset.is_file():
             self._json(404, {"error": "资源不存在"})
             return
+        data = asset.read_bytes()
         kind = mimetypes.guess_type(str(asset))[0] or "application/octet-stream"
+        # Existing assets/tiles/*.png include JPEG-encoded images despite
+        # their extension. Report actual bytes' MIME without re-encoding.
+        if data.startswith(b"\\xff\\xd8\\xff"):
+            kind = "image/jpeg"
+        elif data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            kind = "image/png"
         if kind.startswith("text/") or kind == "application/javascript":
             kind += "; charset=utf-8"
-        self._respond(200, asset.read_bytes(), kind)
+        self._respond(200, data, kind)
 
     def do_POST(self) -> None:
         if urlparse(self.path).path != "/api/action":
