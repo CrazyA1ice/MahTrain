@@ -20,7 +20,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from mahtrain_core import SoloTrainingSession  # noqa: E402
+from mahtrain_core import SoloTrainingSession, FourPlayerOpening  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
 from mahtrain_core.training_levels import DIFFICULTIES
 from mahtrain_core.error_focus import (
@@ -35,6 +35,7 @@ _HISTORY = HistoryStore(Path(os.environ.get("MAHTRAIN_HISTORY_DB",
 
 _SESSIONS: dict[str, SoloTrainingSession] = {}
 _QUIZZES: dict[str, dict] = {}
+_TABLE_DEMOS: dict[str, FourPlayerOpening] = {}
 _LOCK = threading.RLock()
 _MAX_SESSIONS = 32
 _STATIC = {
@@ -46,6 +47,7 @@ _STATIC = {
     "/history.js": ROOT / "web" / "history.js",
     "/quiz.js": ROOT / "web" / "quiz.js",
     "/quiz_history.js": ROOT / "web" / "quiz_history.js",
+    "/four_player.js": ROOT / "web" / "four_player.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
@@ -71,8 +73,79 @@ def _asset_path(url_path: str) -> Path | None:
     return None
 
 
+def _demo_exchange_choice(hand: list[str]) -> list[str]:
+    """Deterministic scripted selection; NOT strategic AI."""
+    for suit in ("m", "s", "p"):
+        owned = [t for t in hand if t.startswith(suit)]
+        if len(owned) >= 3:
+            return owned[:3]
+    raise RuntimeError("invalid demo hand without a three-card suit")
+
+
+def _demo_auto_until_human(game: FourPlayerOpening) -> None:
+    """Demo-only all-pass and scripted opponent cuts; never claim as real play."""
+    for _ in range(32):
+        if game.phase == "claim_window":
+            game.pass_all_claims_demo()
+        if game.phase in ("wall_exhausted", "exchange_select", "missing_select"):
+            return
+        if game.turn == 0 and game.phase in ("dealer_discard", "await_discard"):
+            return
+        if game.phase == "await_draw":
+            # Seat zero's draw is included in the scripted round transition.
+            game.draw(game.turn)
+        elif game.phase in ("dealer_discard", "await_discard"):
+            current = game.turn
+            hand = game.private_view(current)["hand"]
+            # Toy heuristic: cut missing-suit tiles first, otherwise first tile.
+            missing = game.missing_suits[current]
+            tile = next((t for t in hand if t.startswith(missing)), hand[0])
+            game.discard(current, tile)
+        else:
+            raise RuntimeError("unexpected four-player demo phase")
+    raise RuntimeError("demo autoplay failed to reach human turn")
+
+
 def _process(action: str, payload: dict) -> dict:
     with _LOCK:
+        if action == "table_new":
+            seed = payload.get("seed", 42)
+            if type(seed) is not int or not 0 <= seed <= 2**32-1:
+                raise ValueError("四人演示随机种子必须为0至2^32-1")
+            table = FourPlayerOpening(seed)
+            key = secrets.token_urlsafe(24)
+            if len(_TABLE_DEMOS) >= 32:
+                _TABLE_DEMOS.pop(next(iter(_TABLE_DEMOS)))
+            _TABLE_DEMOS[key] = table
+            return {"table_token": key, "table": table.private_view(0)}
+        if action in ("table_exchange","table_missing","table_discard"):
+            key = payload.get("table_token")
+            table = _TABLE_DEMOS.get(key) if type(key) is str else None
+            if table is None:
+                raise ValueError("四人开局演示会话不存在，请重新发牌")
+            if action == "table_exchange":
+                table.select_exchange(0, payload.get("tiles"))
+                for s in (1, 2, 3):
+                    table.select_exchange(
+                        s, _demo_exchange_choice(table.private_view(s)["hand"])
+                    )
+            elif action == "table_missing":
+                table.select_missing(0, payload.get("suit"))
+                for s in (1, 2, 3):
+                    hand = table.private_view(s)["hand"]
+                    missing = min(
+                        ("m", "s", "p"),
+                        key=lambda suit: (
+                            sum(t.startswith(suit) for t in hand),
+                            ("m", "s", "p").index(suit),
+                        )
+                    )
+                    table.select_missing(s, missing)
+                _demo_auto_until_human(table)
+            else:
+                table.discard(0, payload.get("tile"))
+                _demo_auto_until_human(table)
+            return {"table_token": key, "table": table.private_view(0)}
         if action in ("preview", "new"):
             seed = payload.get("seed", 17)
             if type(seed) is not int or seed < 0 or seed > 2**32 - 1:
