@@ -308,3 +308,4 @@ window.MahTrainHistory?.init();
 window.MahTrainQuiz?.init();
 window.MahTrainQuizHistory?.init();
 window.MahTrainTableDemo?.init();
+window.MahTrainMatch?.init();
