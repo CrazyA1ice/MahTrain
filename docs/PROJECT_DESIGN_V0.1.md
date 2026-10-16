@@ -22,6 +22,14 @@ MahTrain 是一个面向川麻爱好者的本地优先训练/对战产品：
 
 已实现两项计算核心：`src/mahtrain_core/rules.py`（判胡、听牌、特殊番型与天听历史判定）和 `src/mahtrain_core/efficiency.py`（13有效张向听数、有效进张枚数与下一摸概率、14有效张局部最优切及并列排名），配套[29个固定规则/事件测试牌例](../tests/fixtures/win_fan_cases_v0.4.json)、`tests/test_rule_cases.py`、`tests/test_efficiency.py` 和 CI。**尚未实现连续多摸真实胡牌概率、完整对局状态机、计分账本与页面**。天听、天胡、地胡资格必须由游戏事件历史验证，不能仅凭手牌冒充。
 
+### M3.7：四人AI公开牌桌逐动作回放与网页统计（2026-10-16）
+
+- `src/mahtrain_core/ai_tournament.py` 在每次四人规则状态机动作后保存公开 `public_replay_frame`：仅含公开出牌/牌河、副露、座位暗手**张数**、墙张数、定缺公开时点与赢家，不包含他家暗手、未来牌墙、摸牌牌种、私有响应选项与逐家向听细节；暗杠仍隐藏牌种。
+- `web_server.py` 新增 `ai_replay_start`、`ai_replay_status`、`ai_replay_match` 三个独立API，以后台线程跑最多2个种子的三轮座位对照，定时查看进度，随机令牌限制访问，后端只从公开快照下发被选中的那一局；限制同时执行1个评测任务，至多保存4个任务结果。避免同步长计算卡住原训练HTTP接口。
+- `web/ai_replay.js` 增加三档对比指标条、轮换场次下拉、单步前进后退与进度条、四色牌河和公开副露的原始麻将贴图展示，支持导出仅含公开信息的JSON文件，独立于真人0号对三AI的旧对战页面。
+- 定缺密封信息不得由逐步日志旁路提前揭示：即使每家的 `declare_missing` 独立发生，回放动作不包含该家的具体花色；四家都完成才显示 `missing_suits`。**当时不公开的私有牌效**只供后台整体统计而不是逐家公开讲解。
+- `tests/test_ai_tournament.py` 检查步骤与公开快照一一对应、密封选择只在合法时点公开、暗杠和摸牌保密；`tests/test_web_app.py` 校验后台计算授权令牌、输入边界、网页静态资源和接口过滤。旧 M3.6 自博弈、单题与14轮训练回归保留。详见[四AI可视化复盘 v0.19](AI_REPLAY_V0.19.md)。
+
 ### M3.6：三档AI全程自动摸切与平衡座位自博弈（2026-10-16）
 
 - 新增 `src/mahtrain_core/ai_tournament.py` 及 `examples/tournament_ai.py`：四名AI使用服务器既有规则状态机从真实108张初始牌、密封换三张、换后定缺、庄家切牌、全体真实碰杠胡响应走至三家已胡或牌墙耗尽；全过程不调用 `pass_all_claims_demo()`。
