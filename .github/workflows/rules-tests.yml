@@ -43,6 +43,8 @@ jobs:
           node --check web/quiz_history.js
           node --check web/four_player.js
           node --check web/match.js
+      - name: Smoke-test four-sided live match DOM and click-to-discard
+        run: node tests/test_match_board_dom.js
           node --check web/ai_replay.js
           node --check web/ai_baseline.js
           node --check web/app.js
