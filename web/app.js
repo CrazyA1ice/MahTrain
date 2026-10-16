@@ -5,10 +5,24 @@ const names = {m:"万", s:"条", p:"筒"};
 let token = null;
 let currentState = null;
 let busy = false;
-let vectorArt = true;
+let currentPreview = null;
 const playSound = (event) => window.MahTrainSound?.play(event);
 const tileName = (tile) => tile.slice(1) + names[tile[0]];
+// Cropping the ORIGINAL 560x420 project sprite sheet, not using synthetic SVG.
 const tileUrl = (tile) => "/assets/tiles/" + encodeURIComponent(names[tile[0]] + tile.slice(1) + ".png");
+const atlasMap = {p:0, m:1, s:2};
+function atlasFace(tile) {
+  const row = atlasMap[tile[0]];
+  const col = Number(tile[1]) - 1;
+  const cropX = 16 + 60 * col;  // 9 columns, 60px step.
+  const cropY = [25,103,180][row]; // 筒/万/条, top to bottom in atlas.
+  const face = node("span", "tile-atlas-face");
+  face.style.backgroundPosition =
+      (100 * cropX / (560 - 46)).toFixed(5) + "% " +
+      (100 * cropY / (420 - 60)).toFixed(5) + "%";
+  face.setAttribute("aria-hidden", "true");
+  return face;
+}
 
 function node(tag, className, text) {
   const element = document.createElement(tag);
@@ -21,15 +35,7 @@ function tileElement(tile, {small=false, selectable=false, drawn=false, missing=
   button.type = "button";
   button.title = tileName(tile);
   button.setAttribute("aria-label", tileName(tile) + (selectable ? "，点击打出" : ""));
-  const svg = vectorArt ? window.MahTrainTiles?.render(tile) : null;
-  if (svg) button.append(svg);
-  else {
-    const img = node("img");
-    img.src = tileUrl(tile);
-    img.alt = tileName(tile);
-    img.decoding = "async";
-    button.append(img);
-  }
+  button.append(atlasFace(tile));
   if (drawn) button.append(node("span", "drawn", "本轮摸牌"));
   if (selectable && onClick) button.addEventListener("click", onClick);
   else button.disabled = true;
@@ -120,7 +126,7 @@ function renderHand(state) {
     const container = node("div", "kong-block");
     container.append(node("div","tiny-caption", "暗杠 · " + tileName(group.tile) + " · 已锁定"));
     const four = node("div","kong-four");
-    group.tiles.forEach((tile) => four.append(tileElement(tile)));
+    group.tiles.forEach((tile) => four.append(tileElement(tile,{small:true})));
     container.append(four);
     kong.append(container);
   });
@@ -258,10 +264,4 @@ $("#sound-toggle").addEventListener("click",()=>{
   button.setAttribute("aria-pressed",String(next));
   if(next)playSound("draw");
 });
-$("#art-toggle").addEventListener("click",()=>{
-  vectorArt=!vectorArt;
-  const button=$("#art-toggle");
-  button.textContent=vectorArt?"高清矢量牌面":"经典原始牌图";
-  button.setAttribute("aria-pressed",String(vectorArt));
-  if(currentState)renderHand(currentState);
-});
+
