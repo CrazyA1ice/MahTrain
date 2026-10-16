@@ -580,6 +580,87 @@ class WebUI(unittest.TestCase):
             self.post({"action":"table_discard",
                        "table_token":"forged","tile":"m1"})
 
+    def test_m31_match_api_scripted_opening_and_claim_windows(self):
+        started=self.post({"action":"match_new","seed":42})
+        token=started["match_token"]
+        state=started["match"]
+        self.assertEqual(state["phase"],"exchange_select")
+        self.assertEqual(state["wall_count"],55)
+        self.assertNotIn("seed",state)
+        self.assertNotIn("_wall",state)
+        self.assertNotIn("_hands",state)
+        self.assertIsNone(state["missing_suits"])
+        self.assertEqual(len(state["hand"]),14 if state["dealer"]==0 else 13)
+        hand=state["hand"]
+        chosen=next([t for t in hand if t.startswith(s)][:3]
+                    for s in "msp"
+                    if sum(t.startswith(s) for t in hand)>=3)
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_exchange","match_token":token,
+                       "tiles":chosen[:2]})
+        swapped=self.post({"action":"match_exchange","match_token":token,
+                           "tiles":chosen})["match"]
+        self.assertEqual(swapped["phase"],"missing_select")
+        self.assertIsNone(swapped["missing_suits"])
+        self.assertEqual(swapped["wall_count"],55)
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_exchange","match_token":token,
+                       "tiles":chosen})
+        started=self.post({"action":"match_missing","match_token":token,
+                           "suit":"p"})["match"]
+        self.assertEqual(started["missing_suits"][0],"p")
+        self.assertNotIn("opponent_hand",started)
+        self.assertNotIn("seed",started)
+        self.assertNotIn("wall",started)
+        current=started
+        for index in range(4):
+            phase=current["phase"]
+            if phase in ("finished","wall_exhausted"):
+                break
+            if phase=="claim_window":
+                choices=current["claim_options"]
+                self.assertGreater(len(choices),1)
+                result=self.post({"action":"match_claim","match_token":token,
+                                   "choice":"pass"})
+            elif phase=="rob_kong_window":
+                self.assertGreater(len(current["rob_options"]),1)
+                result=self.post({"action":"match_rob","match_token":token,
+                                   "choice":"pass"})
+            else:
+                self.assertIn(phase,("dealer_discard","await_discard"))
+                self.assertEqual(current["turn"],0)
+                self.assertEqual(len(current["hand"])+
+                                 3*len(current["own_melds"]),14)
+                result=self.post({"action":"match_discard","match_token":token,
+                                   "tile":current["hand"][0]})
+            current=result["match"]
+            self.assertTrue(0<=current["wall_count"]<=55)
+            self.assertLessEqual(len(current["discards"]),55)
+            self.assertNotIn("_wall",current)
+        self.assertIn(current["phase"],(
+            "finished","wall_exhausted","claim_window","rob_kong_window",
+            "dealer_discard","await_discard"))
+        with self.assertRaises(HTTPError) as exc:
+            self.post({"action":"match_discard","match_token":"forged",
+                       "seat":1,"tile":"m1"})
+        self.assertEqual(exc.exception.code,400)
+
+    def test_m31_match_static_controls_and_validation(self):
+        markup,_=self.get("/")
+        js,mime=self.get("/match.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b'id="match-panel"',markup)
+        self.assertIn(b'src="/match.js"',markup)
+        self.assertIn(b".match-panel",css)
+        self.assertIn("javascript",mime)
+        self.assertIn(b"match_claim",js)
+        self.assertIn(b"match_rob",js)
+        self.assertIn(b"match_kong",js)
+        self.assertIn(b"match_win",js)
+        for bad in (-1,2**32,True,"42"):
+            with self.subTest(bad=bad),self.assertRaises(HTTPError):
+                self.post({"action":"match_new","seed":bad})
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
