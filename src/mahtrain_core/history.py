@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from .retry import MistakeRetry
+from .review import build_round_review
 from .quiz_progress import QuizProgressMixin
 
 SCHEMA_VERSION = 2
@@ -131,11 +132,22 @@ class HistoryStore(QuizProgressMixin):
 
     def detail(self, archive_id: str) -> dict[str, Any]:
         row = self._row(archive_id)
+        report = json.loads(row["report_json"])
+        # Enrich older v0.5-v0.10 archives at read time, without rewriting
+        # frozen grades or changing the SQLite schema/record on disk.
+        if "error_summary" not in report and "history" in report:
+            reviewed = build_round_review(report["history"])
+            report["error_summary"] = reviewed["errors"]
+            previous = {r["round"]: r for r in reviewed["rounds"]}
+            for r in report.get("round_review", ()):
+                if r["round"] in previous:
+                    r["error_types"] = previous[r["round"]]["error_types"]
+                    r["error_labels"] = previous[r["round"]]["error_labels"]
         return {
             "archive_id": row["archive_id"],
             "created_at": row["created_at"],
             "missing_suit": row["missing_suit"],
-            "report": json.loads(row["report_json"]),
+            "report": report,
             "retry": self.retry_list(archive_id),
         }
 
