@@ -70,7 +70,7 @@ def _process(action: str, payload: dict) -> dict:
                 return {
                     "initial_hand": cards,
                     "suit_counts": counts,
-                    "tianque": len(absent) > 0,
+                    "tianque": len(absent) == 1,
                     "absent_suits": absent,
                     "stage": "deal_before_declaring_missing_suit",
                     "note": "单人练习暂无换三张；正式四人玩法为换三张后一起定缺",
