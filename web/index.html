@@ -6,20 +6,22 @@
   <meta name="theme-color" content="#122b2b">
   <title>MahTrain · 四川麻将训练</title>
   <link rel="stylesheet" href="/app.css">
+  <script src="/tile_art.js" defer></script>
+  <script src="/sound.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div class="brand"><span class="brand-mark">麻</span><span><strong>MahTrain</strong><small>四川麻将 · 牌效训练原型</small></span></div>
-      <span class="mode-label">单人摸切 · 14轮</span>
+      <div class="top-actions"><button id="art-toggle" class="toolbar-button" type="button" aria-pressed="true">高清矢量牌面</button><button id="sound-toggle" class="toolbar-button" type="button" aria-pressed="true">🔊 音效开启</button><span class="mode-label">单人摸切 · 14轮</span></div>
     </header>
     <main>
       <section class="intro">
         <div>
           <p class="eyebrow">STRUCTURED PRACTICE</p>
           <h1>每一张切牌，都有依据。</h1>
-          <p>理牌采用 <strong>万 → 条 → 筒</strong>，花色内 <strong>1 → 9</strong> 升序。摸到可胡或可杠的牌时，系统会主动询问。</p>
+          <p>理牌采用 <strong>万 → 条 → 筒</strong>，花色内 <strong>1 → 9</strong> 升序。系统自动校验胡牌与定缺，并提示胡牌、暗杠；音效可随时关闭。</p>
         </div>
         <form id="start-form" class="start-form">
           <label>训练种子<input type="number" id="seed" min="0" max="4294967295" value="17"></label>
@@ -38,8 +40,9 @@
           <div class="play-header"><div><span class="eyebrow">YOUR HAND</span><h2>我的手牌</h2></div><div id="phase-label" class="phase-label">等待摸牌</div></div>
           <div class="hand-layout">
             <section class="concealed">
-              <div class="section-meta"><span>暗手牌 · 单击牌面切牌</span><span id="drawn-label">尚未摸牌</span></div>
+              <div class="section-meta"><span>暗手牌 · 点击切牌 · 金色标记为定缺牌</span><span id="drawn-label">尚未摸牌</span></div>
               <div id="hand" class="hand-row" aria-live="polite"></div>
+              <div id="win-diagnosis" class="win-diagnosis" role="status" aria-live="polite">胡牌检测将在摸牌后自动运行。</div>
             </section>
             <aside class="meld-area"><div class="section-meta">独立杠区 · 不可操作</div><div id="kong-area" class="kong-area"><span class="placeholder">暂未开杠</span></div></aside>
           </div>
