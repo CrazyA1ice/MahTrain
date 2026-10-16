@@ -506,3 +506,12 @@
 @media(max-width:900px){.ai-replay-cluster-differences{grid-template-columns:1fr}}
 @media(max-width:600px){.ai-replay-clusters{padding:12px}
 .ai-replay-explanation{padding:10px 12px}}
+
+
+/* M3.9 independent rule-only baseline side-by-side panel. */
+.ai-baseline-panel{border-color:#cee1d3}
+.ai-baseline-summary{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ai-baseline-summary .ai-replay-score:first-child{background:#fff9ed;border-color:#e7d8b1}
+.ai-baseline-summary .ai-replay-score:first-child h5{color:#7c6129}
+@media(max-width:1040px){.ai-baseline-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:580px){.ai-baseline-summary{grid-template-columns:1fr}}
