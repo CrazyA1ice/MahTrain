@@ -11,7 +11,8 @@ import random
 from collections import Counter
 from typing import Any
 
-from .efficiency import analyze_discards
+from .efficiency import analyze_discards, effective_draws
+from .review import build_round_review
 from .presentation import grouped_hand, sort_hand
 from .rules import SUITS, TILES, _meld_tiles, is_legal_win, diagnose_win
 
@@ -223,15 +224,28 @@ class SoloTrainingSession:
         )
         best = ["win"] if legal_win else list(analysis["best_discards"])
         row = next((r for r in analysis["candidates"] if r["discard"] == action), None)
+        if legal_win and row is None:
+            # The learner declined a legal win and chose to cut. The ordinary
+            # discard analyzer intentionally stops at a completed hand; still
+            # record actual after-cut ukeire so the round isn't lost in review.
+            remainder = list(self._hand)
+            remainder.remove(action)
+            row = {
+                "discard": action,
+                **effective_draws(
+                    remainder, self._melds, self.missing_suit,
+                    visible_tiles=[*self._discards, action],
+                ),
+            }
         loss = (
             row["shanten"] - analysis["minimum_shanten"]
-            if row is not None else None
+            if row is not None and not legal_win else None
         )
         ukeire_loss = (
             max(r["effective_tile_count"] for r in analysis["candidates"]
                 if r["shanten"] == analysis["minimum_shanten"])
             - row["effective_tile_count"]
-            if row is not None and loss == 0 else None
+            if row is not None and loss == 0 and not legal_win else None
         )
         correct = action in best
         if legal_win:
@@ -278,8 +292,11 @@ class SoloTrainingSession:
         successes = sum(row["correct"] for row in self._history)
         comparable = [row["ukeire_loss"] for row in self._history
                       if row["ukeire_loss"] is not None]
+        review = build_round_review(self._history)
         return {
             "session_id": self.session_id,
+            "round_review": review["rounds"],
+            "progress_summary": review["progress"],
             "completed_rounds": total,
             "round_limit": self._rounds,
             "finished": self.finished,
