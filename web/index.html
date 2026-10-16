@@ -107,11 +107,11 @@
         <section id="retry-panel" class="panel retry-panel" hidden><div class="panel-title"><h3>错题重练 · 再做一次</h3><small>仅复习本局答错的回合，不影响原牌墙和成绩</small></div><div id="retry-board" aria-live="polite"></div></section>
       </section>
       <section id="ai-replay-panel" class="panel ai-replay-panel">
-        <div class="panel-title"><h3>M3.7 · 四AI逐步复盘与难度统计</h3><small>三次座位轮换 · 实际摸切 · 公开牌桌回放</small></div>
+        <div class="panel-title"><h3>M3.8 · AI决策公开解释与种子对照统计</h3><small>三次座位轮换合并为一个种子 · 脱敏逐动作讲解</small></div>
         <p class="review-intro">运行三档AI的完整自动对局，完成后逐步查看出牌、碰杠胡、公开副露及每家的牌河。不同档位可比较胡牌事件、放铳责任、最低向听选择率与局部最优率；<strong>公开回放不会显示其他家的暗牌、未来牌墙或隐藏牌效。</strong> 当前积分仅含已确认的胡牌部分，非正式血战胜率。</p>
         <div class="ai-replay-toolbar">
           <label>起始种子 <input id="ai-replay-seed" type="number" min="0" max="4294967295" value="11"/></label>
-          <label>独立洗牌种子数 <select id="ai-replay-seeds"><option value="1" selected>1（3局）</option><option value="2">2（6局）</option></select></label>
+          <label>独立洗牌种子数 <select id="ai-replay-seeds"><option value="1" selected>1（3局）</option><option value="2">2（6局）</option><option value="5">5（15局，耗时较长）</option></select></label>
           <button id="ai-replay-start" type="button" class="primary">开始多回合AI评测</button>
         </div>
         <p id="ai-replay-progress" class="review-intro" role="status" aria-live="polite">尚未运行。单局计算可能需要一些时间，不影响其他训练页面。</p>
@@ -120,6 +120,14 @@
           <h4>三档策略表现（实际对局事件，非正式胜率）</h4>
           <div id="ai-replay-summary" class="ai-replay-summary"></div>
           <p id="ai-replay-terminations" class="review-footnote"></p>
+          <section id="ai-replay-clusters" class="ai-replay-clusters" hidden>
+            <div class="ai-replay-cluster-heading"><h4>以洗牌种子为单位的配对统计</h4>
+              <button id="ai-replay-cluster-download" type="button" class="review-control">导出种子分组 CSV</button>
+            </div>
+            <p id="ai-replay-cluster-warning" class="review-footnote"></p>
+            <div id="ai-replay-cluster-differences" class="ai-replay-cluster-differences"></div>
+            <div id="ai-replay-cluster-table" class="ai-replay-cluster-table"></div>
+          </section>
           <div class="ai-replay-picker">
             <label>选择公开回放 <select id="ai-replay-match"></select></label>
             <button id="ai-replay-download" type="button" class="review-control" disabled>导出本局公开记录 JSON</button>
@@ -132,6 +140,10 @@
             </div>
             <p id="ai-replay-step-title" class="ai-replay-step-title"></p>
             <p id="ai-replay-step-note" class="review-footnote"></p>
+            <aside class="ai-replay-explanation" aria-label="公开策略解释">
+              <strong>本步解释（仅公开信息）</strong>
+              <p id="ai-replay-explanation-text">只展示算法规则与公开事件，不推断对手暗手。</p>
+            </aside>
             <div id="ai-replay-board" class="ai-replay-board"></div>
           </div>
         </div>
