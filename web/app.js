@@ -310,3 +310,4 @@ window.MahTrainQuizHistory?.init();
 window.MahTrainTableDemo?.init();
 window.MahTrainMatch?.init();
 window.MahTrainAIReplay?.init();
+window.MahTrainAIBaseline?.init();
