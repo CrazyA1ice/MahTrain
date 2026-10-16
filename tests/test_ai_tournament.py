@@ -109,6 +109,15 @@ class FourAgentTrialTests(unittest.TestCase):
                     self.assertNotIn("tile",frame["action"])
                 if frame["action"]["action"]=="draw":
                     self.assertNotIn("tile",frame["action"])
+                if frame["action"]["action"]=="declare_missing":
+                    self.assertNotIn("suit",frame["action"])
+                    if index < 7:
+                        self.assertIsNone(frame["board"]["missing_suits"])
+                    else:
+                        self.assertTrue(all(
+                            suit in ("m","s","p") for suit in
+                            frame["board"]["missing_suits"]
+                        ))
             self.assertIsNone(
                 match["public_replay"][0]["board"]["missing_suits"])
 
