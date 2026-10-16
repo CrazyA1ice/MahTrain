@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
@@ -86,7 +87,11 @@ class FourAgentTrialTests(unittest.TestCase):
     def test_json_and_sanitized_summary(self):
         output=json.dumps(self.result,ensure_ascii=False)
         self.assertIn("unpriced",output)
-        compact=tournament(seed_start=11,seeds=1,include_traces=False)
+        # Reuse the already validated games instead of re-playing a second
+        # tournament. Hardware clock time is intentionally not deterministic.
+        with patch("mahtrain_core.ai_tournament.simulate_match",
+                   side_effect=lambda seed, rotation: self.result["matches"][rotation]):
+            compact=tournament(seed_start=11,seeds=1,include_traces=False)
         self.assertEqual(compact["levels"],self.result["levels"])
         self.assertNotIn("trace",compact["matches"][0])
         self.assertNotIn("public_events",compact["matches"][0])
