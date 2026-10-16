@@ -12,9 +12,9 @@ from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.rules import TILES
 
 
-def staged_game(hands: dict[int,list[str]], missing: dict[int,str] | None=None):
+def staged_game(hands: dict[int,list[str]], missing: dict[int,str] | None=None, *, seed=42):
     """Build a legal physical 108-deck at dealer's first-discard checkpoint."""
-    game=FourPlayerOpening(42)
+    game=FourPlayerOpening(seed)
     dealer=game.dealer
     deck=Counter({tile:4 for tile in TILES})
     for cards in hands.values():
@@ -124,7 +124,7 @@ class FourPlayerClaimsTests(unittest.TestCase):
                 while original[tile] and len(target)<size:
                     target.append(tile);original[tile]-=1
         g=staged_game({d:source,receiver:claimant},
-                      {d:"p",receiver:"p"})
+                      {d:"p",receiver:"p"},seed=17)
         # The other players might have valid claims, but all explicitly pass.
         g.discard(d,"m9")
         self.assertIn("peng",g.claim_options(receiver))
@@ -156,7 +156,7 @@ class FourPlayerClaimsTests(unittest.TestCase):
             for tile in TILES:
                 while counts[tile] and len(hand)<size:
                     hand.append(tile);counts[tile]-=1
-        g=staged_game({d:source,p:contestant},{d:"p",p:"p"})
+        g=staged_game({d:source,p:contestant},{d:"p",p:"p"},seed=19)
         old_tail=g._wall[-1]
         g.discard(d,"m9")
         self.assertIn("ming_gang",g.claim_options(p))
@@ -180,7 +180,7 @@ class FourPlayerClaimsTests(unittest.TestCase):
         for tile in TILES:
             while deck[tile] and len(source)<14:
                 source.append(tile);deck[tile]-=1
-        g=staged_game({d:source},{d:"p"})
+        g=staged_game({d:source},{d:"p"},seed=19)
         old_tail=g._wall[-1]
         self.assertEqual(g.kong_options(d),[{"type":"an_gang","tile":"m9"}])
         with self.assertRaises(ValueError):
@@ -274,15 +274,7 @@ class FourPlayerClaimsTests(unittest.TestCase):
         for t in TILES:
             while deck[t] and len(source)<14:
                 source.append(t);deck[t]-=1
-        others={r:ready}
-        for s in range(4):
-            if s in (d,r):continue
-            hand=[]
-            for t in TILES:
-                while deck[t] and len(hand)<13:
-                    hand.append(t);deck[t]-=1
-            others[s]=hand
-        g=staged_game({d:source,**others},{d:"p",r:"p"})
+        g=staged_game({d:source,r:ready},{d:"p",r:"p"})
         # stager accounted all four m9 as remaining wall: replace with real
         # owned peng (three) and retain dealer's fourth one concealed.
         g._melds[d]=[{"type":"peng","tile":"m9"}]
