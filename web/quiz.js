@@ -9,6 +9,7 @@
   };
   const LEVELS={basic:"基础",intermediate:"进阶",challenge:"挑战"};
   let token=null,question=null,selection=new Set(),submitted=false,busy=false;
+  let activeStrategy=null; // null = ordinary, auto = weighted weakness
   const name=t=>t==="win"?"胡牌":window.MahTrainUI.tileName(t);
   function el(tag,css,text){
     const e=document.createElement(tag);
@@ -39,6 +40,7 @@
     try{
       const data=await request("quiz_new",{
         mode:$("quiz-mode").value,difficulty:$("quiz-level").value,
+        ...(activeStrategy?{focus:activeStrategy}:{}),
       });
       token=data.quiz_token;question=data.question;selection.clear();
       submitted=false;renderQuestion();
@@ -52,6 +54,13 @@
     root.replaceChildren();
     root.append(el("p","quiz-meta",TITLES[question.mode]+" · "+
       LEVELS[question.difficulty]+" · 定缺 "+({m:"万",s:"条",p:"筒"}[question.missing_suit])));
+    if(activeStrategy){
+      const explanation=question.focus_label
+        ?("已核验专项："+question.focus_label)
+        :"本题为普通穿插题，保持练习多样性";
+      root.append(el("p","quiz-focus-tag",
+        (activeStrategy==="auto"?"薄弱项强化 · ":"指定专项 · ")+explanation));
+    }
     root.append(el("p","retry-label","手牌（万→条→筒，组内1→9）"));
     const hand=el("div","retry-hand");
     question.concealed.forEach(tile=>hand.append(window.MahTrainUI.tileElement(tile)));
@@ -76,7 +85,10 @@
     root.append(actions);
     const footer=el("div","retry-controls");
     footer.append(button("提交本题答案","primary",submit));
-    footer.append(button("重新出一题","review-control",create));
+    footer.append(button("重新出一题","review-control",()=>create()));
+    if(activeStrategy)footer.append(button("退出强化","review-control",()=>{
+      activeStrategy=null;create();
+    }));
     root.append(footer);
     footer.firstChild.disabled=submitted || (!selection.size && !multiple);
   }
@@ -95,6 +107,8 @@
     const root=$("quiz-feedback");root.replaceChildren();
     root.append(el("h4","",result.correct?"本题回答正确":"本题仍有提升空间"));
     root.append(el("p","review-intro",result.reason));
+    if(result.error_labels?.length)root.append(el("p","quiz-focus-error",
+      "本题错因："+result.error_labels.join("、")));
     if(question.answer_type==="tile_set"){
       root.append(el("p","review-detail-line",
         "正确听口："+result.correct_tiles.map(name).join("、")));
@@ -143,9 +157,14 @@
     }catch(err){showError(err.message);}
     finally{busy=false;}
   }
+  function focus(type){
+    activeStrategy=type;
+    create();
+  }
   function init(){
-    $("quiz-new").addEventListener("click",create);
+    $("quiz-new").addEventListener("click",()=>create());
     $("quiz-mode").addEventListener("change",()=>{
+      activeStrategy=null;
       question=null;token=null;selection.clear();submitted=false;
       $("quiz-question").replaceChildren();
       $("quiz-feedback").replaceChildren();
@@ -158,5 +177,5 @@
       void window.MahTrainQuizHistory?.refresh();
     });
   }
-  window.MahTrainQuiz={init};
+  window.MahTrainQuiz={init,focus};
 })();
