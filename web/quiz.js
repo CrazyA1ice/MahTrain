@@ -62,10 +62,15 @@
       :"请选择一种切牌；若已经胡牌，可以选择「确认胡牌」。"));
     const actions=el("div","quiz-options");
     for(const tile of question.choices){
-      const b=button(name(tile),"quiz-option",()=>pick(tile));
+      const b=tile==="win"
+        ?button("确认胡牌","primary win-option",()=>pick(tile))
+        :window.MahTrainUI.tileElement(tile,{
+          selectable:!submitted,onClick:()=>pick(tile),
+        });
+      b.classList.add("quiz-option");
       if(selection.has(tile))b.classList.add("chosen");
+      b.setAttribute("aria-pressed",String(selection.has(tile)));
       b.disabled=submitted;
-      if(tile==="win")b.classList.add("win-option");
       actions.append(b);
     }
     root.append(actions);
