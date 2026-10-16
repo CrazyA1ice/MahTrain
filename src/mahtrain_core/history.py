@@ -15,11 +15,12 @@ from types import SimpleNamespace
 from typing import Any
 
 from .retry import MistakeRetry
+from .quiz_progress import QuizProgressMixin
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
-class HistoryStore:
+class HistoryStore(QuizProgressMixin):
     def __init__(self, path: str | Path):
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -57,10 +58,36 @@ class HistoryStore:
                 );
                 CREATE INDEX IF NOT EXISTS idx_retries_archive
                     ON local_retries(archive_id, round_number, attempt_id);
+                CREATE TABLE IF NOT EXISTS quiz_attempts (
+                    answer_id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    mode TEXT NOT NULL,
+                    difficulty TEXT NOT NULL,
+                    question_id TEXT NOT NULL,
+                    rule_version TEXT NOT NULL,
+                    correct INTEGER NOT NULL CHECK (correct IN (0,1)),
+                    family TEXT NOT NULL,
+                    question_json TEXT NOT NULL,
+                    selection_json TEXT NOT NULL,
+                    result_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_quiz_progress
+                    ON quiz_attempts(mode,difficulty,created_at DESC,answer_id DESC);
+                CREATE TABLE IF NOT EXISTS quiz_retries (
+                    retry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    answer_id TEXT NOT NULL REFERENCES quiz_attempts(answer_id)
+                        ON DELETE CASCADE,
+                    created_at TEXT NOT NULL,
+                    correct INTEGER NOT NULL CHECK(correct IN (0,1)),
+                    selection_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_quiz_retries
+                    ON quiz_retries(answer_id,retry_id DESC);
             """)
             current = db.execute("PRAGMA user_version").fetchone()[0]
-            if current == 0:
-                db.execute("PRAGMA user_version = 1")
+            if current in (0,1):
+                # Add-only upgrade; existing solo history/retries remain intact.
+                db.execute("PRAGMA user_version = 2")
             elif current > SCHEMA_VERSION:
                 raise ValueError("history database schema is newer than this app")
 
