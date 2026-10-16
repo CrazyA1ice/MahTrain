@@ -6,7 +6,6 @@
   <meta name="theme-color" content="#122b2b">
   <title>MahTrain · 四川麻将训练</title>
   <link rel="stylesheet" href="/app.css">
-  <script src="/tile_art.js" defer></script>
   <script src="/sound.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
@@ -14,19 +13,30 @@
   <div class="app">
     <header class="topbar">
       <div class="brand"><span class="brand-mark">麻</span><span><strong>MahTrain</strong><small>四川麻将 · 牌效训练原型</small></span></div>
-      <div class="top-actions"><button id="art-toggle" class="toolbar-button" type="button" aria-pressed="true">高清矢量牌面</button><button id="sound-toggle" class="toolbar-button" type="button" aria-pressed="true">🔊 音效开启</button><span class="mode-label">单人摸切 · 14轮</span></div>
+      <div class="top-actions"><button id="sound-toggle" class="toolbar-button" type="button" aria-pressed="true">🔊 音效开启</button><span class="mode-label">单人摸切 · 14轮</span></div>
     </header>
     <main>
       <section class="intro">
         <div>
           <p class="eyebrow">STRUCTURED PRACTICE</p>
           <h1>每一张切牌，都有依据。</h1>
-          <p>理牌采用 <strong>万 → 条 → 筒</strong>，花色内 <strong>1 → 9</strong> 升序。系统自动校验胡牌与定缺，并提示胡牌、暗杠；音效可随时关闭。</p>
+          <p>理牌采用 <strong>万 → 条 → 筒</strong>，花色内 <strong>1 → 9</strong> 升序。沿用仓库完整牌面图；单人训练先发牌，再看牌定缺。正式四人对战为换三张后同时定缺。</p>
         </div>
         <form id="start-form" class="start-form">
           <label>训练种子<input type="number" id="seed" min="0" max="4294967295" value="17"></label>
-          <label>定缺<select id="missing"><option value="">自动（初始手牌最少）</option><option value="m">万</option><option value="s">条</option><option value="p">筒</option></select></label>
-          <button type="submit" class="primary">开始新训练 <span aria-hidden="true">↗</span></button>
+          <button type="button" id="preview-button">① 先发牌 · 看13张手牌</button>
+          <div id="preview-section" class="preview-section" hidden>
+            <div class="preview-heading"><span>已发13张（训练起手牌）</span><span id="preview-count">13张</span></div>
+            <div id="preview-hand" class="hand-row"></div>
+            <p id="preview-hint" class="preview-hint">请根据手牌选择定缺。</p>
+          </div>
+          <label>② 看牌后选择定缺
+            <select id="missing" required disabled>
+              <option value="">请选择定缺花色</option>
+              <option value="m">万</option><option value="s">条</option><option value="p">筒</option>
+            </select>
+          </label>
+          <button id="begin-training" type="submit" class="primary" disabled>③ 确认定缺 · 开始训练 <span aria-hidden="true">↗</span></button>
         </form>
       </section>
       <section id="game" class="game" hidden>
