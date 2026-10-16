@@ -16,6 +16,7 @@ from typing import Any, Sequence
 
 from .efficiency import analyze_discards, shanten_13, effective_draws
 from .rules import SUITS, TILES, TILE_INDEX, is_legal_win, winning_tiles
+from .presentation import sort_hand, grouped_hand
 
 MODES = (
     "one_shanten", "tenpai_discard", "pure_suit_waits", "pure_suit_discard"
@@ -153,10 +154,13 @@ def generate_question(mode: str, seed: int) -> dict[str, Any]:
     hand, missing = _make_hand(
         mode, random.Random(seed), force_winning=(mode == "pure_suit_discard" and seed % 5 == 0)
     )
+    # Uniform 理牌 display: 万/条/筒 grouped, 9→1 within each suit.
+    # The hand and choices are display-only copies, not new tile draws.
+    hand = sort_hand(hand)
     choices = (
-        [tile for tile in TILES if tile[0] == hand[0][0]]
+        sort_hand(tile for tile in TILES if tile[0] == hand[0][0])
         if mode == "pure_suit_waits"
-        else sorted(set(hand), key=TILE_INDEX.__getitem__)
+        else sort_hand(set(hand))
     )
     if mode == "pure_suit_discard":
         choices = [*choices, "win"]
@@ -165,6 +169,7 @@ def generate_question(mode: str, seed: int) -> dict[str, Any]:
         "mode": mode,
         "rule_version": RULE_VERSION,
         "concealed": hand,
+        "hand_groups": grouped_hand(hand),
         "missing_suit": missing,
         "choices": choices,
         "answer_type": "tile_set" if mode == "pure_suit_waits" else "single_action",
