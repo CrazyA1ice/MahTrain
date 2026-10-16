@@ -188,6 +188,7 @@ def _process(action: str, payload: dict) -> dict:
                 seed,
                 room_coefficient=payload.get("room_coefficient",100),
                 fan_cap=payload.get("fan_cap",3),
+                kong_base=payload.get("kong_base"),
             )
             token=secrets.token_urlsafe(24)
             if len(_MATCH_SESSIONS)>=32:
