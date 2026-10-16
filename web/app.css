@@ -399,3 +399,20 @@
   border-radius:8px;font-size:13px;color:#2c5b40;font-weight:700}
 .match-exhaustive-review{border-color:#e4d9b6;background:#fffcf5}
 @media(max-width:600px){.match-kong-ledger,.match-exhaustive-review{padding:12px}}
+
+
+/* M3.4 independent visible difficulty selection, without touching tile art. */
+.match-panel .table-demo-toolbar select {
+  appearance:auto;min-width:112px;max-width:160px;
+  background:#fff;border:1px solid #c6dace;border-radius:8px;
+  color:#30533b;padding:10px 8px;font:inherit;
+}
+.match-ai-info{background:#edf5ed;border:1px solid #cee2ce;
+  border-radius:10px;padding:11px 14px;margin:10px 0 15px}
+.match-ai-info strong{display:block;font-size:14px;
+  color:#2c5b41;margin-bottom:7px}
+.match-ai-info .review-footnote{margin:5px 0;line-height:1.6}
+@media(max-width:650px) {
+  .match-panel .table-demo-toolbar select{min-width:98px}
+  .match-ai-info{padding:9px 11px}
+}
