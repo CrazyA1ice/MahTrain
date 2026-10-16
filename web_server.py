@@ -98,6 +98,21 @@ def _process(action: str, payload: dict) -> dict:
                 _SESSIONS.pop(next(iter(_SESSIONS)))
             _SESSIONS[token] = game
             return {"token": token, "state": game.public_state()}
+        if action == "quiz_progress":
+            return {"progress": _HISTORY.quiz_progress(
+                payload.get("mode"), payload.get("difficulty")
+            )}
+        if action == "quiz_detail":
+            return {"detail": _HISTORY.quiz_detail(payload.get("answer_id"))}
+        if action == "quiz_retry_question":
+            return _HISTORY.quiz_retry_question(payload.get("answer_id"))
+        if action == "quiz_retry_answer":
+            return _HISTORY.quiz_retry_submit(
+                payload.get("answer_id"), payload.get("selection")
+            )
+        if action == "quiz_delete":
+            _HISTORY.delete_quiz_attempt(payload.get("answer_id"))
+            return {"deleted": True}
         if action == "quiz_new":
             mode, difficulty = payload.get("mode"), payload.get("difficulty")
             if mode not in MODES or difficulty not in DIFFICULTIES:
@@ -124,8 +139,22 @@ def _process(action: str, payload: dict) -> dict:
                 difficulty=record["difficulty"],
                 question_id=record["question_id"],
             )
+            # Persist only successfully graded answers, then mark the
+            # token consumed. Failed validation/storage must not consume it.
+            question = generate_question(
+                record["mode"], record["seed"],
+                difficulty=record["difficulty"],
+            )
+            answer_id = _HISTORY.save_quiz_answer(
+                question, result, payload.get("selection")
+            )
             record["submitted"] = True
-            return {"result": result}
+            return {
+                "result": result, "answer_id": answer_id,
+                "progress": _HISTORY.quiz_progress(
+                    record["mode"], record["difficulty"]
+                ),
+            }
         if action == "history_retry_question":
             return {"question": _HISTORY.retry_question(
                 payload.get("archive_id"), payload.get("round")
