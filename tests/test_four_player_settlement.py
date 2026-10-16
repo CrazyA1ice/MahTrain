@@ -178,10 +178,17 @@ class M32SettlementTests(unittest.TestCase):
         # This starts at a deliberately staged "just supplemented" state;
         # the normal discard method records the causal event itself.
         g._kong_draw[dealer]=True
+        # Record the antecedent unresolved kong payment without posting
+        # invented currency, then ensure the successful kong-discard ron
+        # flags it as voided.
+        g._pending_kong_price(dealer,"an_gang")
         g.discard(dealer,"s9")
         self.assertTrue(g.public_state()["pending_discard"]["after_kong"])
         for seat in (s1,s2,s3):
             g.respond_discard(seat,"hu" if seat in (s1,s2) else "pass")
+        self.assertEqual(
+            g.public_state()["pending_kong_payments"][0]["status"],"voided"
+        )
         for item in g.public_state()["win_ledger"]["wins"]:
             self.assertEqual(item["bonuses"]["kong_discard_ron"],1)
             self.assertEqual(item["raw_fan"],5)
