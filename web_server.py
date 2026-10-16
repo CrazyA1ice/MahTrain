@@ -133,9 +133,9 @@ class Handler(BaseHTTPRequestHandler):
         kind = mimetypes.guess_type(str(asset))[0] or "application/octet-stream"
         # Existing assets/tiles/*.png include JPEG-encoded images despite
         # their extension. Report actual bytes' MIME without re-encoding.
-        if data.startswith(b"\\xff\\xd8\\xff"):
+        if data.startswith(b"\xff\xd8\xff"):
             kind = "image/jpeg"
-        elif data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        elif data.startswith(b"\x89PNG\r\n\x1a\n"):
             kind = "image/png"
         if kind.startswith("text/") or kind == "application/javascript":
             kind += "; charset=utf-8"
