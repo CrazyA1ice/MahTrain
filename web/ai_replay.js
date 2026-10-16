@@ -56,6 +56,69 @@
     }
     return box;
   }
+  function renderClusterStatistics(){
+    const analysis=overview?.seed_analysis;
+    const area=$("ai-replay-clusters");
+    if(!analysis){area.hidden=true;return;}
+    area.hidden=false;
+    const count=analysis.distinct_seed_count;
+    const warning=$("ai-replay-cluster-warning");
+    warning.textContent="独立洗牌种子："+count+
+      " 个；每种子进行三次相关的座次轮换（不当作三个独立样本）。"+
+      (analysis.intervals===null
+        ?"少于5个独立种子：仅显示描述性差异，不生成不可靠的置信区间。"
+        :"以下区间只是按洗牌种子整组重抽样的探索性95%区间，并非对真人胜率的证明。");
+    const pairs=$("ai-replay-cluster-differences");
+    pairs.replaceChildren();
+    for(const [metric,label] of [
+      ["win_event_fraction","胡牌事件/座位参与"],
+      ["local_optimal_fraction","局部最优切牌率"],
+      ["min_shanten_fraction","最低向听切牌率"],
+    ]){
+      const section=el("div","ai-replay-comparison");
+      section.append(el("strong","",label));
+      const diff=analysis.paired_challenge_differences[metric];
+      const bounds=analysis.intervals?.paired_difference_intervals?.[metric];
+      for(const other of ["basic","advanced"]){
+        const key="challenge_minus_"+other;
+        const value=diff[key];
+        const suffix=(value===null?"无足够切牌":
+          (value>=0?"+":"")+(value*100).toFixed(1)+" 个百分点");
+        const interval=bounds?.[key];
+        section.append(el("p","review-footnote",
+          "挑战－"+LABEL[other]+"："+suffix+
+          (interval?"（探索性区间 "+(interval[0]*100).toFixed(1)+
+            "～"+(interval[1]*100).toFixed(1)+" 个百分点）":"")));
+      }
+      pairs.append(section);
+    }
+    const container=$("ai-replay-cluster-table");
+    container.replaceChildren();
+    const table=el("table","ai-replay-seed-table");
+    const thead=el("thead");
+    const header=el("tr");
+    for(const title of ["洗牌种子","入门胡/参与","进阶胡/参与","挑战胡/参与",
+                         "入门局部最优","进阶局部最优","挑战局部最优"]){
+      header.append(el("th","",title));
+    }
+    thead.append(header);table.append(thead);
+    const tbody=el("tbody");
+    for(const group of analysis.per_seed){
+      const row=el("tr");
+      row.append(el("td","",group.seed));
+      for(const level of ["basic","advanced","challenge"]){
+        const stats=group.levels[level];
+        row.append(el("td","",
+          stats.win_events+" / "+stats.seat_exposures));
+      }
+      for(const level of ["basic","advanced","challenge"]){
+        row.append(el("td","",
+          showRate(group.levels[level].local_optimal_fraction)));
+      }
+      tbody.append(row);
+    }
+    table.append(tbody);container.append(table);
+  }
   function renderSummary(){
     const panel=$("ai-replay-summary");
     panel.replaceChildren();
@@ -88,6 +151,7 @@
       const option=el("option","",label);option.value=String(m.index);
       selection.append(option);
     }
+    renderClusterStatistics();
     $("ai-replay-results").hidden=false;
   }
   function stepTitle(frame,n,total){
@@ -168,6 +232,10 @@
     $("ai-replay-prev").disabled=stepIndex===0;
     $("ai-replay-next").disabled=stepIndex===steps.length-1;
     stepTitle(frame,stepIndex,steps.length);
+    $("ai-replay-explanation-text").textContent=
+      frame.explanation?.scope==="public_policy_only"
+        ?frame.explanation.text
+        :"此动作只显示公开事实；不披露隐藏牌效或其他玩家暗手。";
     const board=$("ai-replay-board");board.replaceChildren();
     for(let s=0;s<4;s++)board.append(renderSeat(frame.board,s));
   }
@@ -239,6 +307,30 @@
     a.click();
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
+  function downloadSeedCSV(){
+    const stats=overview?.seed_analysis;
+    if(!stats)return;
+    const csv=[
+      ["seed","level","seat_exposures","win_events","deal_in_events",
+       "discards","min_shanten_discards","locally_optimal_discards",
+       "win_event_fraction","local_optimal_fraction"].join(","),
+    ];
+    for(const group of stats.per_seed){
+      for(const level of ["basic","advanced","challenge"]){
+        const row=group.levels[level];
+        csv.push([group.seed,level,row.seat_exposures,row.win_events,
+          row.deal_in_events,row.discards,row.min_shanten_discards,
+          row.locally_optimal_discards,row.win_event_fraction,
+          row.local_optimal_fraction??""].join(","));
+      }
+    }
+    const blob=new Blob(["\\uFEFF"+csv.join("\\r\\n")+"\\r\\n"],{
+      type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="mahtrain-ai-seed-clusters.csv";a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
   function init(){
     $("ai-replay-start").addEventListener("click",start);
     $("ai-replay-match").addEventListener("change",e=>{
@@ -254,6 +346,7 @@
       stepIndex+=1;renderStep();
     });
     $("ai-replay-download").addEventListener("click",download);
+    $("ai-replay-cluster-download").addEventListener("click",downloadSeedCSV);
   }
   window.MahTrainAIReplay={init};
 })();
