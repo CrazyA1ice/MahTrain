@@ -61,6 +61,9 @@ async function request(action, extras={}) {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "操作失败");
+    if (action === "preview" && result.initial_hand) {
+      showDealtPreview(result);
+    }
     if (result.token) token = result.token;
     if (result.state) {
       currentState = result.state;
@@ -75,6 +78,44 @@ async function request(action, extras={}) {
     }
   } catch (error) { toast(error.message); }
   finally { busy = false; }
+}
+
+function showDealtPreview(response) {
+  currentPreview = {seed:Number($("#seed").value), hand:response.initial_hand};
+  $("#preview-section").hidden = false;
+  const hand = $("#preview-hand");
+  hand.replaceChildren();
+  let suit = null;
+  response.initial_hand.forEach(tile => {
+    if (suit && suit !== tile[0]) hand.append(node("span","suit-spacer"));
+    suit = tile[0];
+    hand.append(tileElement(tile,{small:true}));
+  });
+  $("#preview-count").textContent = response.initial_hand.length + "张";
+  const select = $("#missing");
+  select.disabled = false;
+  select.value = "";
+  const hint = $("#preview-hint");
+  if (response.tianque) {
+    const choices = response.absent_suits.map(s => names[s]).join("、");
+    hint.className = "preview-hint tianque";
+    hint.textContent = "天缺：手中只有两门或更少，可直接定缺少的「" +
+      choices + "」。本练习不模拟换三张。";
+    if (response.absent_suits.length === 1) {
+      select.value = response.absent_suits[0]; // a suggested choice, not confirmed.
+    }
+  } else {
+    hint.className = "preview-hint";
+    hint.textContent = "已看到13张起手牌，请从万、条、筒中选择要定缺的一门。正式对局应在换三张后定缺。";
+  }
+  $("#begin-training").disabled = !select.value;
+}
+function invalidatePreview() {
+  currentPreview = null;
+  $("#preview-section").hidden = true;
+  $("#missing").value = "";
+  $("#missing").disabled = true;
+  $("#begin-training").disabled = true;
 }
 
 function renderWinDiagnosis(state) {
@@ -244,8 +285,20 @@ function render(state,feedback=null,report=null) {
   promptActions(state);
 }
 
+$("#preview-button").addEventListener("click", () => {
+  request("preview",{seed:Number($("#seed").value),rounds:14});
+});
+$("#seed").addEventListener("input",invalidatePreview);
+$("#missing").addEventListener("change",()=>{
+  $("#begin-training").disabled = !currentPreview || !$("#missing").value;
+});
 $("#start-form").addEventListener("submit",(event)=>{
   event.preventDefault();
+  if (!currentPreview || currentPreview.seed !== Number($("#seed").value)
+      || !$("#missing").value) {
+    toast("请先发牌查看手牌，再选择定缺。");
+    return;
+  }
   $("#feedback").textContent="提交切牌后，这里会显示本轮判题结果。";
   $("#feedback").className="feedback empty";
   $("#report-panel").hidden=true;
