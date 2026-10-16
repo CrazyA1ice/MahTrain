@@ -23,6 +23,9 @@ sys.path.insert(0, str(ROOT / "src"))
 from mahtrain_core import SoloTrainingSession  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
 from mahtrain_core.training_levels import DIFFICULTIES
+from mahtrain_core.error_focus import (
+    ERROR_LABELS, supports_focus, select_focused_question, diagnose_quiz,
+)
 from mahtrain_core.history import HistoryStore  # noqa: E402
 
 # Override MAHTRAIN_HISTORY_DB to relocate the local, single-user SQLite file.
@@ -118,13 +121,49 @@ def _process(action: str, payload: dict) -> dict:
             mode, difficulty = payload.get("mode"), payload.get("difficulty")
             if mode not in MODES or difficulty not in DIFFICULTIES:
                 raise ValueError("invalid quiz mode or difficulty")
-            seed = secrets.randbits(32)
-            question = generate_question(mode, seed, difficulty=difficulty)
+            focus = payload.get("focus")
+            if focus is not None and (focus != "auto" and
+                                       not supports_focus(mode,focus)):
+                raise ValueError("当前单题模式不支持该错因专项")
+            seed = secrets.randbelow(2**32-24)
+            applied_focus = None
+            if focus == "auto":
+                weaknesses = _HISTORY.quiz_progress(mode,difficulty)["weaknesses"]
+                counts = weaknesses["counts"]
+                # 75% focused questions, 25% ordinary variety, once the
+                # learner has mode-specific errors. The ratio and sampled
+                # label are disclosed in the UI, not the answer.
+                options = [name for name,value in counts.items()
+                           for _ in range(value)]
+                if options and secrets.randbelow(4) != 0:
+                    # Weighted by actual misplay frequency, preferring more
+                    # prevalent causes, with graceful verified fallback.
+                    candidate = options[secrets.randbelow(len(options))]
+                    try:
+                        seed,question=select_focused_question(
+                            mode,difficulty,candidate,seed)
+                        applied_focus=candidate
+                    except ValueError:
+                        question=generate_question(mode,seed,difficulty=difficulty)
+                else:
+                    question=generate_question(mode,seed,difficulty=difficulty)
+            elif focus is not None:
+                seed,question=select_focused_question(mode,difficulty,focus,seed)
+                applied_focus=focus
+            else:
+                question=generate_question(mode,seed,difficulty=difficulty)
+            if applied_focus:
+                question={**question, "focus":applied_focus,
+                          "focus_label":ERROR_LABELS[applied_focus]}
+            if focus == "auto":
+                question={**question,"training_strategy":"adaptive_weakness",
+                          "focus_applied":applied_focus is not None}
             quiz_token = secrets.token_urlsafe(24)
             if len(_QUIZZES) >= 128:
                 _QUIZZES.pop(next(iter(_QUIZZES)))
             _QUIZZES[quiz_token] = {
                 "seed": seed, "mode": mode, "difficulty": difficulty,
+                "focus": applied_focus, "strategy": focus,
                 "question_id": question["question_id"], "submitted": False,
             }
             return {"quiz_token": quiz_token, "question": question}
@@ -140,12 +179,22 @@ def _process(action: str, payload: dict) -> dict:
                 difficulty=record["difficulty"],
                 question_id=record["question_id"],
             )
+            result["error_types"] = diagnose_quiz(record["mode"],result)
+            result["error_labels"] = [
+                ERROR_LABELS[cause] for cause in result["error_types"]
+            ]
             # Persist only successfully graded answers, then mark the
             # token consumed. Failed validation/storage must not consume it.
             question = generate_question(
                 record["mode"], record["seed"],
                 difficulty=record["difficulty"],
             )
+            if record["focus"]:
+                question={**question, "focus":record["focus"],
+                          "focus_label":ERROR_LABELS[record["focus"]]}
+            if record["strategy"] == "auto":
+                question={**question,"training_strategy":"adaptive_weakness",
+                          "focus_applied":record["focus"] is not None}
             answer_id = _HISTORY.save_quiz_answer(
                 question, result, payload.get("selection")
             )
