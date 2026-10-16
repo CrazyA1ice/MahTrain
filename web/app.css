@@ -29,3 +29,7 @@
 @media(max-width:1170px){.hand-layout{grid-template-columns:1fr}.meld-area{min-height:110px}.kong-area{flex-wrap:wrap}}
 @media(max-width:650px){.topbar{gap:10px;align-items:flex-start}.top-actions{gap:6px}.mode-label{display:none}.toolbar-button{font-size:11px;padding:7px 9px}.tile{width:55px;height:75px}.tile.mini{width:37px;height:49px}.kong-four .tile{width:30px;height:41px}.hand-row{gap:6px;padding-top:12px}.table-area{padding:15px}.win-diagnosis{font-size:12px}}
 @media(max-width:380px){.tile{width:49px;height:67px}.toolbar-button{font-size:10px}}
+
+/* Readability: inactive tiles should not be washed out by disabled-button opacity. */
+.tile[disabled]{opacity:1;cursor:default}
+.kong-block .tile[disabled]{opacity:.94}
