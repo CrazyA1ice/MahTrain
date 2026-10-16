@@ -10,6 +10,7 @@
   <script src="/review.js" defer></script>
   <script src="/retry.js" defer></script>
   <script src="/history.js" defer></script>
+  <script src="/quiz.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -41,6 +42,30 @@
           </label>
           <button id="begin-training" type="submit" class="primary" disabled>③ 确认定缺 · 开始训练 <span aria-hidden="true">↗</span></button>
         </form>
+      </section>
+      <section id="quiz-center" class="panel quiz-center">
+        <div class="panel-title"><h3>单题训练中心</h3><small>四种模式 · 基础 / 进阶 / 挑战</small></div>
+        <p class="review-intro">和连续14轮训练相互独立。服务端按已验证的顺子、搭子、七对等牌形出题，提交后才公布标准答案。</p>
+        <div class="quiz-toolbar">
+          <label>选择训练模式
+            <select id="quiz-mode">
+              <option value="one_shanten">一向听何切</option>
+              <option value="tenpai_discard">听牌何切</option>
+              <option value="pure_suit_waits">清一色听牌（多选全部听口）</option>
+              <option value="pure_suit_discard">清一色何切 / 判断已胡</option>
+            </select>
+          </label>
+          <label>难度等级
+            <select id="quiz-level">
+              <option value="basic">基础 · 刻子/孤张</option>
+              <option value="intermediate">进阶 · 顺子/相邻搭子</option>
+              <option value="challenge">挑战 · 七对竞争与复杂牌形</option>
+            </select>
+          </label>
+          <button id="quiz-new" class="primary" type="button">生成训练题</button>
+        </div>
+        <div id="quiz-question" aria-live="polite"></div>
+        <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
       </section>
       <section id="game" class="game" hidden>
         <div class="stats">
