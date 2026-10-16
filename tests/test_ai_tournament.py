@@ -81,8 +81,36 @@ class FourAgentTrialTests(unittest.TestCase):
         self.assertEqual(first["winners"],second["winners"])
         self.assertEqual(first["public_events"],second["public_events"])
         self.assertEqual(first["trace"],second["trace"])
+        self.assertEqual(first["public_replay"],second["public_replay"])
         self.assertEqual(first["partial_win_balances"],
                          second["partial_win_balances"])
+
+    def test_public_replay_frames_are_step_aligned_and_never_leak_hands(self):
+        for match in self.result["matches"]:
+            self.assertEqual(len(match["public_replay"]),len(match["trace"]))
+            self.assertEqual(match["public_replay"][-1]["board"]["phase"],
+                             match["terminal_phase"])
+            for index,frame in enumerate(match["public_replay"]):
+                self.assertEqual(frame["action"]["action"],
+                                 match["trace"][index]["action"])
+                self.assertNotIn("shanten_after",frame["action"])
+                self.assertNotIn("legal_options",frame["action"])
+                self.assertNotIn("effective_copies",frame["action"])
+                self.assertEqual(
+                    set(frame["board"]),
+                    {"phase","turn","dealer","wall_count","hand_counts",
+                     "missing_suits","won","melds","discards","winners"})
+                self.assertEqual(len(frame["board"]["hand_counts"]),4)
+                for melds in frame["board"]["melds"]:
+                    for meld in melds:
+                        if meld["type"]=="an_gang":
+                            self.assertIsNone(meld["tile"])
+                if frame["action"]["action"]=="an_gang":
+                    self.assertNotIn("tile",frame["action"])
+                if frame["action"]["action"]=="draw":
+                    self.assertNotIn("tile",frame["action"])
+            self.assertIsNone(
+                match["public_replay"][0]["board"]["missing_suits"])
 
     def test_json_and_sanitized_summary(self):
         output=json.dumps(self.result,ensure_ascii=False)
@@ -95,6 +123,7 @@ class FourAgentTrialTests(unittest.TestCase):
         self.assertEqual(compact["levels"],self.result["levels"])
         self.assertNotIn("trace",compact["matches"][0])
         self.assertNotIn("public_events",compact["matches"][0])
+        self.assertNotIn("public_replay",compact["matches"][0])
 
     def test_bad_seed_and_rotation_do_not_run(self):
         for value in (-1,True,2**32,"2"):
