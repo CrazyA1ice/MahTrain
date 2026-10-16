@@ -718,6 +718,39 @@ class WebUI(unittest.TestCase):
             with self.subTest(settings=settings),self.assertRaises(HTTPError):
                 self.post({"action":"match_new","seed":42,**settings})
 
+    def test_m33_optional_kong_base_is_not_automatically_equal_to_room_coefficient(self):
+        default=self.post({"action":"match_new","seed":42,
+                           "room_coefficient":300})
+        m=default["match"]
+        self.assertIsNone(m["kong_ledger"]["base"])
+        self.assertEqual(m["kong_ledger"]["balances"],[0]*4)
+        self.assertEqual(m["combined_balances"],m["win_ledger"]["balances"])
+        self.assertIsNone(m["exhaustive_review"])
+        explicit=self.post({"action":"match_new","seed":42,
+                            "room_coefficient":300,"kong_base":25})
+        m2=explicit["match"]
+        self.assertEqual(m2["kong_ledger"]["base"],25)
+        self.assertEqual(m2["kong_ledger"]["mode"],"simulated_explicit_base")
+        self.assertTrue(m2["kong_ledger"]["zero_sum"])
+        self.assertEqual(m2["kong_ledger"]["balances"],[0]*4)
+        self.assertNotIn("_wall",str(m2))
+        self.assertNotIn("_hands",str(m2))
+        markup,_=self.get("/")
+        script,mime=self.get("/match.js")
+        self.assertIn(b'id="match-enable-kong"',markup)
+        self.assertIn(b'id="match-kong-base"',markup)
+        self.assertIn(b"match-exhaustive-review",script)
+        self.assertIn(b"match-kong-ledger",script)
+        self.assertIn(b"kong_base",script)
+        self.assertIn("javascript",mime)
+        for bad in (0,-1,True,1.4,"10",10**6+1):
+            with self.subTest(bad=bad),self.assertRaises(HTTPError):
+                self.post({"action":"match_new","seed":42,"kong_base":bad})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_settle_review",
+                       "match_token":explicit["match_token"],
+                       "balances":[100,0,0,-100]})
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
