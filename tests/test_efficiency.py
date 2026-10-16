@@ -26,7 +26,7 @@ def words(s: str) -> list[str]:
 
 
 READY = words("m1 m1 m1 m4 m4 m4 p1 p1 p1 p4 p4 p4 m9")
-ONE_SHANTEN = words("m1 m1 m1 m4 m4 m4 p1 p1 p1 p4 p4 m8 m9")
+ONE_SHANTEN = words("m1 m1 m1 m4 m4 m4 p1 p1 p1 p4 p4 m8 p9")
 
 
 class EfficiencyCases(unittest.TestCase):
@@ -55,7 +55,7 @@ class EfficiencyCases(unittest.TestCase):
     def test_one_shanten_and_improving_draw(self):
         self.assertEqual(shanten_13(ONE_SHANTEN, missing_suit="s"), 1)
         result = effective_draws(ONE_SHANTEN, missing_suit="s")
-        self.assertIn("m7", result["effective_types"])
+        self.assertIn("m8", result["effective_types"])
         self.assertGreaterEqual(result["effective_tile_count"], 4)
         self.assertGreater(result["next_draw_probability"], 0)
 
