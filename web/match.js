@@ -1,5 +1,5 @@
 "use strict";
-/* M3.1 LOCAL rule-state experimental match. Seat zero only; three scripted
+/* M3.2 LOCAL rule-state experimental match. Seat zero only; three scripted
    opponents, no AI skill, payment, flower-pig or end-wall settlement.
 */
 (function(){
@@ -64,7 +64,7 @@
       await_discard:"你的回合：切牌、胡牌或选择杠",
       claim_window:"别人打出一张牌：请确认碰、明杠或胡牌",
       rob_kong_window:"别人补杠：判断是否抢杠胡",
-      finished:"已有三家胡牌，血战摸切结束（未计分）",
+      finished:"已有三家胡牌，摸切结束（胡牌已入账，其他项目待定）",
       wall_exhausted:"牌墙耗尽，待实现查花猪与查大叫",
     };
     const phase=state.phase;
@@ -125,10 +125,10 @@
           }));
       }
       controls.append(el("p","review-intro",
-        "请点击自己的麻将切牌。其他三家由固定规则脚本响应，不是智能AI；本局暂不结算分数。"));
+        "请点击自己的麻将切牌。其他三家是固定脚本，不是智能AI；合法胡牌将即时记录部分积分流水。"));
     }else{
       controls.append(el("p","review-intro",
-        "本局摸切已结束，尚未实现正式番数、杠钱与流局查牌。可以重新开一局。"));
+        "本局摸切已结束。胡牌部分已计算，杠钱撤销及流局赔付尚未计入完整结算。可以重新开一局。"));
     }
     const publicInfo=$("match-public");publicInfo.replaceChildren();
     if(state.missing_suits){
