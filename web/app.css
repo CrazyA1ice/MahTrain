@@ -477,3 +477,32 @@
 @media(max-width:650px){.ai-replay-panel{padding:16px 12px}
 .ai-replay-picker select{min-width:180px}
 .ai-replay-board .tile.ai-replay-tile{width:31px;height:43px;min-width:31px;min-height:43px}}
+
+
+/* M3.8 cluster-aware seed table and privacy-safe public decision annotations. */
+.ai-replay-clusters{margin:18px 0;padding:16px;border:1px solid #d8e5d9;
+  border-radius:12px;background:#fbfdfb}
+.ai-replay-cluster-heading{display:flex;justify-content:space-between;gap:9px;
+  align-items:center;flex-wrap:wrap}
+.ai-replay-cluster-heading h4{margin:0;color:#315841}
+.ai-replay-cluster-differences{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;margin:12px 0}
+.ai-replay-comparison{padding:10px 12px;background:#f1f8f1;
+  border:1px solid #dce9de;border-radius:8px;min-width:0}
+.ai-replay-comparison strong{color:#315741;font-size:13px}
+.ai-replay-comparison p{overflow-wrap:anywhere;line-height:1.65}
+.ai-replay-cluster-table{overflow-x:auto;margin-top:12px}
+.ai-replay-seed-table{border-collapse:collapse;width:100%;min-width:620px;
+  font-size:12px;text-align:right;font-variant-numeric:tabular-nums}
+.ai-replay-seed-table th,.ai-replay-seed-table td{padding:10px 8px;
+  border-bottom:1px solid #e3eae3}
+.ai-replay-seed-table th{color:#467455;background:#ebf3ec;font-weight:700}
+.ai-replay-seed-table td:first-child,.ai-replay-seed-table th:first-child{text-align:left}
+.ai-replay-explanation{border-left:4px solid #66a07c;background:#eff7ef;
+  padding:12px 15px;border-radius:0 10px 10px 0;margin:10px 0 14px}
+.ai-replay-explanation strong{color:#2c6045;font-size:13px}
+.ai-replay-explanation p{margin:7px 0 0;line-height:1.7;font-size:13px;
+  color:#4d6957}
+@media(max-width:900px){.ai-replay-cluster-differences{grid-template-columns:1fr}}
+@media(max-width:600px){.ai-replay-clusters{padding:12px}
+.ai-replay-explanation{padding:10px 12px}}
