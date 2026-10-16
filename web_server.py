@@ -42,6 +42,7 @@ _STATIC = {
     "/retry.js": ROOT / "web" / "retry.js",
     "/history.js": ROOT / "web" / "history.js",
     "/quiz.js": ROOT / "web" / "quiz.js",
+    "/quiz_history.js": ROOT / "web" / "quiz_history.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
