@@ -83,6 +83,8 @@ class MahjongAIUnitTests(unittest.TestCase):
         # This game is at dealer's first discard. Suit already decided in
         # trusted stage here to exercise actual expert discard logic.
         game.missing_suits=["p"]*4
+        game.phase="dealer_discard"
+        game.turn=dealer
         view=game.private_view(dealer)
         original=copy.deepcopy(view)
         def sabotage(v):
@@ -129,6 +131,8 @@ class MahjongAIUnitTests(unittest.TestCase):
     def test_advanced_always_minimizes_post_cut_shanten(self):
         game=FourPlayerOpening(42)
         game.missing_suits=["p"]*4
+        game.phase="dealer_discard"
+        game.turn=game.dealer
         dealer=game.dealer
         view=game.private_view(dealer)
         level=MahjongAgent("advanced",seed=42,seat=dealer)
@@ -144,6 +148,8 @@ class MahjongAIUnitTests(unittest.TestCase):
         for seed in (17,42,99):
             game=FourPlayerOpening(seed)
             game.missing_suits=["p"]*4
+            game.phase="dealer_discard"
+            game.turn=game.dealer
             view=game.private_view(game.dealer)
             hand=view["hand"]
             # Fully completed hand has no meaningful discard optimization.
