@@ -9,6 +9,88 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
+from .error_focus import ERROR_LABELS
+
+# Solo training presents only discard and prompted legal win actions.  There
+# is no button for an illegal win, nor an exact-tiles listening-set question.
+SOLO_ERROR_ORDER = (
+    "missed_win", "shanten_regression", "ukeire_loss", "other_error",
+)
+SOLO_PRACTICE = {
+    "missed_win": {"mode": "pure_suit_discard", "focus": "missed_win"},
+    "shanten_regression": {
+        "mode": "one_shanten", "focus": "shanten_regression"
+    },
+    "ukeire_loss": {"mode": "tenpai_discard", "focus": "ukeire_loss"},
+}
+
+
+def diagnose_solo_round(item: Mapping[str, Any]) -> list[str]:
+    """Diagnose a completed solo decision from contemporaneous frozen facts.
+
+    Missed legal wins take precedence: the after-discard shanten/ukeire from
+    that hand is descriptive, not an alternative reason for the missed win.
+    A completed self-draw win is never assigned an error.
+    """
+    if item["correct"]:
+        return []
+    if item["choice"] != "win" and "win" in item.get("best_actions", ()):
+        return ["missed_win"]
+    if (item.get("shanten_loss") or 0) > 0:
+        return ["shanten_regression"]
+    if (item.get("ukeire_loss") or 0) > 0:
+        return ["ukeire_loss"]
+    # Historic records may not have numeric losses: use verified candidates.
+    analysis = item.get("analysis") or {}
+    candidate = item.get("selected_candidate") or {}
+    minimum = analysis.get("minimum_shanten")
+    if minimum is not None and candidate.get("shanten") is not None:
+        if candidate["shanten"] > minimum:
+            return ["shanten_regression"]
+        best = max((
+            row.get("effective_tile_count", 0)
+            for row in analysis.get("candidates", ())
+            if row.get("shanten") == minimum
+        ), default=0)
+        if candidate.get("effective_tile_count", 0) < best:
+            return ["ukeire_loss"]
+    return ["other_error"]
+
+
+def summarize_solo_errors(rounds: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """Count decisions, not across-round probability fluctuations."""
+    groups = {
+        category: {"label": ERROR_LABELS[category], "count": 0, "rounds": []}
+        for category in SOLO_ERROR_ORDER
+    }
+    for row in rounds:
+        for category in row.get("error_types", ()):
+            if category in groups:
+                groups[category]["count"] += 1
+                groups[category]["rounds"].append(row["round"])
+    rank = sorted(SOLO_ERROR_ORDER,
+                  key=lambda key: (-groups[key]["count"],
+                                   SOLO_ERROR_ORDER.index(key)))
+    primary = next((key for key in rank if groups[key]["count"] > 0), None)
+    recommendations = [
+        {"error_type": key, "label": ERROR_LABELS[key],
+         "count": groups[key]["count"], "rounds": list(groups[key]["rounds"]),
+         "mode": SOLO_PRACTICE[key]["mode"],
+         "focus": SOLO_PRACTICE[key]["focus"]}
+        for key in rank
+        if groups[key]["count"] > 0 and key in SOLO_PRACTICE
+    ]
+    return {
+        "error_rounds": sum(not row["correct"] for row in rounds),
+        "correct_rounds": sum(bool(row["correct"]) for row in rounds),
+        "counts": groups,
+        "primary_error": primary,
+        "primary_label": ERROR_LABELS[primary] if primary else None,
+        "recommendations": recommendations,
+        "unmapped_error_rounds": groups["other_error"]["count"],
+    }
+
+
 
 def build_round_review(history: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     """Return stable, JSON-ready compact review plus descriptive change summary.
@@ -54,7 +136,10 @@ def build_round_review(history: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
             }
             if chosen and baseline else None
         )
+        errors = diagnose_solo_round(item)
         round_review = {
+            "error_types": errors,
+            "error_labels": [ERROR_LABELS[e] for e in errors],
             "round": number,
             "drawn_tile": item.get("drawn_tile"),
             "choice": action,
@@ -139,4 +224,5 @@ def build_round_review(history: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "discard_rounds": len(discards),
         "win_rounds": sum(r["is_win"] for r in rounds),
     }
-    return {"rounds": rounds, "progress": progress}
+    return {"rounds": rounds, "progress": progress,
+            "errors": summarize_solo_errors(rounds)}
