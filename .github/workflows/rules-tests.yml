@@ -175,3 +175,42 @@ jobs:
             /tmp/mahtrain-m312-pressure.csv
             /tmp/mahtrain-m311-report.html
           if-no-files-found: warn
+
+  constructed-pressure-scenario-probe:
+    # Separate job to keep deterministic constructed tests apart from
+    # real 25-match ablation data. No pip dependencies, no private tiles.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Probe public-pung fixtures with the REAL shanten oracle
+        run: |
+          python examples/probe_pressure_scenarios.py --json-out /tmp/mahtrain-m313.json --csv-out /tmp/mahtrain-m313.csv
+      - name: Assert one true policy flip and four meaningful negative controls
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('/tmp/mahtrain-m313.json').read_text(encoding='utf8'))
+          assert d['protocol']=='m313_physically_feasible_constructed_public_snapshot_v1'
+          assert d['summary']['scenarios']==5
+          assert d['summary']['choice_would_change']==1
+          assert d['summary']['pressure_discriminates']>=2
+          rows={x['scenario']:x for x in d['scenarios']}
+          assert rows['two_same_suit_pungs']['actual_choice_changed']
+          assert all(not x['choice_would_change'] for k,x in rows.items() if k!='two_same_suit_pungs')
+          assert all(x['physically_feasible'] and x['known_physical_tiles']<=108 for x in rows.values())
+          PY
+      - name: Archive constructed scenario CSV and JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-pressure-scenarios-py311
+          path: |
+            /tmp/mahtrain-m313.json
+            /tmp/mahtrain-m313.csv
+          if-no-files-found: warn
