@@ -137,6 +137,38 @@ class TrainingQuestionCases(unittest.TestCase):
         with self.assertRaises(ValueError):
             generate_question("tenpai_discard", -1)
 
+
+    def test_seed_sweep_produces_legal_and_mode_consistent_questions(self):
+        # Prevent accidental random-only generation and category drift.
+        for seed in range(6):
+            for mode in MODES:
+                with self.subTest(seed=seed, mode=mode):
+                    q = generate_question(mode, seed)
+                    hand = q["concealed"]
+                    missing = q["missing_suit"]
+                    self.assertTrue(q["question_id"])
+                    self.assertTrue(all(n <= 4 for n in Counter(hand).values()))
+                    if mode == "pure_suit_waits":
+                        self.assertTrue(winning_tiles(hand, missing_suit=missing))
+                    elif mode == "pure_suit_discard" and seed % 5 == 0:
+                        self.assertTrue(is_legal_win(hand, missing_suit=missing))
+                    else:
+                        self.assertFalse(is_legal_win(hand, missing_suit=missing))
+                        expected = 1 if mode == "one_shanten" else 0
+                        result = analyze_discards(hand, missing_suit=missing)
+                        self.assertEqual(result["minimum_shanten"], expected)
+
+    def test_seeded_answer_replay_never_trusts_modified_question(self):
+        # Caller submits only mode/seed/answer/id, NOT a possibly edited hand.
+        q0 = generate_question("tenpai_discard", 0)
+        q1 = generate_question("tenpai_discard", 1)
+        self.assertNotEqual(q0["question_id"], q1["question_id"])
+        with self.assertRaises(ValueError):
+            grade_answer(
+                "tenpai_discard", 0, q0["choices"][0],
+                question_id=q1["question_id"]
+            )
+
     def test_different_seed_produces_different_question(self):
         a = generate_question("pure_suit_waits", 0)
         b = generate_question("pure_suit_waits", 1)
