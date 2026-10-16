@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 import sys
 import threading
 import unittest
@@ -15,11 +16,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import web_server  # noqa: E402
 from mahtrain_core.efficiency import analyze_discards  # noqa: E402
+from mahtrain_core.history import HistoryStore  # noqa: E402
 
 
 class WebUI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls._old_store = web_server._HISTORY
+        cls._temp = tempfile.TemporaryDirectory()
+        cls._history_path = Path(cls._temp.name) / "http-archive.sqlite3"
+        web_server._HISTORY = HistoryStore(cls._history_path)
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), web_server.Handler)
         cls.base = "http://127.0.0.1:" + str(cls.httpd.server_address[1])
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -30,6 +36,8 @@ class WebUI(unittest.TestCase):
         cls.httpd.shutdown()
         cls.httpd.server_close()
         cls.thread.join(timeout=5)
+        web_server._HISTORY = cls._old_store
+        cls._temp.cleanup()
 
     @classmethod
     def get(cls, route):
@@ -238,6 +246,65 @@ class WebUI(unittest.TestCase):
         )[0])
         self.assertEqual(restored["report"],original)
         self.assertEqual(restored["state"],completed["state"])
+
+
+    def test_sqlite_history_after_restart_and_archived_retry_http(self):
+        created=self.post({"action":"new","seed":17,"rounds":1,"missing_suit":"p"})
+        token=created["token"]
+        step=self.post({"action":"draw","token":token})
+        while step["state"]["phase"] in ("offer_win","offer_kong"):
+            mode=step["state"]["phase"]
+            step=self.post({"action":"win" if mode=="offer_win" else "kong",
+                "token":token,**({"accept":False} if mode=="offer_win"
+                else {"tile":None})})
+        state=step["state"]
+        ranked=analyze_discards(state["hand"],missing_suit="p",
+                                visible_tiles=state["discard_history"])
+        wrong=next(tile for tile in state["choices"]
+                   if tile not in ranked["best_discards"])
+        result=self.post({"action":"discard","token":token,"tile":wrong})
+        self.assertTrue(result["report"]["finished"])
+        archive_id=result["archive_id"]
+        self.assertTrue(archive_id)
+        history=json.loads(self.get("/api/history")[0])
+        self.assertTrue(any(row["archive_id"]==archive_id
+                            for row in history["sessions"]))
+        # Simulate closing the Python HTTP server and starting a new process:
+        # discard live tokens; reopen the sqlite3 file from disk.
+        web_server._SESSIONS.pop(token)
+        web_server._HISTORY=HistoryStore(self._history_path)
+        stored=json.loads(self.get("/api/history?archive_id="+
+                      urlencode({"id":archive_id}).split("=",1)[1])[0])
+        self.assertEqual(stored["report"],result["report"])
+        self.assertNotIn("wall",stored)
+        question=self.post({"action":"history_retry_question",
+                            "archive_id":archive_id,"round":1})["question"]
+        self.assertNotIn("best_actions",question)
+        self.assertNotIn("analysis",question)
+        right=result["feedback"]["best_actions"][0]
+        replay=self.post({"action":"history_retry_submit",
+                          "archive_id":archive_id,"round":1,"tile":right})
+        self.assertTrue(replay["result"]["correct"])
+        self.assertTrue(replay["retry"]["corrected_count"])
+        self.assertEqual(json.loads(self.get(
+            "/api/history?archive_id="+archive_id
+        )[0])["retry"]["corrected_count"],1)
+        delete=self.post({"action":"history_delete","archive_id":archive_id})
+        self.assertTrue(delete["deleted"])
+        with self.assertRaises(HTTPError) as err:
+            self.get("/api/history?archive_id="+archive_id)
+        self.assertEqual(err.exception.code,400)
+
+    def test_history_page_scripts_and_controls(self):
+        html,_=self.get("/")
+        self.assertIn(b"/history.js",html)
+        self.assertIn(b"id=\"history-panel\"",html)
+        js,kind=self.get("/history.js")
+        self.assertIn("javascript",kind)
+        self.assertIn(b"history_retry_submit",js)
+        self.assertIn(b"MahTrainHistory",js)
+        css,_=self.get("/app.css")
+        self.assertIn(b".history-panel",css)
 
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
