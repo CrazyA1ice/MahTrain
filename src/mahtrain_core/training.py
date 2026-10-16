@@ -158,7 +158,7 @@ def generate_question(mode: str, seed: int) -> dict[str, Any]:
     # The hand and choices are display-only copies, not new tile draws.
     hand = sort_hand(hand)
     choices = (
-        sort_hand(tile for tile in TILES if tile[0] == hand[0][0])
+        sort_hand([tile for tile in TILES if tile[0] == hand[0][0]])
         if mode == "pure_suit_waits"
         else sort_hand(set(hand))
     )
