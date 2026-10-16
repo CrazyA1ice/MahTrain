@@ -220,8 +220,75 @@
           voided+"笔杠上炮作废（底分和撤销细则待确认，未产生虚构退款）。"));
       }
       score.append(el("p","review-footnote",
-        "此处展示已确认的胡牌付款，不是现金账户；流局查花猪、大叫尚未实现。"));
+        "胡牌零和流水已入账；独立杠钱只有明确勾选后才模拟入账，流局赔付只提供预览。"));
       publicInfo.append(score);
+    }
+    const kongLedger=state.kong_ledger;
+    if(kongLedger){
+      const k=el("section","match-kong-ledger");
+      k.append(el("h4","","独立杠钱模拟与冲销流水"));
+      k.append(el("p","review-footnote",kongLedger.base===null
+        ?"未设置杠钱底分：不自动计价，所有杠钱为待定。"
+        :"已启用单独杠钱底分"+kongLedger.base+
+          "（仅为试验积分，不代表已确定的正式房间规则）。"));
+      k.append(el("p","review-intro",
+        "四家杠钱余额："+kongLedger.balances.map(
+          (n,i)=>i+"号"+(n>=0?"+":"")+n).join(" · ")));
+      if(kongLedger.events.length){
+        for(const item of kongLedger.events){
+          const kind={ming_gang:"明杠",an_gang:"暗杠",bu_gang:"补杠"}[item.type];
+          const stateLabel={posted:"已模拟入账",unpriced:"未计价",
+            voided:"已作废并冲销"}[item.status];
+          k.append(el("p","review-footnote",
+            "第"+item.id+"笔 · "+item.seat+"号"+kind+
+            " · "+stateLabel+(item.amount_per_payer!==null
+              ?" · 每付款者"+item.amount_per_payer+"积分":"")));
+        }
+      }
+      if(kongLedger.entries.length){
+        const details=el("details","match-transfers");
+        details.append(el("summary","","查看杠钱原始与反向流水（"+
+          kongLedger.entries.length+"条）"));
+        for(const item of kongLedger.entries){
+          details.append(el("p","review-footnote",
+            "第"+item.kong_id+"笔 · "+(item.kind==="reversal"?"冲销":"入账")+
+            "："+item.payer+"号付"+item.recipient+"号 "+
+            item.amount));
+        }
+        k.append(details);
+      }
+      const net=state.combined_balances||[0,0,0,0];
+      k.append(el("p","match-net",
+        "胡牌 + 模拟杠钱余额："+net.map((n,i)=>
+          i+"号"+(n>=0?"+":"")+n).join(" · ")));
+      publicInfo.append(k);
+    }
+    const review=state.exhaustive_review;
+    if(review?.triggered){
+      const sec=el("section","match-exhaustive-review");
+      sec.append(el("h4","","流局查花猪 / 查大叫：待确认结算预览"));
+      sec.append(el("p","review-intro",
+        "本局牌墙耗尽，仍有"+review.participating_active_seats.length+
+        "位活跃玩家。仅按“活跃玩家之间付款”方案试算，"+
+        "已胡玩家是否参与尚未确认；以下金额没有进入实际账本。"));
+      const kinds={flower_pig:"花猪",listening:"合法听牌",
+        unready:"未听牌",unresolved_exposed_missing:"有缺门公开副露，待核验",
+        unresolved_nonstable_hand:"非稳定张数，待核验"};
+      for(const item of review.seats){
+        sec.append(el("p","review-footnote",
+          item.seat+"号："+(kinds[item.classification]||"待核验")+
+          (item.max_effective_fan!==null?
+            " · 最大可结"+item.max_effective_fan+"番":"")));
+      }
+      for(const entry of review.proposed_transfers){
+        sec.append(el("p","review-footnote",
+          (entry.stage==="flower_pig"?"花猪":"查大叫")+
+          "（仅试算）："+entry.payer+"号向"+entry.recipient+
+          "号付"+entry.amount));
+      }
+      sec.append(el("p","match-unpriced",
+        "流局付款状态：未入账。赔付参与人及缺门副露归属确认后才能正式结算。"));
+      publicInfo.append(sec);
     }
     const winners=state.winners;
     if(winners.length)publicInfo.append(el("p","match-win-note",
@@ -245,11 +312,16 @@
     publicInfo.append(log);
   }
   function init(){
+    $("match-enable-kong").addEventListener("change",()=>{
+      $("match-kong-base").disabled=!$("match-enable-kong").checked;
+    });
     $("match-new").addEventListener("click",()=>{
       const seed=Number($("match-seed").value);
       action("match_new",{seed,
         room_coefficient:Number($("match-coefficient").value),
         fan_cap:Number($("match-fan-cap").value),
+        kong_base:$("match-enable-kong").checked
+          ?Number($("match-kong-base").value):null,
       });
     });
   }
