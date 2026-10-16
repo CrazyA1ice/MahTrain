@@ -56,6 +56,9 @@ class FourPlayerOpening:
             {"eligible":False,"initial_waits":[],"reason":"not_initialized",
              "checkpoints":0} for _ in range(4)
         ]
+        # Private tile identity of each seat's latest front/tail draw.
+        # The public board NEVER includes these hidden identities.
+        self._drawn_tiles: list[str | None] = [None] * 4
         self._kong_draw: list[bool] = [False] * 4
         self._kong_reference: list[int | None] = [None] * 4
         self._settlement_pending: list[dict[str, Any]] = []
@@ -243,7 +246,8 @@ class FourPlayerOpening:
         return is_legal_win(self._hands[seat], self._melds[seat],
                             self.missing_suits[seat])
 
-    def discard(self, seat: int, tile: str) -> None:
+    def discard(self, seat: int, tile: str, *,
+                from_draw: bool | None = None) -> None:
         if self.phase not in ("dealer_discard", "await_discard"):
             raise ValueError("must first reach a discard phase")
         self._check_turn(seat)
@@ -251,11 +255,27 @@ class FourPlayerOpening:
             raise ValueError("tile not in concealed hand")
         if self._effective(seat) != 14:
             raise RuntimeError("discard requires 14 effective tiles")
+        drawn = self._drawn_tiles[seat]
+        if from_draw is not None and type(from_draw) is not bool:
+            raise ValueError("from_draw must be boolean when supplied")
+        # For older callers, a discarded tile matching the most recent draw
+        # is counted as a draw-cut. The human UI can distinguish equal copies
+        # by explicitly clicking either the separate right-hand draw or an
+        # identically named tile in the existing hand.
+        if from_draw is None:
+            from_draw = drawn is not None and tile == drawn
+        if from_draw:
+            if drawn is None or tile != drawn:
+                raise ValueError("draw-cut must discard the actual drawn tile")
+        elif drawn == tile and self._hands[seat].count(tile) < 2:
+            raise ValueError("hand-cut cannot discard the only drawn copy")
         self._hands[seat].remove(tile)
+        self._drawn_tiles[seat] = None
         self._verify_tian_ting_checkpoint(seat)
         after_kong=self._kong_draw[seat]
         self._kong_draw[seat]=False
-        entry = {"seat": seat, "tile": tile, "index": len(self._discards) + 1}
+        entry = {"seat": seat, "tile": tile, "index": len(self._discards) + 1,
+                 "discard_kind": "tsumogiri" if from_draw else "tedashi"}
         if after_kong:
             entry["after_kong"]=True
             entry["kong_id"]=self._kong_reference[seat]
@@ -355,6 +375,7 @@ class FourPlayerOpening:
             if action=="peng":
                 self._cancel_tian_ting(seat,"peng_called")
             last["claimed_by"] = seat
+            self._drawn_tiles[seat] = None  # Peng is followed by hand cut.
             self.turn = seat
             self._pending_discard = None
             self._responses.clear()
@@ -387,6 +408,7 @@ class FourPlayerOpening:
             raise RuntimeError("cannot supplement an empty wall")
         tile = self._wall.pop()  # TAIL, not the normal front draw.
         self._hands[seat].append(tile)
+        self._drawn_tiles[seat] = tile
         self.turn = seat
         self.phase = "await_discard"
         self._kong_draw[seat]=True
@@ -418,6 +440,7 @@ class FourPlayerOpening:
             raise ValueError("illegal concealed or supplement kong")
         if self._effective(seat)!=14:
             raise RuntimeError("kong requires 14 effective tiles")
+        self._drawn_tiles[seat] = None
         if kind=="an_gang":
             for _ in range(4):
                 self._hands[seat].remove(tile)
@@ -516,6 +539,7 @@ class FourPlayerOpening:
             seat,source=seat,tile=tile,kind="self_draw",score=points,
         )
         self._won[seat] = True
+        self._drawn_tiles[seat] = None
         self._winners.append({"seat":seat,"source":seat,
                               "kind":"self_draw","score":payment})
         self._events.append({"type":"self_draw_win","seat":seat})
@@ -538,6 +562,7 @@ class FourPlayerOpening:
             raise RuntimeError("no legal front-wall draw")
         tile = self._wall.pop(0)
         self._hands[seat].append(tile)
+        self._drawn_tiles[seat] = tile
         self._kong_draw[seat]=False
         self._kong_reference[seat]=None
         self.phase="await_discard"
@@ -611,6 +636,10 @@ class FourPlayerOpening:
             "seat":seat,
             "hand":sort_hand(self._hands[seat]),
             "own_melds":[dict(m) for m in self._melds[seat]],
+            "drawn_tile": (self._drawn_tiles[seat]
+                           if seat == self.turn and
+                           self.phase in ("dealer_discard", "await_discard")
+                           else None),
             "tian_ting":dict(self._tian_ting[seat]),
             "sealed_exchange":list(self._exchange_offers[seat])
                 if seat in self._exchange_offers else None,
