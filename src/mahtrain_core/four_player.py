@@ -17,6 +17,8 @@ from typing import Any, Sequence
 from .presentation import sort_hand
 from .rules import SUITS, TILES, is_legal_win, winning_tiles, score_win
 from .settlement import WinLedger
+from .kong_ledger import KongLedger
+from .exhaustive_review import review_exhaustive_draw
 
 EXCHANGE_OFFSETS = {"clockwise": 1, "counterclockwise": 3, "opposite": 2}
 SEAT_COUNT = 4
@@ -25,10 +27,11 @@ _KONG_TYPES = ("ming_gang", "an_gang", "bu_gang")
 
 class FourPlayerOpening:
     def __init__(self, seed: int, *, room_coefficient: int = 100,
-                 fan_cap: int = 3) -> None:
+                 fan_cap: int = 3, kong_base: int | None = None) -> None:
         if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
             raise ValueError("seed must be an integer from 0 to 2^64 - 1")
         self.ledger = WinLedger(room_coefficient, fan_cap)
+        self.kong_ledger = KongLedger(kong_base)
         rng = random.Random(seed)
         deck = [tile for tile in TILES for _ in range(4)]
         rng.shuffle(deck)
@@ -54,6 +57,7 @@ class FourPlayerOpening:
              "checkpoints":0} for _ in range(4)
         ]
         self._kong_draw: list[bool] = [False] * 4
+        self._kong_reference: list[int | None] = [None] * 4
         self._settlement_pending: list[dict[str, Any]] = []
         self.phase = "exchange_select"
         self.turn: int | None = None
@@ -254,6 +258,8 @@ class FourPlayerOpening:
         entry = {"seat": seat, "tile": tile, "index": len(self._discards) + 1}
         if after_kong:
             entry["after_kong"]=True
+            entry["kong_id"]=self._kong_reference[seat]
+            self._kong_reference[seat]=None
         self._discards.append(entry)
         self._pending_discard = dict(entry)
         self._responses.clear()
@@ -308,12 +314,10 @@ class FourPlayerOpening:
             # A kong which immediately produced this discard is void when
             # that discard is won. We do not undo cash: no kong cash was
             # ever posted. Mark the unpriced event explicitly as void.
-            if entry.get("after_kong"):
-                for kong in reversed(self._settlement_pending):
-                    if kong["seat"]==source and kong["status"]=="unpriced":
-                        kong["status"]="voided"
-                        kong["reason"]="杠后炮：原杠作废；尚未计价，无款项可撤销"
-                        break
+            if entry.get("after_kong") and entry.get("kong_id") is not None:
+                self.kong_ledger.void(
+                    entry["kong_id"],reason="kong_discard_ron")
+                self._settlement_pending=self.kong_ledger.public_state()["events"]
             last["won_by"] = list(winners)
             for seat in winners:
                 points=self._win_score(
@@ -369,10 +373,14 @@ class FourPlayerOpening:
 
     def _pending_kong_price(self, seat: int, kind: str,
                             source: int | None = None) -> None:
-        self._settlement_pending.append({
-            "type":kind,"seat":seat,"source":source,"status":"unpriced",
-            "reason":"杠钱底分和杠作废撤销规则尚未最终确认；不计入胡牌余额",
-        })
+        # Only a caller who has explicitly configured an independent kong
+        # base can post *simulated* kong amounts.
+        payers=([source] if kind=="ming_gang"
+                else [s for s in range(4) if s!=seat and not self._won[s]])
+        event_id=self.kong_ledger.declare(
+            kind=kind,winner=seat,payers=payers,source=source)
+        self._kong_reference[seat]=event_id
+        self._settlement_pending=self.kong_ledger.public_state()["events"]
 
     def _supplement(self, seat: int) -> None:
         if not self._wall:
@@ -531,6 +539,7 @@ class FourPlayerOpening:
         tile = self._wall.pop(0)
         self._hands[seat].append(tile)
         self._kong_draw[seat]=False
+        self._kong_reference[seat]=None
         self.phase="await_discard"
         self._events.append({"type":"draw","seat":seat})
         self._assert_physical_tiles()
@@ -554,6 +563,21 @@ class FourPlayerOpening:
             "won":list(self._won),
             "winners":[dict(w) for w in self._winners],
             "win_ledger":self.ledger.public_state(),
+            "kong_ledger":self.kong_ledger.public_state(),
+            "combined_balances":[
+                a+b for a,b in zip(
+                    self.ledger.public_state()["balances"],
+                    self.kong_ledger.public_state()["balances"])
+            ],
+            "exhaustive_review":(
+                review_exhaustive_draw(
+                    hands=self._hands,melds=self._melds,
+                    missing_suits=self.missing_suits,won=self._won,
+                    tian_ting=self._tian_ting,
+                    coefficient=self.ledger.room_coefficient,
+                    fan_cap=self.ledger.fan_cap,
+                ) if self.phase=="wall_exhausted" else None
+            ),
             "pending_kong_payments":[dict(item) for item in self._settlement_pending],
             "wall_count":len(self._wall),
             "turn":self.turn,
@@ -570,7 +594,9 @@ class FourPlayerOpening:
                 if event["type"]=="an_gang" else dict(event)
             ) for event in self._events],
             "prototype_limitations":{
-                "win_payments_only":True,"kong_payments_pending":True,
+                "win_payments_only":True,
+                "kong_simulation_optional":True,
+                "exhaustive_draw_payments_posted":False,
                 "ai":False,"tian_ting_tracking":True,
                 "exhaustive_draw_settlement":False,
             },
