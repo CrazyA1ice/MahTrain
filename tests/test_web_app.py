@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import web_server  # noqa: E402
+from mahtrain_core.efficiency import analyze_discards  # noqa: E402
 
 
 class WebUI(unittest.TestCase):
@@ -183,6 +184,60 @@ class WebUI(unittest.TestCase):
         self.assertEqual(preview["tianque"],len(absent)==1)
         self.assertNotIn("wall",preview)
         self.assertNotIn("correct_answer",preview)
+
+    def test_retry_endpoints_hide_solution_and_keep_original_session(self):
+        create=self.post({"action":"new","seed":17,"rounds":1,
+                          "missing_suit":"p"})
+        token=create["token"]
+        with self.assertRaises(HTTPError) as err:
+            self.post({"action":"retry_list","token":token})
+        self.assertEqual(err.exception.code,400)
+        step=self.post({"action":"draw","token":token})
+        while step["state"]["phase"] in ("offer_win","offer_kong"):
+            action="win" if step["state"]["phase"]=="offer_win" else "kong"
+            step=self.post({"action":action,"token":token,**(
+                {"accept":False} if action=="win" else {"tile":None}
+            )})
+        state=step["state"]
+        analysis=analyze_discards(
+            state["hand"],missing_suit="p",
+            visible_tiles=state["discard_history"]
+        )
+        if analysis["status"]=="already_winning":
+            wrong=state["choices"][0]
+        else:
+            wrong=next(t for t in state["choices"]
+                       if t not in analysis["best_discards"])
+        completed=self.post({"action":"discard","token":token,"tile":wrong})
+        self.assertFalse(completed["feedback"]["correct"])
+        original=completed["report"]
+        self.assertTrue(original["finished"])
+        listing=self.post({"action":"retry_list","token":token})["retry"]
+        self.assertEqual(listing["mistake_count"],1)
+        question=self.post({"action":"retry_question","token":token,
+                            "round":1})["question"]
+        self.assertNotIn("best_actions",question)
+        self.assertNotIn("correct",question)
+        self.assertNotIn("wall",question)
+        self.assertEqual(len(question["concealed"]),14)
+        with self.assertRaises(HTTPError) as err:
+            self.post({"action":"retry_submit","token":token,
+                       "round":1,"tile":"invalid"})
+        self.assertEqual(err.exception.code,400)
+        wrong_retry=self.post({"action":"retry_submit","token":token,
+                               "round":1,"tile":wrong})
+        self.assertFalse(wrong_retry["result"]["correct"])
+        right=completed["feedback"]["best_actions"][0]
+        right_retry=self.post({"action":"retry_submit","token":token,
+                               "round":1,"tile":right})
+        self.assertTrue(right_retry["result"]["correct"])
+        self.assertTrue(right_retry["result"]["improved"])
+        self.assertEqual(right_retry["retry"]["corrected_count"],1)
+        restored=json.loads(self.get(
+            "/api/state?"+urlencode({"token":token})
+        )[0])
+        self.assertEqual(restored["report"],original)
+        self.assertEqual(restored["state"],completed["state"])
 
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
