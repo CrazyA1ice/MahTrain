@@ -306,6 +306,8 @@ def grade_answer(
             "手牌已经满足定缺及胡牌结构，应直接胡牌。"
             if correct else "这是可直接胡牌的局面，普通切牌不是本题最优动作。"
         )
+    elif chosen == "win":
+        reason = "当前并未满足合法胡牌结构与定缺条件，不能直接胡牌；请选择最优切牌。"
     elif chosen_row is not None and not chosen_row["non_regressing"]:
         reason = "这张切牌增加了本轮可达的最小向听数，违反局部最优切的求稳约束。"
     elif correct:
