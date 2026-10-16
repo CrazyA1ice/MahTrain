@@ -19,11 +19,13 @@ from .efficiency import shanten_13, analyze_discards
 from .rules import TILE_INDEX, TILES, SUITS
 
 AI_LEVELS = ("basic", "advanced", "challenge")
+# Experimental variants are excluded from normal game difficulty selection.
+ABLATION_LEVELS = ("challenge_no_ukeire", "challenge_no_risk")
 LABELS = {"basic": "入门", "advanced": "进阶", "challenge": "挑战"}
 
 
 def _validate_level(level: str) -> None:
-    if type(level) is not str or level not in AI_LEVELS:
+    if type(level) is not str or level not in (*AI_LEVELS, *ABLATION_LEVELS):
         raise ValueError("AI difficulty must be basic, advanced or challenge")
 
 
@@ -222,7 +224,13 @@ class MahjongAgent:
         best = [t for t,s in scored if s == minimum]
         if self.level == "advanced" or len(best) == 1:
             return best[0]
-        # Challenge: prefer maximum public-information-based effective copies.
+        if self.level == "challenge_no_ukeire":
+            # Remove public effective-draw ranking, retain open-meld pressure.
+            # No analyze_discards oracle is called in this ablated policy.
+            return min(best, key=lambda t:(
+                public_suit_pressure(t, view), TILE_INDEX[t]
+            ))
+        # Challenge / no-risk ablation: public effective copies.
         # analyze_discards validates known physical counts and uses NO wall.
         ranked = analyze_discards(
             hand, melds, missing_suit=missing,
@@ -233,7 +241,8 @@ class MahjongAgent:
         }
         return min(best,key=lambda t:(
             -candidates[t]["effective_tile_count"],
-            public_suit_pressure(t,view),
+            (0 if self.level == "challenge_no_risk" else
+             public_suit_pressure(t,view)),
             TILE_INDEX[t],
         ))
 
@@ -242,4 +251,6 @@ class MahjongAgent:
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
             "challenge":"向听及公开有效进张优先；完全相同时以公开副露花色压力做弱风险判别",
+            "challenge_no_ukeire":"消融公开进张排序：向听优先、公开副露压力作平局排序",
+            "challenge_no_risk":"消融弱风险项：向听和公开进张优先，完全并列按牌序",
         }[self.level]
