@@ -312,6 +312,7 @@ class SoloTrainingSession:
             "session_id": self.session_id,
             "round_review": review["rounds"],
             "progress_summary": review["progress"],
+            "error_summary": review["errors"],
             "completed_rounds": total,
             "round_limit": self._rounds,
             "finished": self.finished,
