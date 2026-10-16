@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#122b2b">
+  <title>MahTrain · 四川麻将训练</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">麻</span><span><strong>MahTrain</strong><small>四川麻将 · 牌效训练原型</small></span></div>
+      <span class="mode-label">单人摸切 · 14轮</span>
+    </header>
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">STRUCTURED PRACTICE</p>
+          <h1>每一张切牌，都有依据。</h1>
+          <p>理牌采用 <strong>万 → 条 → 筒</strong>，花色内 <strong>1 → 9</strong> 升序。摸到可胡或可杠的牌时，系统会主动询问。</p>
+        </div>
+        <form id="start-form" class="start-form">
+          <label>训练种子<input type="number" id="seed" min="0" max="4294967295" value="17"></label>
+          <label>定缺<select id="missing"><option value="">自动（初始手牌最少）</option><option value="m">万</option><option value="s">条</option><option value="p">筒</option></select></label>
+          <button type="submit" class="primary">开始新训练 <span aria-hidden="true">↗</span></button>
+        </form>
+      </section>
+      <section id="game" class="game" hidden>
+        <div class="stats">
+          <div><span>训练进度</span><strong id="progress">0 / 14</strong></div>
+          <div><span>牌墙剩余</span><strong id="wall">95</strong></div>
+          <div><span>已开暗杠</span><strong id="kong-count">0</strong></div>
+          <div><span>本局定缺</span><strong id="missing-name">—</strong></div>
+        </div>
+        <div class="table-area">
+          <div class="play-header"><div><span class="eyebrow">YOUR HAND</span><h2>我的手牌</h2></div><div id="phase-label" class="phase-label">等待摸牌</div></div>
+          <div class="hand-layout">
+            <section class="concealed">
+              <div class="section-meta"><span>暗手牌 · 单击牌面切牌</span><span id="drawn-label">尚未摸牌</span></div>
+              <div id="hand" class="hand-row" aria-live="polite"></div>
+            </section>
+            <aside class="meld-area"><div class="section-meta">独立杠区 · 不可操作</div><div id="kong-area" class="kong-area"><span class="placeholder">暂未开杠</span></div></aside>
+          </div>
+          <div class="actions"><div id="action-hint" class="action-hint">点击「摸下一张牌」开始本轮。</div><button id="draw-button" class="primary" type="button">摸下一张牌</button></div>
+        </div>
+        <div class="below">
+          <section class="panel"><div class="panel-title"><h3>已打出的牌</h3><small>公开弃牌 · 不再回到牌墙</small></div><div id="discards" class="small-tiles"><span class="placeholder">暂无弃牌</span></div></section>
+          <section class="panel"><div class="panel-title"><h3>本轮解析</h3><small>作答后显示正确切牌与进张差异</small></div><div id="feedback" class="feedback empty">提交切牌后，这里会显示本轮判题结果。</div></section>
+        </div>
+        <section id="report-panel" class="panel report-panel" hidden><div class="panel-title"><h3>训练总结</h3><small>最多14轮 · 中途胡牌会提前结束</small></div><div id="report"></div></section>
+      </section>
+      <div id="prompt-layer" class="prompt-layer" hidden><div class="prompt-card" role="dialog" aria-modal="true" aria-labelledby="prompt-title"><div class="eyebrow" id="prompt-kicker">ACTION AVAILABLE</div><h2 id="prompt-title">操作提示</h2><p id="prompt-message"></p><div id="prompt-tiles" class="prompt-tiles"></div><div id="prompt-buttons" class="prompt-buttons"></div></div></div>
+    </main>
+    <footer>本地训练演示 · 暗杠后从牌墙尾部补牌 · 牌墙与标准答案保留在 Python 服务端</footer>
+  </div>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
