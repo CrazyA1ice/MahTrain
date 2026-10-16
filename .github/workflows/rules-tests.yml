@@ -87,6 +87,19 @@ jobs:
             /tmp/mahtrain-ai-selfplay.csv
             /tmp/mahtrain-ai-seed-clusters.csv
           if-no-files-found: warn
+      - name: Smoke-test four-policy independent-baseline tournament
+        run: |
+          python examples/benchmark_independent_ai.py --seed-start 11 --seeds 1 --json-out /tmp/mahtrain-ai-independent.json --csv-out /tmp/mahtrain-ai-independent.csv
+          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-independent.json',encoding='utf8')); assert d['games']==4; assert d['independent_shuffle_seeds']==1; assert all(d['levels'][x]['exposures']==4 for x in ('baseline','basic','advanced','challenge')); assert all(m['physical_count']==108 for m in d['matches']); assert d['intervals'] is None"
+      - name: Archive independent baseline four-seat benchmark
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-independent-python-${{ matrix.python-version }}
+          path: |
+            /tmp/mahtrain-ai-independent.json
+            /tmp/mahtrain-ai-independent.csv
+          if-no-files-found: warn
       - name: Smoke-test deterministic four-seat opening
         run: |
           python examples/four_player_opening_demo.py --seed 42 --turns 8
