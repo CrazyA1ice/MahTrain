@@ -87,6 +87,86 @@ def _quantiles(values: list[float]) -> list[float] | None:
             round(values[int((n-1)*.975)], 4)]
 
 
+def _seed_stability(by_seed: list[dict[str, Any]]) -> dict[str, Any]:
+    """Descriptive paired-seed direction and leave-one-seed-out diagnostics.
+
+    Never treat the five rotations of one shuffle seed as independent rows.
+    Excluding one seed recomputes *pooled numerators/denominators*, not a
+    naive average of rounded per-seed ratios.
+    """
+    rows = []
+    directions = {
+        a+"_vs_"+b: {
+            metric: {"positive": 0, "negative": 0, "tied": 0, "undefined": 0}
+            for metric in METRICS
+        }
+        for a, b in CONTRASTS
+    }
+    for group in by_seed:
+        differences = {}
+        for a, b in CONTRASTS:
+            key = a+"_vs_"+b
+            differences[key] = {}
+            for metric in METRICS:
+                delta = _difference(group["levels"], a, b, metric)
+                if delta is None:
+                    directions[key][metric]["undefined"] += 1
+                elif delta > 0:
+                    directions[key][metric]["positive"] += 1
+                elif delta < 0:
+                    directions[key][metric]["negative"] += 1
+                else:
+                    directions[key][metric]["tied"] += 1
+                differences[key][metric] = (
+                    round(delta, 4) if delta is not None else None
+                )
+        rows.append({"seed": group["seed"], "differences": differences})
+
+    # Five seeds is a tiny exploratory threshold, not proof of significance.
+    sensitivity = None
+    if len(by_seed) >= MIN_SEEDS_FOR_INTERVAL:
+        ranges = {
+            a+"_vs_"+b: {metric: [] for metric in METRICS}
+            for a, b in CONTRASTS
+        }
+        for dropped in range(len(by_seed)):
+            pooled = {level: _empty() for level in LEVELS}
+            for idx, group in enumerate(by_seed):
+                if idx == dropped:
+                    continue
+                for level in LEVELS:
+                    for name, value in group["levels"][level].items():
+                        pooled[level][name] += value
+            for a, b in CONTRASTS:
+                for metric in METRICS:
+                    delta = _difference(pooled, a, b, metric)
+                    if delta is not None:
+                        ranges[a+"_vs_"+b][metric].append(delta)
+        sensitivity = {
+            key: {
+                metric: ({
+                    "min": round(min(values), 4),
+                    "max": round(max(values), 4),
+                    "valid_exclusions": len(values),
+                    "crosses_zero": min(values) <= 0 <= max(values),
+                } if values else None)
+                for metric, values in metrics.items()
+            }
+            for key, metrics in ranges.items()
+        }
+    return {
+        "unit": "independent_shuffle_seed_cluster",
+        "distinct_seed_count": len(by_seed),
+        "per_seed_differences": rows,
+        "direction_counts": directions,
+        "leave_one_seed_out": sensitivity,
+        "interpretation": (
+            "descriptive sign counts and pooled leave-one-seed-out ranges; "
+            "not a formal test, not independently randomized outcomes"
+        ),
+    }
+
+
 def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
                        on_match: Any = None, include_traces: bool = False,
                        bootstrap_replicates: int = 400) -> dict[str, Any]:
@@ -184,6 +264,7 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
         "levels": summary,
         "paired_differences": differences,
         "per_seed": by_seed,
+        "seed_analysis": _seed_stability(by_seed),
         "terminal_phase_counts": {
             phase: sum(game["terminal_phase"] == phase for game in matches)
             for phase in ("finished", "wall_exhausted")
