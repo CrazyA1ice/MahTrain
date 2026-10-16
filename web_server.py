@@ -90,6 +90,13 @@ def _process(action: str, payload: dict) -> dict:
         if not isinstance(token, str) or token not in _SESSIONS:
             raise ValueError("训练会话不存在，请重新开始")
         game = _SESSIONS[token]
+        if action == "retry_list":
+            return {"retry": game.retry_list()}
+        if action == "retry_question":
+            return {"question": game.retry_question(payload.get("round"))}
+        if action == "retry_submit":
+            answer = game.retry_submit(payload.get("round"), payload.get("tile"))
+            return {"result": answer, "retry": game.retry_list()}
         feedback = None
         if action == "draw":
             game.draw_next()
