@@ -81,14 +81,17 @@ def make_one_shanten(
             sequence = difficulty != "basic"
             for _ in range(3):
                 hand.extend(_meld(rng, rng.choice(suits), sequence))
-            paired = f"{rng.choice(suits)}{rng.randint(1,9)}"
-            hand += [paired, paired]
             if sequence:
-                suit = rng.choice(suits)
-                a = rng.randint(1,8)
-                hand += [f"{suit}{a}", f"{suit}{a+1}"]
-                family = "adjacent_taatsu"
+                # 3 complete melds + 2 incomplete adjacent groups, NO fixed
+                # head. A hand with a completed head AND adjacent group here
+                # would actually be tenpai (0 shanten), not one-shanten.
+                for suit in suits:
+                    a = rng.randint(1, 8)
+                    hand.extend((f"{suit}{a}", f"{suit}{a+1}"))
+                family = "two_taatsu"
             else:
+                paired = f"{rng.choice(suits)}{rng.randint(1,9)}"
+                hand += [paired, paired]
                 hand += [
                     f"{rng.choice(suits)}{rng.randint(1,9)}" for _ in range(2)
                 ]
