@@ -12,7 +12,8 @@ from statistics import mean
 from time import perf_counter_ns
 from typing import Any
 
-from .ai import AI_LEVELS, MahjongAgent, visible_tiles
+from .ai import (AI_LEVELS, ABLATION_VARIANTS, MahjongAgent,
+                 AblationMahjongAgent, visible_tiles)
 from .ai_baseline import ShapeBaselineAgent
 from .efficiency import analyze_discards
 from .four_player import FourPlayerOpening
@@ -144,13 +145,19 @@ def explain_public_action(action: dict[str, Any],
         missing=suits[seat] if suits is not None else None
         if missing and action["tile"][0]==missing:
             code="discard_missing"
-            explanation="本次切掉已公开的定缺花色。四种对照策略都优先处理定缺牌；这一行为不能单独证明切牌为全局最优。"
+            explanation="本次切掉已公开的定缺花色。当前对照策略都优先处理定缺牌；这一行为不能单独证明切牌为全局最优。"
         elif level=="baseline":
             code="baseline_shape_policy"
             explanation="独立牌形基线按自己的同牌及邻牌数量选择孤立牌；不使用向听数、有效进张评估器或对手暗牌。"
         elif level=="basic":
             code="basic_discard"
             explanation="入门档在可选切牌范围内按种子随机选择；不公开用到的自家暗手和私有牌效数据。"
+        elif level=="challenge_no_ukeire":
+            code="ablation_no_ukeire_policy"
+            explanation="消融版本只按向听与公开副露弱风险规则选切牌；不调用有效进张排序，不公布隐藏牌效。"
+        elif level=="challenge_no_pressure":
+            code="ablation_no_pressure_policy"
+            explanation="消融版本按向听与公开信息有效进张排序；不使用公开副露花色压力平局规则。"
         elif level=="advanced":
             code="advanced_policy"
             explanation="进阶档的切牌策略优先降低切后向听数；此处只说明算法规则，不公布本家隐藏向听数。"
@@ -255,7 +262,7 @@ def simulate_match(seed: int, rotation: int = 0,
         assignment=seat_assignment(rotation)
     else:
         if (type(lineup) is not list or len(lineup)!=4 or
-            any(type(level) is not str or level not in (*AI_LEVELS,"baseline")
+            any(type(level) is not str or level not in (*AI_LEVELS,"baseline",*ABLATION_VARIANTS)
                 for level in lineup) or len(set(lineup))!=4):
             raise ValueError("independent lineup needs 4 distinct AI policies")
         assignment=list(lineup)
@@ -263,6 +270,8 @@ def simulate_match(seed: int, rotation: int = 0,
     agents={
         seat:(ShapeBaselineAgent(seed=seed,seat=seat)
               if assignment[seat]=="baseline" else
+              AblationMahjongAgent(assignment[seat],seed=seed,seat=seat)
+              if assignment[seat] in ABLATION_VARIANTS else
               MahjongAgent(assignment[seat],seed=seed,seat=seat))
         for seat in range(4)
     }
