@@ -103,7 +103,7 @@ jobs:
           if-no-files-found: warn
       - name: Smoke-test five-policy ablation seat balance
         run: |
-          python examples/benchmark_ablation_ai.py --seed-start 11 --seeds 1 --json-out /tmp/mahtrain-ai-ablation.json --csv-out /tmp/mahtrain-ai-ablation.csv --contrast-csv-out /tmp/mahtrain-ai-contrast.csv --html-out /tmp/mahtrain-ai-ablation.html
+          python examples/benchmark_ablation_ai.py --seed-start 11 --seeds 1 --json-out /tmp/mahtrain-ai-ablation.json --csv-out /tmp/mahtrain-ai-ablation.csv --contrast-csv-out /tmp/mahtrain-ai-contrast.csv --pressure-csv-out /tmp/mahtrain-ai-pressure.csv --html-out /tmp/mahtrain-ai-ablation.html
           python -c "import json; d=json.load(open('/tmp/mahtrain-ai-ablation.json',encoding='utf8')); assert d['games']==5; assert d['independent_shuffle_seeds']==1; assert len(d['opponents'])==5; assert all(d['levels'][x]['exposures']==4 for x in d['opponents']); assert all(m['physical_count']==108 for m in d['matches']); assert d['intervals'] is None; assert d['seed_analysis']['distinct_seed_count']==1; assert d['seed_analysis']['leave_one_seed_out'] is None"
       - name: Archive five-policy ablation result
         if: always()
@@ -114,6 +114,7 @@ jobs:
             /tmp/mahtrain-ai-ablation.json
             /tmp/mahtrain-ai-ablation.csv
             /tmp/mahtrain-ai-contrast.csv
+            /tmp/mahtrain-ai-pressure.csv
             /tmp/mahtrain-ai-ablation.html
           if-no-files-found: warn
       - name: Smoke-test deterministic four-seat opening
@@ -137,7 +138,7 @@ jobs:
           python-version: "3.11"
       - name: Run five independent shuffle seeds and produce offline report
         run: |
-          python examples/benchmark_ablation_ai.py --seed-start 30 --seeds 5 --json-out /tmp/mahtrain-m311.json --csv-out /tmp/mahtrain-m311-policy.csv --contrast-csv-out /tmp/mahtrain-m311-contrasts.csv --html-out /tmp/mahtrain-m311-report.html
+          python examples/benchmark_ablation_ai.py --seed-start 30 --seeds 5 --json-out /tmp/mahtrain-m311.json --csv-out /tmp/mahtrain-m311-policy.csv --contrast-csv-out /tmp/mahtrain-m311-contrasts.csv --pressure-csv-out /tmp/mahtrain-m312-pressure.csv --html-out /tmp/mahtrain-m311-report.html
       - name: Validate five seed clusters, seat exposures, intervals and HTML
         run: |
           python - <<'PY'
@@ -155,6 +156,12 @@ jobs:
           html=Path('/tmp/mahtrain-m311-report.html').read_text(encoding='utf8')
           assert '<svg role="img"' in html and '<script' not in html
           assert Path('/tmp/mahtrain-m311-contrasts.csv').is_file()
+          p=d['pressure_diagnostics']
+          assert set(p)=={'challenge','challenge_no_pressure'}
+          for row in p.values():
+              assert row['actual_changed']<=row['would_change']<=row['pressure_discriminates']<=row['effective_ties']<=row['decisions']
+          assert Path('/tmp/mahtrain-m312-pressure.csv').is_file()
+          assert '弱风险规则触发诊断' in html
           PY
       - name: Archive five-seed HTML and structured reports
         if: always()
@@ -165,5 +172,6 @@ jobs:
             /tmp/mahtrain-m311.json
             /tmp/mahtrain-m311-policy.csv
             /tmp/mahtrain-m311-contrasts.csv
+            /tmp/mahtrain-m312-pressure.csv
             /tmp/mahtrain-m311-report.html
           if-no-files-found: warn
