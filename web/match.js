@@ -144,12 +144,57 @@
         cell.title=tileName(entry.tile);
       }
       if(entry.won_by)cell.classList.add("is-winning-discard");
+      // Read the authoritative public classification; never infer it from
+      // another player's private latest-drawn tile.
+      if(entry.discard_kind==="tsumogiri" || entry.discard_kind==="tedashi"){
+        const drawCut=entry.discard_kind==="tsumogiri";
+        cell.classList.add(drawCut?"is-tsumogiri":"is-tedashi");
+        cell.append(el("span","match-discard-kind",drawCut?"摸切":"手切"));
+        cell.title+=(drawCut?" · 摸切":" · 手切");
+      }
       if(entry.order===state.discards.length-1){
         cell.classList.add("is-latest");
       }
       tiles.append(cell);
     }
     root.append(tiles);
+  }
+  function renderReadyHint(){
+    const root=$("match-ready-hint");
+    root.replaceChildren();
+    const waits=state.ready_waits||[];
+    if(waits.length){
+      root.append(el("strong","","已听牌 · 听 "+waits.length+" 种："));
+      for(const tile of waits)root.append(card(tile,null,false));
+      root.append(el("span","match-ready-note","结构听口，并非牌山中剩余数量"));
+      return;
+    }
+    const cuts=state.ready_after_discards||[];
+    if(cuts.length){
+      root.append(el("strong","","听牌提示："));
+      for(const item of cuts){
+        const group=el("span","match-ready-option");
+        group.append(el("span","","切"));
+        group.append(card(item.discard,null,false));
+        group.append(el("span","","听 "+item.waits.map(tileName).join("、")));
+        root.append(group);
+      }
+    }
+  }
+  function renderWinAlert(){
+    const banner=$("match-win-alert");
+    const wins=state.winners||[];
+    const aiWins=wins.filter(w=>w.seat!==0);
+    banner.hidden=!aiWins.length;
+    banner.replaceChildren();
+    if(!aiWins.length)return;
+    const latest=aiWins.slice(-3);
+    const kind={self_draw:"自摸",ron:"点炮胡",rob_kong:"抢杠胡"};
+    banner.append(el("strong","","AI 胡牌！"));
+    banner.append(el("span","",latest.map(w=>
+      w.seat+"号AI "+(kind[w.kind]||"胡牌")+
+      (w.kind==="ron"||w.kind==="rob_kong"?" · 来自"+w.source+"号":"")
+    ).join(" ｜ ")));
   }
   function renderWall(){
     $("match-wall-count").textContent=String(state.wall_count);
@@ -182,14 +227,32 @@
       "你是0号位 · 庄家"+state.dealer+"号 · "+directions[state.exchange_direction]+
       "换牌 · 剩余"+state.wall_count+"张 · 当前行动："+(state.turn??"—");
     const hand=$("match-hand");hand.replaceChildren();
+    // Exactly one equal-valued copy is the newly drawn physical tile.
+    // Other equal copies remain selectable as an explicit HAND-cut.
+    const drawn=(state.turn===0 &&
+      (phase==="dealer_discard"||phase==="await_discard"))
+      ?state.drawn_tile:null;
+    let drawnIndex=drawn===null?-1:state.hand.lastIndexOf(drawn);
     state.hand.forEach((tile,i)=>{
+      if(i===drawnIndex)return;
       let onclick=null;
       if(phase==="exchange_select")onclick=()=>toggle(i);
       if((phase==="dealer_discard"||phase==="await_discard")&&state.turn===0)
-        onclick=()=>action("match_discard",{tile});
+        onclick=()=>action("match_discard",{tile,from_draw:false});
       hand.append(card(tile,onclick,choice.has(i)));
     });
+    if(drawnIndex>=0){
+      const last=card(drawn,()=>action("match_discard",{
+        tile:drawn,from_draw:true,
+      }),false);
+      last.classList.add("match-new-draw");
+      last.title="刚摸到："+tileName(drawn)+" · 点击摸切";
+      last.setAttribute("aria-label","刚摸到"+tileName(drawn)+"，点击摸切");
+      hand.append(last);
+    }
     renderBoard();
+    renderReadyHint();
+    renderWinAlert();
     const controls=$("match-controls");controls.replaceChildren();
     if(phase==="exchange_select"){
       controls.append(el("p","review-intro","已选择"+choice.size+

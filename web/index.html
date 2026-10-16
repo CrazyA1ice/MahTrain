@@ -198,6 +198,8 @@
         <div id="match-stage" hidden>
           <h4 id="match-title"></h4>
           <p id="match-status" class="review-footnote"></p>
+          <div id="match-win-alert" class="match-win-alert" role="status"
+               aria-live="assertive" hidden></div>
 
           <div class="match-board-scroll" tabindex="0" aria-label="四家麻将牌桌，可横向滚动">
             <div id="match-board" class="match-board" aria-label="四人血战牌桌">
@@ -225,6 +227,7 @@
                 <div class="match-self-header">0号 · 自己</div>
                 <div id="match-self-status" class="match-seat-status"></div>
                 <div id="match-hand" class="retry-hand"></div>
+                <div id="match-ready-hint" class="match-ready-hint" aria-live="polite"></div>
                 <div id="match-self-melds" class="match-seat-melds"></div>
               </section>
             </div>

@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from mahtrain_core import SoloTrainingSession, FourPlayerOpening  # noqa: E402
 from mahtrain_core.ai import MahjongAgent, AI_LEVELS  # noqa: E402
+from mahtrain_core.rules import winning_tiles  # noqa: E402
 from mahtrain_core.ai_tournament import tournament  # noqa: E402
 from mahtrain_core.ai_independent_benchmark import independent_benchmark  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
@@ -121,6 +122,28 @@ def _match_private_view(game: FourPlayerOpening,
                         agents: dict[int, MahjongAgent]) -> dict:
     """Send seat 0 ONLY: published AI level/strategy, never AI hidden cards."""
     view = game.private_view(0)
+    view["ready_waits"] = []
+    view["ready_after_discards"] = []
+    # This is a strictly seat-zero-only presentation hint, not an AI input.
+    # waiting_tiles returns STRUCTURAL wait kinds, not unknown-wall odds.
+    missing = game.missing_suits[0]
+    hand = view["hand"]
+    melds = view["own_melds"]
+    effective = len(hand) + 3*len(melds)
+    if (missing in ("m", "s", "p") and not game._won[0]
+            and not any(tile[0] == missing for tile in hand)):
+        if effective == 13:
+            view["ready_waits"] = winning_tiles(hand, melds, missing)
+        elif effective == 14 and game.turn == 0 and (
+                game.phase in ("dealer_discard","await_discard")):
+            for cut in sorted(set(hand)):
+                remaining = list(hand)
+                remaining.remove(cut)
+                waits = winning_tiles(remaining, melds, missing)
+                if waits:
+                    view["ready_after_discards"].append({
+                        "discard": cut, "waits": waits,
+                    })
     view["ai_opponents"] = [
         {"seat": seat, "difficulty": agents[seat].level,
          "description": agents[seat].policy_description()}
@@ -433,7 +456,8 @@ def _process(action: str, payload: dict) -> dict:
                         s,agents[s].missing(game.private_view(s)))
                 _match_script_until_human(game,agents)
             elif action=="match_discard":
-                game.discard(0,payload.get("tile"))
+                game.discard(0,payload.get("tile"),
+                             from_draw=payload.get("from_draw"))
                 _match_script_until_human(game,agents)
             elif action=="match_claim":
                 game.respond_discard(0,payload.get("choice"))

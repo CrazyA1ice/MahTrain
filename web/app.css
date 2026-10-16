@@ -642,3 +642,73 @@
   .match-board{padding:10px;gap:7px}
   .match-seat--bottom #match-hand .tile{width:53px;height:71px}
 }
+
+
+/* M3.15: drawn tile, tenpai waits, continuous AI backs and win notification. */
+.match-seat--top .match-seat-backs{
+  flex-wrap:nowrap;white-space:nowrap;justify-content:center;
+}
+.match-seat--left .match-seat-backs,
+.match-seat--right .match-seat-backs{
+  display:flex;flex-direction:column;flex-wrap:nowrap;
+  align-items:center;justify-content:center;
+  gap:1px;max-height:none;overflow:visible;
+  flex-shrink:0;
+}
+.match-seat--left .match-tile-back,
+.match-seat--right .match-tile-back{
+  width:18px;height:19px;flex:0 0 19px;
+  min-width:18px;border-width:1px;border-radius:3px;
+}
+/* 14 back tiles remain one uninterrupted vertical line on side seats. */
+.match-seat--left,.match-seat--right{justify-content:center;gap:4px!important}
+.match-seat--left .match-seat-melds,
+.match-seat--right .match-seat-melds{max-height:65px;overflow:auto}
+.match-seat--bottom #match-hand .tile.match-new-draw{
+  flex-shrink:0;
+  margin-left:18px;
+  outline:3px solid #f5c55e;
+  outline-offset:2px;
+  box-shadow:0 0 0 5px #f7dd8947,0 5px 10px #0c2c26;
+  transform:translateY(-4px);
+}
+.match-seat--bottom #match-hand .tile.match-new-draw::after{
+  content:"摸牌";position:absolute;top:-21px;left:50%;
+  transform:translateX(-50%);
+  background:#efc86c;color:#2d3b2c;font-size:10px;font-weight:800;
+  padding:2px 4px;border-radius:5px;white-space:nowrap;pointer-events:none;
+}
+.match-ready-hint{
+  display:flex;align-items:center;justify-content:center;
+  flex-wrap:wrap;gap:6px;margin:0 auto 9px;min-height:0;
+  font-size:12px;color:#f5e7b6;
+}
+.match-ready-hint:empty{display:none}
+.match-ready-hint>strong{white-space:nowrap}
+.match-ready-hint .tile{width:31px;height:42px;flex:0 0 31px;pointer-events:none}
+.match-ready-option{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:4px 6px;border:1px solid #f5d38566;
+  border-radius:6px;background:#0a372965;
+}
+.match-ready-note{font-size:10px;color:#c3dfcb}
+.match-win-alert{
+  display:flex;flex-wrap:wrap;align-items:center;gap:7px;
+  margin:9px 0 13px;padding:12px 15px;
+  border:2px solid #efb55b;border-radius:12px;
+  background:#fff0bf;color:#70400d;
+  box-shadow:0 0 0 3px #f3c66e32;
+}
+.match-win-alert[hidden]{display:none}
+.match-win-alert strong{font-weight:900;font-size:20px}
+.match-win-alert span{font-size:13px;font-weight:700}
+.match-river-cell.is-tsumogiri{border-bottom:2px solid #ffe69a}
+.match-river-cell.is-tedashi{border-bottom:2px solid #8fd8bf}
+.match-discard-kind{
+  position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);
+  padding:1px 2px;border-radius:3px;background:#194337eb;
+  font-size:8px;line-height:1;white-space:nowrap;
+  font-weight:750;color:#fae5ae;pointer-events:none;z-index:2;
+}
+.match-river-cell.is-tedashi .match-discard-kind{color:#9decc9}
+.match-river-tiles{row-gap:11px}
