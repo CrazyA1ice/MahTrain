@@ -115,6 +115,8 @@
     if(result.construction_family){
       const family={
         sequence_melds:"顺子组合",seven_pairs:"七对听牌",
+        edge_wait:"边张听口",closed_wait:"嵌张听口",
+        two_sided_wait:"两面听口",two_taatsu:"双搭子竞争",
         seven_pairs_race:"七对竞争",adjacent_taatsu:"顺子+相邻搭子",
         mixed_melds:"顺子/刻子组合",meld_and_isolates:"面子与孤张",
       };
