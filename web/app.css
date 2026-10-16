@@ -380,3 +380,22 @@
 @media(max-width:600px){.match-balances{grid-template-columns:repeat(2,minmax(0,1fr))}
 .match-balance strong{font-size:19px}
 .match-ledger{padding:12px}}
+
+
+/* M3.3 reversible kong simulation and read-only exhaustive draw review. */
+.match-kong-toggle{display:flex!important;flex-direction:row!important;
+  gap:7px!important;align-items:center!important;font-size:13px!important;
+  color:#3c644a!important}
+.match-kong-toggle input{width:17px;height:17px;accent-color:#387951}
+.match-kong-ledger,.match-exhaustive-review{border:1px solid #dce8df;
+  border-radius:12px;padding:15px 18px;margin-top:16px;background:#fff}
+.match-kong-ledger h4,.match-exhaustive-review h4{font-size:16px;
+  color:#345944;margin:0 0 10px}
+.match-kong-ledger p,.match-exhaustive-review p{overflow-wrap:anywhere}
+.match-transfers{background:#f5f9f4;border-radius:9px;padding:10px 13px}
+.match-transfers summary{cursor:pointer;font-weight:600;color:#386047;
+  font-size:13px}
+.match-net{padding:11px 13px;background:#e9f3ec;border:1px solid #c8decf;
+  border-radius:8px;font-size:13px;color:#2c5b40;font-weight:700}
+.match-exhaustive-review{border-color:#e4d9b6;background:#fffcf5}
+@media(max-width:600px){.match-kong-ledger,.match-exhaustive-review{padding:12px}}
