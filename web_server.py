@@ -139,6 +139,11 @@ def _process(action: str, payload: dict) -> dict:
                     # Weighted by actual misplay frequency, preferring more
                     # prevalent causes, with graceful verified fallback.
                     candidate = options[secrets.randbelow(len(options))]
+                    # Do not disclose win/no-win answers via focus labels.
+                    # Mix positive and negative win decisions 50/50.
+                    if candidate in ("missed_win","false_win"):
+                        candidate=("missed_win" if secrets.randbelow(2)==0
+                                   else "false_win")
                     try:
                         seed,question=select_focused_question(
                             mode,difficulty,candidate,seed)
@@ -148,13 +153,23 @@ def _process(action: str, payload: dict) -> dict:
                 else:
                     question=generate_question(mode,seed,difficulty=difficulty)
             elif focus is not None:
-                seed,question=select_focused_question(mode,difficulty,focus,seed)
-                applied_focus=focus
+                candidate=focus
+                if candidate in ("missed_win","false_win"):
+                    candidate=("missed_win" if secrets.randbelow(2)==0
+                               else "false_win")
+                seed,question=select_focused_question(
+                    mode,difficulty,candidate,seed)
+                applied_focus=candidate
             else:
                 question=generate_question(mode,seed,difficulty=difficulty)
             if applied_focus:
-                question={**question, "focus":applied_focus,
-                          "focus_label":ERROR_LABELS[applied_focus]}
+                public_focus=("win_decision" if applied_focus
+                              in ("missed_win","false_win") else applied_focus)
+                public_label=("胡牌判断（混合可胡和不可胡）"
+                              if public_focus=="win_decision"
+                              else ERROR_LABELS[applied_focus])
+                question={**question, "focus":public_focus,
+                          "focus_label":public_label}
             if focus == "auto":
                 question={**question,"training_strategy":"adaptive_weakness",
                           "focus_applied":applied_focus is not None}
@@ -190,8 +205,14 @@ def _process(action: str, payload: dict) -> dict:
                 difficulty=record["difficulty"],
             )
             if record["focus"]:
-                question={**question, "focus":record["focus"],
-                          "focus_label":ERROR_LABELS[record["focus"]]}
+                original_focus=record["focus"]
+                public_focus=("win_decision" if original_focus
+                              in ("missed_win","false_win") else original_focus)
+                label=("胡牌判断（混合可胡和不可胡）"
+                       if public_focus=="win_decision"
+                       else ERROR_LABELS[original_focus])
+                question={**question, "focus":public_focus,
+                          "focus_label":label}
             if record["strategy"] == "auto":
                 question={**question,"training_strategy":"adaptive_weakness",
                           "focus_applied":record["focus"] is not None}
