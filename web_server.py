@@ -22,6 +22,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from mahtrain_core import SoloTrainingSession, FourPlayerOpening  # noqa: E402
 from mahtrain_core.ai import MahjongAgent, AI_LEVELS  # noqa: E402
+from mahtrain_core.ai_tournament import tournament  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
 from mahtrain_core.training_levels import DIFFICULTIES
 from mahtrain_core.error_focus import (
@@ -39,6 +40,9 @@ _QUIZZES: dict[str, dict] = {}
 _TABLE_DEMOS: dict[str, FourPlayerOpening] = {}
 _MATCH_SESSIONS: dict[str, FourPlayerOpening] = {}
 _MATCH_AGENTS: dict[str, dict[int, MahjongAgent]] = {}
+_AI_REPLAY_JOBS: dict[str, dict] = {}
+_MAX_REPLAY_JOBS = 4
+_MAX_ACTIVE_REPLAY_JOBS = 1
 _LOCK = threading.RLock()
 _MAX_SESSIONS = 32
 _STATIC = {
@@ -52,6 +56,7 @@ _STATIC = {
     "/quiz_history.js": ROOT / "web" / "quiz_history.js",
     "/four_player.js": ROOT / "web" / "four_player.js",
     "/match.js": ROOT / "web" / "match.js",
+    "/ai_replay.js": ROOT / "web" / "ai_replay.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
@@ -184,8 +189,123 @@ def _match_script_until_human(
     raise RuntimeError("AI script exceeded 512 transitions")
 
 
+def _replay_worker(token: str, seed_start: int, seeds: int) -> None:
+    """Slow multi-AI runs live outside the global HTTP session lock."""
+    def progress(done: int, total: int) -> None:
+        with _LOCK:
+            job=_AI_REPLAY_JOBS.get(token)
+            if job is not None:
+                job["completed_games"]=done
+
+    try:
+        result=tournament(seed_start,seeds,on_match=progress)
+    except Exception as exc:
+        # The development UI receives concise diagnostics, no traceback or
+        # inaccessible private wall/hand details.
+        with _LOCK:
+            if token in _AI_REPLAY_JOBS:
+                _AI_REPLAY_JOBS[token].update({
+                    "status":"error",
+                    "error":"试验计算失败："+str(exc)[:180],
+                })
+    else:
+        with _LOCK:
+            if token in _AI_REPLAY_JOBS:
+                _AI_REPLAY_JOBS[token].update({
+                    "status":"done","result":result,
+                    "completed_games":result["games"],
+                })
+
+
+def _replay_summary(job: dict) -> dict:
+    response={
+        "status":job["status"],
+        "completed_games":job["completed_games"],
+        "total_games":job["seeds"]*3,
+        "seed_start":job["seed_start"],
+        "seeds":job["seeds"],
+    }
+    if job["status"]=="error":
+        response["error"]=job["error"]
+    if job["status"]=="done":
+        result=job["result"]
+        response["overview"]={
+            "games":result["games"],
+            "terminal_phase_counts":result["terminal_phase_counts"],
+            "levels":result["levels"],
+            "limitations":result["limitations"],
+            "matches":[{
+                "index":i,"seed":m["seed"],"rotation":m["rotation"],
+                "assignment":m["assignment"],"dealer":m["dealer"],
+                "terminal_phase":m["terminal_phase"],
+                "actions":m["actions"],"winners":m["winners"],
+            } for i,m in enumerate(result["matches"])],
+        }
+    return response
+
+
+
 def _process(action: str, payload: dict) -> dict:
     with _LOCK:
+        if action == "ai_replay_start":
+            seed_start=payload.get("seed_start",11)
+            seeds=payload.get("seeds",1)
+            if (type(seed_start) is not int or
+                not 0 <= seed_start < 2**32 or
+                type(seeds) is not int or not 1 <= seeds <= 2 or
+                seed_start+seeds > 2**32):
+                raise ValueError("AI复盘种子需在uint32范围、独立种子数1至2")
+            active=sum(
+                job["status"]=="running" for job in _AI_REPLAY_JOBS.values()
+            )
+            if active >= _MAX_ACTIVE_REPLAY_JOBS:
+                raise ValueError("已有AI对局在运算，请等待它完成后重试")
+            if len(_AI_REPLAY_JOBS)>=_MAX_REPLAY_JOBS:
+                idle=next((
+                    name for name,job in _AI_REPLAY_JOBS.items()
+                    if job["status"]!="running"
+                ),None)
+                if idle is None:
+                    raise ValueError("AI复盘会话已满，请稍后再试")
+                _AI_REPLAY_JOBS.pop(idle)
+            token=secrets.token_urlsafe(24)
+            _AI_REPLAY_JOBS[token]={
+                "status":"running","completed_games":0,
+                "seed_start":seed_start,"seeds":seeds,
+            }
+            threading.Thread(
+                target=_replay_worker,args=(token,seed_start,seeds),
+                daemon=True,
+            ).start()
+            return {"replay_token":token,
+                    "replay":_replay_summary(_AI_REPLAY_JOBS[token])}
+        if action in ("ai_replay_status","ai_replay_match"):
+            token=payload.get("replay_token")
+            job=_AI_REPLAY_JOBS.get(token) if type(token) is str else None
+            if job is None:
+                raise ValueError("复盘任务不存在，请重新开始")
+            if action=="ai_replay_status":
+                return {"replay":_replay_summary(job)}
+            if job["status"]!="done":
+                raise ValueError("复盘尚未计算完成")
+            index=payload.get("match_index")
+            result=job["result"]
+            if (type(index) is not int or
+                not 0<=index<len(result["matches"])):
+                raise ValueError("复盘对局编号无效")
+            match=result["matches"][index]
+            return {"match":{
+                "seed":match["seed"],"rotation":match["rotation"],
+                "dealer":match["dealer"],
+                "assignment":match["assignment"],
+                "terminal_phase":match["terminal_phase"],
+                "winners":match["winners"],
+                "wall_remaining":match["wall_remaining"],
+                "partial_win_balances":match["partial_win_balances"],
+                "steps":match["public_replay"],
+                "privacy":"public_board_and_public_action_only",
+                "notes":"其他家暗手、未来牌墙、私有合法响应选项及逐家向听不公开",
+            }}
         if action == "match_new":
             seed=payload.get("seed",42)
             if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
