@@ -305,3 +305,4 @@ $("#sound-toggle").addEventListener("click",()=>{
 // Controlled view helpers for the independent mistake-replay panel.
 window.MahTrainUI = {getToken:()=>token, tileElement, tileName};
 window.MahTrainHistory?.init();
+window.MahTrainQuiz?.init();
