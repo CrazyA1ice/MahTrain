@@ -133,3 +133,10 @@
   .review-stat strong{font-size:19px}
   .review-bar-item{min-width:25px;flex-basis:25px}
 }
+
+
+.review-controls{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin:0 0 13px}
+.review-control{font:inherit;font-size:12px;font-weight:700;color:#33634c;background:#f5faf6;
+                border:1px solid #cfe1d4;border-radius:8px;padding:9px 13px;cursor:pointer}
+.review-control:hover,.review-control.active{background:#dbefe1;border-color:#8fb99a}
+.review-control:focus-visible{outline:2px solid #67a47b;outline-offset:2px}
