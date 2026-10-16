@@ -27,6 +27,68 @@ CONTRASTS = (
 MIN_SEEDS_FOR_INTERVAL = 5
 
 
+PRESSURE_POLICIES = ("challenge", "challenge_no_pressure")
+PRESSURE_FIELDS = ("decisions", "effective_ties", "pressure_present",
+                   "pressure_discriminates", "would_change",
+                   "actual_changed", "games_with_would_change",
+                   "wins_in_changed_games", "deal_ins_in_changed_games")
+
+
+def _pressure_totals(games: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
+    """Aggregate shadow choice differences without exporting concealed cuts.
+
+    Real game outcomes are grouped by 'a change was possible in this match',
+    *not* attributed as consequences of a specific alternate discard.
+    """
+    totals = {
+        level: {field: 0 for field in PRESSURE_FIELDS}
+        for level in PRESSURE_POLICIES
+    }
+    fields = {
+        "effective_ties": "effective_tie",
+        "pressure_present": "public_pressure_present",
+        "pressure_discriminates": "public_pressure_discriminates",
+        "would_change": "choice_would_change",
+        "actual_changed": "actual_choice_changed",
+    }
+    for game in games:
+        changed_seats = set()
+        assignment = game["assignment"]
+        for event in game["trace"]:
+            if event.get("action") != "discard":
+                continue
+            seat = event["seat"]
+            level = assignment[seat]
+            if level not in PRESSURE_POLICIES:
+                continue
+            probe = event.get("pressure_probe")
+            if probe is None:
+                # Legacy/fake match fixtures predate M3.12 instrumentation.
+                continue
+            target = totals[level]
+            target["decisions"] += 1
+            for name, flag in fields.items():
+                target[name] += int(bool(probe[flag]))
+            if probe["choice_would_change"]:
+                changed_seats.add(seat)
+        for seat in changed_seats:
+            level = assignment[seat]
+            totals[level]["games_with_would_change"] += 1
+            totals[level]["wins_in_changed_games"] += sum(
+                w["seat"] == seat for w in game["winners"]
+            )
+            totals[level]["deal_ins_in_changed_games"] += sum(
+                w["source"] == seat and w["seat"] != seat
+                for w in game["winners"]
+            )
+    for level, stats in totals.items():
+        if not (0 <= stats["actual_changed"] <= stats["would_change"]
+                <= stats["pressure_discriminates"]
+                <= stats["effective_ties"] <= stats["decisions"]):
+            raise RuntimeError("inconsistent pressure telemetry for "+level)
+    return totals
+
+
 def ablation_lineup(rotation: int) -> list[str]:
     if type(rotation) is not int or rotation not in range(5):
         raise ValueError("ablation rotation must be 0..4")
@@ -192,7 +254,8 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
         subtotal = _totals(batch)
         if any(row["exposures"] != 4 for row in subtotal.values()):
             raise RuntimeError("unbalanced ablation seat exposure")
-        by_seed.append({"seed": seed, "rotations": 5, "levels": subtotal})
+        by_seed.append({"seed": seed, "rotations": 5, "levels": subtotal,
+                        "pressure_diagnostics": _pressure_totals(batch)})
 
     totals = _totals(matches)
     if any(row["exposures"] != 4*seeds for row in totals.values()):
@@ -264,6 +327,7 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
         "levels": summary,
         "paired_differences": differences,
         "per_seed": by_seed,
+        "pressure_diagnostics": _pressure_totals(matches),
         "seed_analysis": _seed_stability(by_seed),
         "terminal_phase_counts": {
             phase: sum(game["terminal_phase"] == phase for game in matches)
@@ -284,5 +348,7 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
             "prototype win events do not establish official settled win rates",
             "unconfirmed kong and exhaustive-draw payments are not posted",
             "a weak public meld pressure heuristic is not validated danger prediction",
+            "same-state shadow ties do not reveal the alternative physical tile",
+            "wins and deal-ins from changed games are associations, not counterfactual outcomes",
         ],
     }
