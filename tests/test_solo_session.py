@@ -14,18 +14,19 @@ from mahtrain_core import (  # noqa: E402
     grouped_hand, sort_hand,
 )
 from mahtrain_core.rules import TILES  # noqa: E402
+from mahtrain_core.efficiency import analyze_discards  # noqa: E402
 
 
 class HandSortingTests(unittest.TestCase):
-    def test_descending_suit_groups_and_copy_count(self):
+    def test_ascending_suit_groups_and_copy_count(self):
         unsorted = ["p1", "m3", "m9", "s2", "m3", "s9", "p8"]
         copy = list(unsorted)
-        expected = ["m9", "m3", "m3", "s9", "s2", "p8", "p1"]
+        expected = ["m3", "m3", "m9", "s2", "s9", "p1", "p8"]
         self.assertEqual(sort_hand(unsorted), expected)
         self.assertEqual(unsorted, copy, "sorting must not mutate game state")
         self.assertEqual(Counter(expected), Counter(unsorted))
         self.assertEqual(format_hand(unsorted),
-                         "万[9 3 3] | 条[9 2] | 筒[8 1]")
+                         "万[3 3 9] | 条[2 9] | 筒[1 8]")
         groups = grouped_hand(unsorted)
         self.assertEqual([g["suit"] for g in groups], ["m", "s", "p"])
         self.assertEqual([g["tiles"] for g in groups], [
@@ -35,7 +36,7 @@ class HandSortingTests(unittest.TestCase):
     def test_single_suit_and_bad_tiles(self):
         self.assertEqual(sort_hand([]), [])
         self.assertEqual(sort_hand(["p1", "p9", "p3", "p9"]),
-                         ["p9", "p9", "p3", "p1"])
+                         ["p1", "p3", "p9", "p9"])
         with self.assertRaises(ValueError):
             sort_hand(["m10"])
 
@@ -83,7 +84,7 @@ class SoloSessionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             session.submit("m100")
         self.assertEqual(session.public_state(), first)
-        action = next(t for t in first["choices"] if t != "win")
+        action = first["choices"][0]
         result = session.submit(action)
         self.assertEqual(result["choice"], action)
         self.assertEqual(result["round"], 1)
@@ -112,7 +113,10 @@ class SoloSessionTests(unittest.TestCase):
                 drawn.append(state["drawn_tile"])
                 # Even if a natural win is possible, test choosing to cut,
                 # which is allowed but marked suboptimal.
-                choice = next(t for t in state["choices"] if t != "win")
+                while state["phase"] in ("offer_win", "offer_kong"):
+                    state = (session.decide_win(False) if state["phase"] == "offer_win"
+                             else session.decide_kong(None))
+                choice = state["choices"][0]
                 feedback = session.submit(choice)
                 self.assertIsInstance(feedback["correct"], bool)
                 self.assertEqual(len(feedback["hand_after"]), 13)
@@ -138,11 +142,15 @@ class SoloSessionTests(unittest.TestCase):
         qb = b.draw_next()
         self.assertEqual(qa, qb)
         analysis = analyze_discards(qa["hand"], missing_suit="p")
-        if analysis["status"] == "already_winning":
+        if qa["phase"] == "offer_win":
+            result = a.decide_win(True)
             answer = "win"
         else:
+            while qa["phase"] == "offer_kong":
+                qa = a.decide_kong(None)
+            analysis = analyze_discards(qa["hand"], missing_suit="p")
             answer = analysis["best_discards"][0]
-        result = a.submit(answer)
+            result = a.submit(answer)
         self.assertTrue(result["correct"])
         self.assertEqual(result["best_actions"], [answer] if answer == "win"
                          else analysis["best_discards"])
