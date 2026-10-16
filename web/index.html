@@ -11,6 +11,7 @@
   <script src="/retry.js" defer></script>
   <script src="/history.js" defer></script>
   <script src="/quiz.js" defer></script>
+  <script src="/quiz_history.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -66,6 +67,14 @@
         </div>
         <div id="quiz-question" aria-live="polite"></div>
         <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
+        <section class="quiz-history-section">
+          <div class="panel-title"><h3>单题成绩与难度建议</h3><small>不同模式独立统计 · 保存至本地SQLite</small></div>
+          <div id="quiz-history-stats" class="quiz-history-stats" aria-live="polite"></div>
+          <div id="quiz-recommendation" class="quiz-recommendation"></div>
+          <div class="panel-title"><h3>近期单题与错题本</h3><small>只记录提交评分的题目</small></div>
+          <div id="quiz-attempt-list" class="quiz-attempt-list"></div>
+          <div id="quiz-history-detail" class="quiz-history-detail" aria-live="polite"></div>
+        </section>
       </section>
       <section id="game" class="game" hidden>
         <div class="stats">
