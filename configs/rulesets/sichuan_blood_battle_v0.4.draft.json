@@ -62,7 +62,7 @@
       "physical_hand_tile_consumed": false,
       "before_exchange_allowed": false,
       "tianque": {
-        "definition": "after_exchange_hand_contains_only_two_suits_or_fewer",
+        "definition": "after_exchange_hand_contains_exactly_two_suits",
         "eligible_to_declare_absent_suit_directly": true,
         "bonus_fan": 0,
         "note": "天缺只说明换三张后手中有缺门，不额外消耗手牌"
@@ -333,8 +333,9 @@
         "begin_practice"
       ],
       "user_selection_required": true,
-      "tianque_hint_if_two_or_fewer_suits": true,
-      "no_exchange_in_solo_mode": true
+      "tianque_hint_if_two_or_fewer_suits": false,
+      "no_exchange_in_solo_mode": true,
+      "tianque_hint_if_exactly_two_suits": true
     }
   },
   "confirmation_required": [
