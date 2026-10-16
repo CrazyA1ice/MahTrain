@@ -30,7 +30,7 @@ const ids=[
   "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
-  "match-self-melds","match-self-status",
+  "match-self-melds","match-self-status","match-ready-hint","match-win-alert",
   ...[0,1,2,3].flatMap(n=>["match-seat-"+n,"match-river-"+n])
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
@@ -58,13 +58,15 @@ const base={
   ],
   pending_discard:null,pending_rob_kong:null,can_self_draw_win:false,
   claim_options:[],rob_options:[],kong_options:[],
-  tian_ting:null,win_ledger:null,kong_ledger:null,exhaustive_review:null,
+  tian_ting:null,ready_waits:[],ready_after_discards:[],drawn_tile:null,
+  win_ledger:null,kong_ledger:null,exhaustive_review:null,
   winners:[],events:[]
 };
 const next={...base,wall_count:53,discards:[
   ...base.discards,{seat:0,tile:"m1"}
 ]};
 let requests=[];
+let startMatch=base,replyMatch=next;
 const window={
   MahTrainUI:{
     tileName:tile=>tile,
@@ -89,7 +91,7 @@ const context={
     const req=JSON.parse(opts.body);
     requests.push(req);
     return {ok:true,json:async()=>({match_token:"test-session",match:
-      req.action==="match_new"?base:next})};
+      req.action==="match_new"?startMatch:replyMatch})};
   },
   confirm:()=>true,
   console,
@@ -144,7 +146,46 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests[1].action,"match_discard");
   assert.equal(requests[1].match_token,"test-session");
   assert.equal(requests[1].tile,"m1");
+  assert.equal(requests[1].from_draw,false);
   assert.equal(dom["match-wall-count"].textContent,"53");
   assert.equal(descendants(dom["match-river-0"],x=>x.tile==="m1").length,1);
-  console.log("M3.14 live match board DOM smoke: PASS");
+
+  // Same-valued physical copy: own old m1 and freshly drawn m1 must be
+  // separate clickable cards. Only the far-right card is marked drawn.
+  const duplicated=[...hand];duplicated[1]="m1";
+  startMatch={...base,hand:duplicated,drawn_tile:"m1",
+    ready_after_discards:[{discard:"m3",waits:["m6","s2"]}]};
+  replyMatch={...next,drawn_tile:null,ready_waits:["p3","p6"],
+    ready_after_discards:[],winners:[{seat:2,kind:"self_draw",source:2}],
+    won:[false,false,true,false],
+    discards:[...base.discards,{
+      seat:0,tile:"m1",discard_kind:"tsumogiri"
+    }]};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-hand"].children.length,14);
+  const oldCopy=dom["match-hand"].children.find(x=>x.tile==="m1");
+  const newCopy=dom["match-hand"].children.at(-1);
+  assert.equal(newCopy.tile,"m1");
+  assert.equal(newCopy.classList.contains("match-new-draw"),true);
+  assert.equal(oldCopy.classList.contains("match-new-draw"),false);
+  assert.ok(descendants(dom["match-ready-hint"],x=>x.tile==="m3").length);
+  // Hand cut of an identical tile differs from a draw cut.
+  oldCopy.handlers.click();
+  await settle();
+  assert.equal(requests.at(-1).from_draw,false);
+  assert.equal(dom["match-win-alert"].hidden,false);
+  assert.ok(descendants(dom["match-win-alert"],
+    x=>x.textContent.includes("2号AI 自摸")).length);
+  assert.equal(descendants(dom["match-ready-hint"],x=>x.tile==="p3").length,1);
+  assert.equal(descendants(dom["match-river-0"],
+    x=>x.className==="match-discard-kind" && x.textContent==="摸切").length,1);
+
+  dom["match-new"].handlers.click();
+  await settle();
+  dom["match-hand"].children.at(-1).handlers.click();
+  await settle();
+  assert.equal(requests.at(-1).tile,"m1");
+  assert.equal(requests.at(-1).from_draw,true);
+  console.log("M3.15 live match draw/tenpai/win DOM smoke: PASS");
 })().catch(error=>{console.error(error);process.exitCode=1;});
