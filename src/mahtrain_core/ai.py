@@ -6,7 +6,7 @@ public board facts; no wall, opponents' concealed hands or opponent W0.
 
 basic:     seeded varied legal cuts / conservative calls.
 advanced:  minimum-shanten cuts, only useful peng/ming-gang.
-challenge: minimum-shanten + visible-tile ukeire tie break and stable waits.
+challenge: minimum-shanten, public ukeire, then weak open-meld pressure ties.
 All difficulty levels accept verified HU, not speculative or illegal claims.
 """
 from __future__ import annotations
@@ -56,6 +56,31 @@ def visible_tiles(view: Mapping[str, Any]) -> list[str]:
             if tile is not None:
                 visible.extend([tile] * (3 if meld["type"] == "peng" else 4))
     return visible
+
+
+def public_suit_pressure(tile: str, view: Mapping[str, Any]) -> int:
+    """Weak OPEN-MELD exposure heuristic, never an absolute safe-tile claim.
+
+    When another active seat openly holds >=2 melds all in one suit, it
+    *might* be building a suit-focused hand. Only break exact shanten/ukeire
+    ties with this signal. No hidden hand or future draw is consulted.
+    """
+    if tile not in TILE_INDEX:
+        raise ValueError("unknown tile")
+    pressure=0
+    own=view["seat"]
+    for seat, groups in enumerate(view["melds"]):
+        if seat==own or view["won"][seat]:
+            continue
+        if view["missing_suits"][seat]==tile[0]:
+            continue
+        public_suits=[
+            m["tile"][0] for m in groups
+            if m.get("tile") in TILE_INDEX
+        ]
+        if len(public_suits)>=2 and set(public_suits)=={tile[0]}:
+            pressure+=len(public_suits)-1
+    return pressure
 
 
 def _cut_shanten(hand: Sequence[str], melds: Sequence[Mapping[str, str]],
@@ -207,12 +232,14 @@ class MahjongAgent:
             entry["discard"]: entry for entry in ranked["candidates"]
         }
         return min(best,key=lambda t:(
-            -candidates[t]["effective_tile_count"],TILE_INDEX[t]
+            -candidates[t]["effective_tile_count"],
+            public_suit_pressure(t,view),
+            TILE_INDEX[t],
         ))
 
     def policy_description(self) -> str:
         return {
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
-            "challenge":"向听优先，再按公开信息最大有效进张选牌，谨慎保留天听",
+            "challenge":"向听及公开有效进张优先；完全相同时以公开副露花色压力做弱风险判别",
         }[self.level]
