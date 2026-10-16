@@ -13,7 +13,7 @@ from typing import Any
 
 from .efficiency import analyze_discards
 from .presentation import grouped_hand, sort_hand
-from .rules import SUITS, TILES, _meld_tiles, is_legal_win
+from .rules import SUITS, TILES, _meld_tiles, is_legal_win, diagnose_win
 
 
 class SoloTrainingSession:
@@ -116,6 +116,7 @@ class SoloTrainingSession:
             ),
             "phase": self._phase,
             "missing_suit": self.missing_suit,
+            "win_status": diagnose_win(self._hand, self._melds, self.missing_suit),
             "hand": hand,
             "hand_groups": grouped_hand(hand),
             "exposed_kongs": [
