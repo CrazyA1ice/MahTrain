@@ -29,7 +29,7 @@ def discard(round_no,chosen,eff,prob,shanten,best=("m1",),
             "status":"choose_discard",
             "candidates":[
                 {"discard":best[0],"shanten":shanten-(shanten_loss or 0),
-                 "effective_tile_count":eff+ukeire_loss,
+                 "effective_tile_count":eff+(ukeire_loss or 0),
                  "next_draw_probability":prob+.01}
             ],
         },
