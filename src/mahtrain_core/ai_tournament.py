@@ -15,6 +15,7 @@ from typing import Any
 from .ai import AI_LEVELS, MahjongAgent, visible_tiles
 from .efficiency import analyze_discards
 from .four_player import FourPlayerOpening
+from .ai_seed_stats import analyze_seed_clusters
 
 
 def _validate(seed_start: int, seeds: int) -> None:
@@ -127,6 +128,63 @@ def _take_action(game: FourPlayerOpening, agents: dict[int, MahjongAgent],
 
 
 
+def explain_public_action(action: dict[str, Any],
+                          board: dict[str, Any]) -> dict[str, str]:
+    """Safe POLICY rationale from public action + already-public board only.
+
+    Never claim a private numerical justification (shanten/ukeire/risk exact
+    values); such metrics stay server-side even after the hand is over.
+    """
+    kind=action["action"]
+    seat=action["seat"]
+    level=action.get("level")
+    if kind=="discard":
+        suits=board["missing_suits"]
+        missing=suits[seat] if suits is not None else None
+        if missing and action["tile"][0]==missing:
+            code="discard_missing"
+            explanation="本次切掉已公开的定缺花色。三档策略目前都优先处理定缺牌；无法据此证明这一切是全局最优。"
+        elif level=="basic":
+            code="basic_discard"
+            explanation="入门档在可选切牌范围内按种子随机选择；不公开用到的自家暗手和私有牌效数据。"
+        elif level=="advanced":
+            code="advanced_policy"
+            explanation="进阶档的切牌策略优先降低切后向听数；此处只说明算法规则，不公布本家隐藏向听数。"
+        else:
+            code="challenge_policy"
+            explanation="挑战档优先向听、再考虑公开信息有效进张；完全并列才参考公开副露的弱风险信号。此处不声称风险已准确预测。"
+    elif kind=="response_submitted":
+        code="sealed_response"
+        explanation="响应仍在密封收集中；此时不能公开选的是胡、碰、杠还是过。"
+    elif kind=="response_resolved":
+        code="resolved_response"
+        explanation="活跃玩家的响应已经经过规则状态机统一裁决；只公开最终牌权结果。"
+    elif kind=="declare_missing":
+        code="sealed_missing" if board["missing_suits"] is None else "missing_revealed"
+        explanation=("每家选缺门仍为密封声明，尚未统一公开。" if
+                     board["missing_suits"] is None else
+                     "四家完成定缺后才同时揭示全部缺门，未提前暴露单家的选择。")
+    elif kind=="exchange_three":
+        code="sealed_exchange"
+        explanation="仅记录本家已密封提交同花色三张；具体换出牌不进入公开复盘。"
+    elif kind=="an_gang":
+        code="concealed_kong"
+        explanation="暗杠已成立，补牌由规则引擎执行；公开复盘不显示暗杠牌种或补牌内容。"
+    elif kind in ("ming_gang","bu_gang"):
+        code="kong_claim"
+        explanation="公开杠牌操作由状态机核验合法性并处理尾墙补摸及可能的抢杠；不推断隐藏牌。"
+    elif kind=="self_draw_win":
+        code="verified_self_win"
+        explanation="已由服务端合法胡牌判定后执行自摸；不在公开复盘中展开暗手牌型或私有听口。"
+    elif kind=="draw":
+        code="hidden_draw"
+        explanation="按当前牌墙规则摸牌，只更新公开的张数与行动状态；新摸到的牌不公开。"
+    else:
+        code="public_event"
+        explanation="只显示已结算或当时可公开的操作，不展示隐藏决策明细。"
+    return {"code":code,"text":explanation,"scope":"public_policy_only"}
+
+
 def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict[str, Any]:
     """Capture PUBLIC board after this action. No seat-private effective draws.
 
@@ -167,6 +225,7 @@ def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict
                 visible_action["resolution"]=public_result
     return {
         "action":visible_action,
+        "explanation":explain_public_action(visible_action,state),
         "board":{
             "phase":state["phase"],"turn":state["turn"],
             "dealer":state["dealer"],"wall_count":state["wall_count"],
@@ -332,6 +391,7 @@ def tournament(seed_start: int = 0, seeds: int = 2,
             "rule preset still draft and disabled",
         ],
         "levels":by_level,
+        "seed_analysis":analyze_seed_clusters(games),
         "matches":games if include_traces else [
             {k:v for k,v in g.items()
              if k not in ("trace","public_events","public_replay")}
