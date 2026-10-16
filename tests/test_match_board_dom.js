@@ -1,0 +1,150 @@
+"use strict";
+/* M3.14 no-dependency DOM-level smoke test: real match.js, fake DOM only.
+   The test never constructs an extra private-hand endpoint. */
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const vm=require("node:vm");
+const path=require("node:path");
+
+class Node {
+  constructor(tag="div"){
+    this.tagName=tag;this.children=[];this.className="";this.textContent="";
+    this.attributes={};this.handlers={};this.disabled=false;this.hidden=false;
+    this.value="";this.title="";
+    this.classes=new Set();
+    this.classList={
+      add: name=>this.classes.add(name),
+      toggle:(name,condition)=>{
+        if(condition)this.classes.add(name);else this.classes.delete(name);
+      },
+      contains:name=>this.classes.has(name),
+    };
+  }
+  append(...children){this.children.push(...children);}
+  replaceChildren(...children){this.children=[...children];}
+  setAttribute(name,value){this.attributes[name]=value;}
+  addEventListener(type,fn){this.handlers[type]=fn;}
+}
+const ids=[
+  "match-new","match-enable-kong","match-kong-base","match-seed",
+  "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
+  "match-error","match-stage","match-title","match-status",
+  "match-hand","match-controls","match-public","match-wall","match-wall-count",
+  "match-self-melds","match-self-status",
+  ...[0,1,2,3].flatMap(n=>["match-seat-"+n,"match-river-"+n])
+];
+const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
+for(const id of ids)dom[id].id=id;
+dom["match-seed"].value="42";
+dom["match-coefficient"].value="100";
+dom["match-fan-cap"].value="3";
+for(const n of [1,2,3])dom["match-ai-"+n].value="advanced";
+const hand=["m1","m2","m3","m4","m5","m6","m7","s1","s2","s3","s4","s5","p1","p2"];
+const base={
+  phase:"await_discard",seat:0,turn:0,dealer:0,wall_count:54,
+  exchange_direction:"clockwise",hand,hand_counts:[14,13,10,13],
+  missing_suits:["p","s","p","m"],won:[false,false,false,false],
+  melds:[[],[],[{type:"an_gang",tile:null}],
+    [{type:"peng",tile:"p4"}]],
+  own_melds:[],ai_opponents:[
+    {seat:1,difficulty:"basic",description:"公开策略1"},
+    {seat:2,difficulty:"advanced",description:"公开策略2"},
+    {seat:3,difficulty:"challenge",description:"公开策略3"}
+  ],
+  discards:[
+    {seat:1,tile:"m5"},
+    {seat:2,tile:"s3",claimed_by:3},
+    {seat:0,tile:"p1"},
+  ],
+  pending_discard:null,pending_rob_kong:null,can_self_draw_win:false,
+  claim_options:[],rob_options:[],kong_options:[],
+  tian_ting:null,win_ledger:null,kong_ledger:null,exhaustive_review:null,
+  winners:[],events:[]
+};
+const next={...base,wall_count:53,discards:[
+  ...base.discards,{seat:0,tile:"m1"}
+]};
+let requests=[];
+const window={
+  MahTrainUI:{
+    tileName:tile=>tile,
+    tileElement:(tile,opts)=>{
+      const node=new Node("button");
+      node.tile=tile;
+      node.className="tile";
+      if(opts.onClick)node.addEventListener("click",opts.onClick);
+      return node;
+    }
+  }
+};
+const context={
+  document:{createElement:tag=>new Node(tag),getElementById:id=>{
+    assert.ok(dom[id],"missing required DOM id "+id);
+    return dom[id];
+  }},
+  window,
+  fetch:async (url,opts)=>{
+    assert.equal(url,"/api/action");
+    assert.equal(opts.method,"POST");
+    const req=JSON.parse(opts.body);
+    requests.push(req);
+    return {ok:true,json:async()=>({match_token:"test-session",match:
+      req.action==="match_new"?base:next})};
+  },
+  confirm:()=>true,
+  console,
+};
+const script=fs.readFileSync(path.join(__dirname,"../web/match.js"),"utf8");
+vm.runInNewContext(script,context,{filename:"web/match.js"});
+window.MahTrainMatch.init();
+function visit(node,fn){
+  fn(node);
+  for(const child of node.children)if(child instanceof Node)visit(child,fn);
+}
+function descendants(node,test){
+  const out=[];visit(node,x=>{if(test(x))out.push(x);});return out;
+}
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+
+(async()=>{
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(requests[0].action,"match_new");
+  assert.equal(dom["match-stage"].hidden,false);
+  assert.equal(dom["match-wall-count"].textContent,"54");
+  assert.equal(dom["match-hand"].children.length,14);
+
+  for(const n of [0,1,2,3]){
+    assert.ok(dom["match-seat-"+n]);
+    assert.ok(dom["match-river-"+n]);
+  }
+  const opponent=dom["match-seat-1"];
+  assert.equal(descendants(opponent,x=>x.className==="match-tile-back").length,13);
+  assert.equal(descendants(opponent,x=>x.tile!==undefined).length,0);
+
+  // Concealed an-gang remains redacted even if melds are visible.
+  const anonymous=dom["match-seat-2"];
+  assert.equal(descendants(anonymous,x=>x.tile!==undefined).length,0);
+  assert.equal(descendants(anonymous,x=>x.className==="match-tile-back").length,14);
+  // Public peng remains visible as exactly three declared tile faces.
+  const declared=dom["match-seat-3"];
+  assert.equal(descendants(declared,x=>x.tile==="p4").length,3);
+
+  const river=dom["match-river-2"];
+  assert.equal(descendants(river,x=>x.tile==="s3").length,0,
+    "claimed discard must not be duplicated as a physical tile in river");
+  assert.equal(descendants(river,x=>x.className==="match-river-claimed").length,1);
+  assert.equal(descendants(dom["match-river-0"],x=>x.tile==="p1").length,1);
+  assert.equal(dom["match-seat-0"].classList.contains("is-active"),true);
+  assert.equal(dom["match-seat-1"].classList.contains("is-active"),false);
+
+  assert.equal(typeof dom["match-hand"].children[0].handlers.click,"function");
+  dom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.equal(requests[1].action,"match_discard");
+  assert.equal(requests[1].match_token,"test-session");
+  assert.equal(requests[1].tile,"m1");
+  assert.equal(dom["match-wall-count"].textContent,"53");
+  assert.equal(descendants(dom["match-river-0"],x=>x.tile==="m1").length,1);
+  console.log("M3.14 live match board DOM smoke: PASS");
+})().catch(error=>{console.error(error);process.exitCode=1;});
