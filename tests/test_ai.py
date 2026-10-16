@@ -12,7 +12,7 @@ from mahtrain_core.ai import AI_LEVELS, MahjongAgent, visible_tiles
 from mahtrain_core.efficiency import shanten_13, analyze_discards
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.rules import TILE_INDEX, is_legal_win
-from test_four_player_claims import deal_for_ron
+from test_four_player_claims import deal_for_ron, staged_game
 
 
 class MahjongAIUnitTests(unittest.TestCase):
@@ -145,31 +145,22 @@ class MahjongAIUnitTests(unittest.TestCase):
         self.assertEqual(score(cut),min(score(t) for t in eligible))
 
     def test_challenge_tie_break_is_consistent_with_public_ukeire(self):
-        for seed in (17,42,99):
-            game=FourPlayerOpening(seed)
-            game.missing_suits=["p"]*4
-            game.phase="dealer_discard"
-            game.turn=game.dealer
-            view=game.private_view(game.dealer)
-            hand=view["hand"]
-            # Fully completed hand has no meaningful discard optimization.
-            if is_legal_win(hand,missing_suit="p"):
-                continue
-            proposed=MahjongAgent(
-                "challenge",seed=seed,seat=game.dealer).discard(view)
-            self.assertIn(proposed,hand)
-            forced=[t for t in set(hand) if t.startswith("p")]
-            if forced:
-                self.assertIn(proposed,forced)
-                continue
-            options=analyze_discards(hand,missing_suit="p",visible_tiles=[])
-            scores={x["discard"]:(x["shanten"],-x["effective_tile_count"])
-                    for x in options["candidates"]}
-            optimum=min(scores.values())
-            self.assertEqual(scores[proposed],optimum)
-            break
-        else:
-            self.fail("no eligible useful full-hand expert sample found")
+        # Stage a valid 14-card hand containing no missing suit, so this
+        # exercises effective-draw tie breaking rather than trivial dingque.
+        dealer=FourPlayerOpening(42).dealer
+        hand=["m1","m1","m2","m3","m3","m4","m5","m6",
+              "s2","s3","s5","s6","s8","s9"]
+        game=staged_game({dealer:hand},{dealer:"p"})
+        view=game.private_view(dealer)
+        self.assertFalse(is_legal_win(hand,missing_suit="p"))
+        proposed=MahjongAgent(
+            "challenge",seed=42,seat=dealer).discard(view)
+        self.assertIn(proposed,hand)
+        options=analyze_discards(hand,missing_suit="p",visible_tiles=[])
+        scores={x["discard"]:(x["shanten"],-x["effective_tile_count"])
+                for x in options["candidates"]}
+        self.assertEqual(scores[proposed],min(scores.values()))
+
 
 
 if __name__=="__main__":
