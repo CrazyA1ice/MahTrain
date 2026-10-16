@@ -17,7 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mahtrain_core import MODES, generate_question, grade_answer  # noqa: E402
+from mahtrain_core import MODES, generate_question, grade_answer, format_hand, sort_hand  # noqa: E402
 
 CHINESE = {"m": "万", "s": "条", "p": "筒"}
 TITLES = {
@@ -38,17 +38,17 @@ def display_result(mode: str, report: dict) -> None:
     print("\n判题：", "正确" if report["correct"] else "未答对")
     print("解析：", report["reason"])
     if mode == "pure_suit_waits":
-        print("完整听口：", "、".join(label(t) for t in report["correct_tiles"]))
+        print("完整听口：", "、".join(label(t) for t in sort_hand(report["correct_tiles"])))
         if report["missed_tiles"]:
-            print("漏选：", "、".join(label(t) for t in report["missed_tiles"]))
+            print("漏选：", "、".join(label(t) for t in sort_hand(report["missed_tiles"])))
         if report["extra_tiles"]:
-            print("多选：", "、".join(label(t) for t in report["extra_tiles"]))
+            print("多选：", "、".join(label(t) for t in sort_hand(report["extra_tiles"])))
         e = report["effective_draws"]
         print("剩余可胡枚数：", e["effective_tile_count"])
         print("下一摸和牌概率：", f"{e['next_draw_probability']:.2%}")
         return
 
-    print("正确动作：", "、".join(label(t) for t in report["best_actions"]))
+    print("正确动作：", "、".join(label(t) for t in (["win"] if "win" in report["best_actions"] else sort_hand(report["best_actions"]))))
     if report["analysis"]["status"] == "already_winning":
         return
     print("\n切牌对照（向听数越小越好，进张枚数越多越好）：")
@@ -81,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
     print("题号：", question["question_id"])
     print("规则：", question["rule_version"])
     print("定缺：", CHINESE[question["missing_suit"]])
-    print("手牌：", " ".join(label(t) for t in question["concealed"]))
+    print("理牌：", format_hand(question["concealed"]))
     print("可选：", " ".join(
         f"{option}({label(option)})" for option in question["choices"]
     ))
