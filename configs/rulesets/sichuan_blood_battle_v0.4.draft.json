@@ -116,11 +116,13 @@
       "start_after_exchange": true,
       "can_stack_with_other_hand_types": true,
       "no_hand_change_definition": "keep_exact_same_full_wait_tile_set_as_post_exchange_initial_13_tiles_throughout_draw_discard_decisions",
-      "note": "换三张之后13张即听; 保持条件需详细定义, 不得假定与碰杠兼容",
-      "peng_kong_revoke_eligibility_automatically": false,
+      "note": "换三张后闲家起手13张即听；后续所有可比较稳定状态听口必须与初始听口相同。碰牌直接取消天听资格（即使听口不变），杠牌本身不取消；补杠不能恢复已因碰牌取消的资格。",
       "check_wait_set_at_stable_13_effective_tile_states": true,
       "first_wait_set_captured": "after_exchange_three_before_dealer_first_discard",
-      "required_proof": "verified_action_trace_not_user_boolean"
+      "required_proof": "verified_action_trace_not_user_boolean",
+      "peng_always_revokes_eligibility": true,
+      "kong_alone_revokes_eligibility": false,
+      "upgrade_from_peng_to_added_kong_does_not_restore": true
     },
     "pure_all_pungs": {
       "fan": 3
@@ -304,7 +306,8 @@
     "score_awareness": "only_after_rules_confirmed",
     "single_session_draw_discard_rounds": 14,
     "no_cheating_hidden_info": true,
-    "question_assumes_exchange_and_dingque_already_complete": null
+    "question_assumes_exchange_and_dingque_already_complete": null,
+    "implemented_stage": "basic_13_tile_shanten_ukeire_single_draw_probability_and_14_tile_local_discards"
   },
   "confirmation_required": [
     "settlement_eligibility_of_previous_winners",
@@ -323,6 +326,9 @@
     "fixtures": "tests/fixtures/win_fan_cases_v0.4.json",
     "test_command": "python -m unittest discover -s tests -v",
     "kernel": "src/mahtrain_core/rules.py",
-    "scope": "win_waits_and_selected_scoring_only"
+    "scope": "win_waits_and_selected_scoring_only",
+    "fixture_case_count": 29,
+    "efficiency_kernel": "src/mahtrain_core/efficiency.py",
+    "efficiency_tests": "tests/test_efficiency.py"
   }
 }
