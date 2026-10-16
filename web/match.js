@@ -54,6 +54,115 @@
     }
     choice.add(i);render();
   }
+  // M3.14: the API already gives seat-zero private hand and four public
+  // seats. Never request, infer, or draw an opponent's concealed tile faces.
+  const seats=[
+    {id:0,label:"自己"}, {id:1,label:"下家"},
+    {id:2,label:"对家"}, {id:3,label:"上家"},
+  ];
+  function tileBack(){
+    const back=el("span","match-tile-back");
+    back.setAttribute("aria-hidden","true");
+    return back;
+  }
+  function renderMelds(root,groups,showOwn){
+    root.replaceChildren();
+    if(!groups?.length){
+      root.append(el("span","match-empty-melds","暂无公开碰杠"));
+      return;
+    }
+    for(const meld of groups){
+      const item=el("div","match-seat-meld");
+      item.append(el("small","",actionNames[meld.type]||meld.type));
+      const tiles=el("div","match-meld-tiles");
+      for(let n=0;n<(meld.type==="peng"?3:4);n++){
+        // Public an-gang is intentionally redacted by public_state().
+        if(meld.tile===null || meld.tile===undefined){
+          tiles.append(tileBack());
+        }else{
+          tiles.append(card(meld.tile,null,false));
+        }
+      }
+      item.append(tiles);
+      root.append(item);
+    }
+  }
+  function renderSeat(seat){
+    const root=$("match-seat-"+seat);
+    root.classList.toggle("is-active",
+      state.turn===seat && !state.won[seat] &&
+      ["dealer_discard","await_discard"].includes(state.phase));
+    root.classList.toggle("is-won",!!state.won[seat]);
+    if(seat===0){
+      const missing=state.missing_suits?.[0];
+      $("match-self-status").textContent=
+        (state.won[0]?"已胡 · ":"")+
+        (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
+        "庄家"+state.dealer+"号 · 当前手牌"+state.hand.length+"张";
+      renderMelds($("match-self-melds"),state.own_melds,true);
+      return;
+    }
+    root.replaceChildren();
+    const ai=state.ai_opponents?.find(x=>x.seat===seat);
+    const levels={basic:"入门",advanced:"进阶",challenge:"挑战"};
+    root.append(el("strong","match-seat-name",
+      seat+"号 · "+seats[seat].label+(ai?" · "+(levels[ai.difficulty]||ai.difficulty):"")));
+    const missing=state.missing_suits?.[seat];
+    root.append(el("div","match-seat-status",
+      (state.won[seat]?"已胡 · ":"")+
+      (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
+      "暗手"+state.hand_counts[seat]+"张"));
+    const backs=el("div","match-seat-backs");
+    backs.setAttribute("aria-label","暗手"+state.hand_counts[seat]+"张，牌面不可见");
+    for(let n=0;n<state.hand_counts[seat];n++)backs.append(tileBack());
+    root.append(backs);
+    const melds=el("div","match-seat-melds");
+    renderMelds(melds,state.melds[seat],false);
+    root.append(melds);
+  }
+  function renderRiver(seat){
+    const root=$("match-river-"+seat);
+    root.replaceChildren();
+    root.append(el("strong","match-river-title",seats[seat].label+"牌河"));
+    const tiles=el("div","match-river-tiles");
+    const entries=state.discards.map((entry,index)=>({...entry,order:index}))
+      .filter(entry=>entry.seat===seat);
+    if(!entries.length){
+      tiles.append(el("span","match-river-empty","尚无弃牌"));
+    }
+    for(const entry of entries){
+      const cell=el("div","match-river-cell");
+      const claimed=entry.claimed_by!==undefined;
+      if(claimed){
+        // A claimed discard is physically held in another player's meld,
+        // never show a duplicate face still lying in the river.
+        cell.classList.add("is-claimed");
+        cell.append(el("span","match-river-claimed","已取走"));
+        cell.title="本张弃牌已被碰或杠取走";
+      }else{
+        cell.append(card(entry.tile,null,false));
+        cell.title=tileName(entry.tile);
+      }
+      if(entry.won_by)cell.classList.add("is-winning-discard");
+      if(entry.order===state.discards.length-1){
+        cell.classList.add("is-latest");
+      }
+      tiles.append(cell);
+    }
+    root.append(tiles);
+  }
+  function renderWall(){
+    $("match-wall-count").textContent=String(state.wall_count);
+    $("match-wall").classList.toggle("is-exhausted",state.wall_count===0);
+  }
+  function renderBoard(){
+    renderWall();
+    for(const seat of seats){
+      renderSeat(seat.id);
+      renderRiver(seat.id);
+    }
+  }
+
   function render(){
     if(!state)return;
     $("match-stage").hidden=false;
@@ -80,6 +189,7 @@
         onclick=()=>action("match_discard",{tile});
       hand.append(card(tile,onclick,choice.has(i)));
     });
+    renderBoard();
     const controls=$("match-controls");controls.replaceChildren();
     if(phase==="exchange_select"){
       controls.append(el("p","review-intro","已选择"+choice.size+
@@ -149,27 +259,6 @@
     publicInfo.append(el("p","review-intro",
       "各家暗手牌张数："+state.hand_counts.map((v,i)=>
         i+"号"+v+"张"+(state.won[i]?"（已胡）":"")).join("，")));
-    const myMelds=el("div","match-melds");
-    myMelds.append(el("strong","","自己的副露区（已锁定，不可再出牌）"));
-    if(!state.own_melds.length)myMelds.append(el("p","review-intro","尚无碰或杠。"));
-    for(const m of state.own_melds){
-      const row=el("div","match-meld");
-      row.append(el("span","",actionNames[m.type]||m.type));
-      const num=m.type==="peng"?3:4;
-      for(let n=0;n<num;n++)row.append(card(m.tile,null,false));
-      myMelds.append(row);
-    }
-    publicInfo.append(myMelds);
-    const discards=el("div","match-discards");
-    discards.append(el("strong","","公开弃牌记录"));
-    for(const entry of state.discards.slice(-24)){
-      const cell=el("div","match-discard");
-      cell.append(el("span","",entry.seat+"号"+(entry.claimed_by!==undefined?"·已被碰杠":
-        entry.won_by?"·已点炮":"")));
-      cell.append(card(entry.tile,null,false));discards.append(cell);
-    }
-    if(!state.discards.length)discards.append(el("p","review-intro","暂无弃牌。"));
-    publicInfo.append(discards);
     const tian=state.tian_ting;
     if(tian){
       const status=tian.reason==="not_initialized"?"尚未定缺，等待判定":
