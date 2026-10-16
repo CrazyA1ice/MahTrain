@@ -751,6 +751,74 @@ class WebUI(unittest.TestCase):
                        "match_token":explicit["match_token"],
                        "balances":[100,0,0,-100]})
 
+    def test_m34_three_independent_ai_opponents_and_seed_replay(self):
+        settings={"action":"match_new","seed":127,
+                  "ai_levels":["challenge","basic","advanced"]}
+        first=self.post(settings)
+        second=self.post(settings)
+        a,b=first["match"],second["match"]
+        self.assertEqual(a,b,
+            "seed and difficulty should deterministically initialize AI")
+        self.assertEqual([x["seat"] for x in a["ai_opponents"]],[1,2,3])
+        self.assertEqual([x["difficulty"] for x in a["ai_opponents"]],
+                         ["challenge","basic","advanced"])
+        self.assertEqual(len({x["description"] for x in a["ai_opponents"]}),3)
+        self.assertNotIn("opponent_hands",a)
+        self.assertNotIn("future_wall",a)
+        self.assertNotIn("opponent_tian_ting",a)
+        self.assertNotIn("ai_private_state",a)
+        own=a["hand"]
+        selected=next([x for x in own if x[0]==s][:3] for s in "msp"
+                      if sum(x[0]==s for x in own)>=3)
+        one=self.post({"action":"match_exchange",
+                       "match_token":first["match_token"],
+                       "tiles":selected})["match"]
+        two=self.post({"action":"match_exchange",
+                       "match_token":second["match_token"],
+                       "tiles":selected})["match"]
+        self.assertEqual(one,two)
+        one=self.post({"action":"match_missing",
+                       "match_token":first["match_token"],
+                       "suit":"p"})["match"]
+        two=self.post({"action":"match_missing",
+                       "match_token":second["match_token"],
+                       "suit":"p"})["match"]
+        self.assertEqual(one,two)
+        self.assertEqual(one["ai_opponents"],a["ai_opponents"])
+        self.assertNotIn("seed",one)
+        self.assertNotIn("_hands",str(one))
+        self.assertNotIn("_wall",str(one))
+        self.assertIn(one["phase"],(
+            "dealer_discard","await_discard","claim_window","rob_kong_window",
+            "finished","wall_exhausted"))
+
+    def test_m34_rejects_invalid_ai_levels_and_ui_has_selector_controls(self):
+        page,_=self.get("/")
+        script,mime=self.get("/match.js")
+        for seat in (1,2,3):
+            self.assertIn(('id="match-ai-%d"'%seat).encode(),page)
+        self.assertIn(b"ai_levels",script)
+        self.assertIn(b"ai_opponents",script)
+        self.assertIn("javascript",mime)
+        for invalid in (
+            [],["basic"],["basic","advanced"],
+            ["basic","advanced","extreme"],
+            ["basic","advanced","challenge", "basic"],
+            ["basic","advanced",True],
+            "basic",None,{"1":"basic"},[1,2,3],
+        ):
+            with self.subTest(invalid=invalid),self.assertRaises(HTTPError):
+                self.post({"action":"match_new","seed":42,
+                           "ai_levels":invalid})
+        # Client seat spoofing remains unauthorized despite AI activation.
+        created=self.post({"action":"match_new","seed":42})
+        self.assertEqual(
+            [x["difficulty"] for x in created["match"]["ai_opponents"]],
+            ["basic","advanced","challenge"])
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_discard",
+                       "match_token":created["match_token"],"seat":2,"tile":"m1"})
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
