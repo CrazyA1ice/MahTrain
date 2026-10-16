@@ -165,8 +165,12 @@
     const panel=$("retry-panel");
     if(!panel)return;
     if(!report?.finished){
+      // A live training has its own report visibility rules.
+      if(activeQuestion){
+        $("report-panel").hidden=!report?.completed_rounds;
+        $("feedback").hidden=false;
+      }
       panel.hidden=true;
-      maskOldAnswers(false);
       sessionId=null;originalReport=null;retryStatus=null;activeQuestion=null;
       return;
     }
