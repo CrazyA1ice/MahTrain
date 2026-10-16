@@ -60,6 +60,23 @@ class WebUI(unittest.TestCase):
         self.assertIn("javascript", kind)
         css, kind = self.get("/app.css")
         self.assertIn(b".kong-area", css)
+        self.assertIn(b".win-diagnosis", css)
+        self.assertIn(b"width:64px;height:88px", css)
+        self.assertIn(b"tile_art.js", html)
+        self.assertIn(b"sound.js", html)
+        self.assertIn(b"win-diagnosis", html)
+        self.assertIn(b"sound-toggle", html)
+        artwork, art_kind = self.get("/tile_art.js")
+        self.assertIn("javascript", art_kind)
+        self.assertIn(b"MahTrainTiles", artwork)
+        self.assertIn(b"createElementNS", artwork)
+        sounds, sound_kind = self.get("/sound.js")
+        self.assertIn("javascript", sound_kind)
+        self.assertIn(b"AudioContext", sounds)
+        self.assertIn(b"MahTrainSound", sounds)
+        self.assertIn(b"offer_win", code)
+        self.assertIn(b"renderWinDiagnosis", code)
+        self.assertIn(b"sound-toggle", code)
         art, kind = self.get("/assets/tiles/%E4%B8%871.png")
         # Files in this repository use .png names but JPEG signatures.
         self.assertTrue(art.startswith(b"\xff\xd8\xff"))
@@ -91,11 +108,15 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("seed", state)
         self.assertNotIn("analysis", state)
         self.assertEqual(len(state["hand"]), 13)
+        self.assertIn("win_status", state)
+        self.assertIn("missing_suit_tile_count", state["win_status"])
         second = self.post({"action": "draw", "token": token})
         self.assertIn(second["state"]["phase"], (
             "await_discard", "offer_kong", "offer_win"
         ))
         self.assertIsNone(second["feedback"])
+        self.assertIn("win_status",second["state"])
+        self.assertEqual(second["state"]["win_status"]["legal_win"],second["state"]["phase"]=="offer_win")
         while second["state"]["phase"] in ("offer_win", "offer_kong"):
             action = "win" if second["state"]["phase"] == "offer_win" else "kong"
             option = {"accept": False} if action == "win" else {"tile": None}
