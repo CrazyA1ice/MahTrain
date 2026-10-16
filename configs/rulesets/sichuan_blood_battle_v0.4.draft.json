@@ -56,8 +56,25 @@
         "tiao",
         "tong"
       ],
-      "fixed_for_hand": true
-    }
+      "fixed_for_hand": true,
+      "after_players_have_seen_hand": true,
+      "simultaneous_face_down_declaration": true,
+      "physical_hand_tile_consumed": false,
+      "before_exchange_allowed": false,
+      "tianque": {
+        "definition": "after_exchange_hand_contains_only_two_suits_or_fewer",
+        "eligible_to_declare_absent_suit_directly": true,
+        "bonus_fan": 0,
+        "note": "天缺只说明换三张后手中有缺门，不额外消耗手牌"
+      }
+    },
+    "sequence": [
+      "deal_full_hand",
+      "players_inspect_their_dealt_hand",
+      "exchange_three_simultaneously",
+      "players_inspect_post_exchange_hand",
+      "declare_missing_suit_simultaneously_face_down"
+    ]
   },
   "moves": {
     "chi": false,
@@ -307,7 +324,18 @@
     "single_session_draw_discard_rounds": 14,
     "no_cheating_hidden_info": true,
     "question_assumes_exchange_and_dingque_already_complete": null,
-    "implemented_stage": "basic_13_tile_shanten_ukeire_single_draw_probability_and_14_tile_local_discards"
+    "implemented_stage": "basic_13_tile_shanten_ukeire_single_draw_probability_and_14_tile_local_discards",
+    "solo_missing_suit_selection": {
+      "sequence": [
+        "deal_13_cards",
+        "preview_initial_hand",
+        "player_selects_missing_suit",
+        "begin_practice"
+      ],
+      "user_selection_required": true,
+      "tianque_hint_if_two_or_fewer_suits": true,
+      "no_exchange_in_solo_mode": true
+    }
   },
   "confirmation_required": [
     "settlement_eligibility_of_previous_winners",
