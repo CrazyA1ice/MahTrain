@@ -504,6 +504,82 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".solo-error-summary",css)
         self.assertIn("javascript",mime)
 
+    def test_four_seat_opening_browser_demo_and_sealed_phases(self):
+        setup=self.post({"action":"table_new","seed":42})
+        token=setup["table_token"]
+        table=setup["table"]
+        self.assertEqual(table["phase"],"exchange_select")
+        self.assertEqual(table["wall_count"],55)
+        self.assertEqual(sorted(table["hand_counts"]),[13,13,13,14])
+        self.assertEqual(table["seat"],0)
+        self.assertEqual(len(table["hand"]),
+                         14 if table["dealer"]==0 else 13)
+        self.assertNotIn("seed",str(table))
+        self.assertNotIn("_hands",str(table))
+        self.assertNotIn("_wall",str(table))
+        self.assertIsNone(table["missing_suits"])
+        self.assertEqual(table["exchange_submitted"],[])
+        hand=table["hand"]
+        pick=next([t for t in hand if t.startswith(s)][:3]
+                  for s in "msp"
+                  if len([t for t in hand if t.startswith(s)])>=3)
+        with self.assertRaises(HTTPError) as exc:
+            self.post({"action":"table_exchange",
+                "table_token":token,"tiles":pick[:2]})
+        self.assertEqual(exc.exception.code,400)
+        exchanged=self.post({"action":"table_exchange",
+            "table_token":token,"tiles":pick})["table"]
+        self.assertEqual(exchanged["phase"],"missing_select")
+        self.assertEqual(exchanged["wall_count"],55)
+        self.assertEqual(len(exchanged["hand"]),len(hand))
+        self.assertTrue(exchanged["tianque"] in (True,False))
+        self.assertIsNone(exchanged["missing_suits"])
+        with self.assertRaises(HTTPError):
+            self.post({"action":"table_exchange",
+                "table_token":token,"tiles":pick})
+        started=self.post({"action":"table_missing",
+            "table_token":token,"suit":"p"})["table"]
+        self.assertIn(started["phase"],("dealer_discard","await_discard"))
+        self.assertEqual(started["turn"],0)
+        self.assertEqual(len(started["missing_suits"]),4)
+        self.assertEqual(started["missing_suits"][0],"p")
+        self.assertEqual(len(started["hand"]),14)
+        self.assertNotIn("opponent_hand",started)
+        self.assertGreaterEqual(started["wall_count"],52)
+        with self.assertRaises(HTTPError):
+            self.post({"action":"table_missing",
+                "table_token":token,"suit":"m"})
+        cut=started["hand"][0]
+        next_turn=self.post({"action":"table_discard",
+            "table_token":token,"tile":cut})["table"]
+        self.assertEqual(next_turn["discards"][0]["tile"],cut)
+        self.assertEqual(next_turn["discards"][0]["seat"],
+                         started["dealer"] if started["dealer"]==0 else started["dealer"])
+        self.assertGreaterEqual(next_turn["wall_count"],0)
+        self.assertEqual(next_turn["turn"],0)
+        self.assertEqual(next_turn["phase"],"await_discard")
+        self.assertEqual(len(next_turn["hand"]),14)
+        self.assertIn("demo_no_claims",[
+            e["type"] for e in next_turn["events"]
+        ])
+
+    def test_four_seat_demo_static_assets_and_bad_seeds(self):
+        html,_=self.get("/")
+        script,mime=self.get("/four_player.js")
+        self.assertIn("javascript",mime)
+        self.assertIn(b'id="four-player-demo"',html)
+        self.assertIn(b'id="table-hand"',html)
+        self.assertIn(b"table_exchange",script)
+        self.assertIn(b"table_missing",script)
+        css,_=self.get("/app.css")
+        self.assertIn(b".table-demo",css)
+        for seed in (-1,2**32,True,"42"):
+            with self.subTest(seed=seed),self.assertRaises(HTTPError):
+                self.post({"action":"table_new","seed":seed})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"table_discard",
+                       "table_token":"forged","tile":"m1"})
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
