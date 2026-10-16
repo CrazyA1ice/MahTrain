@@ -59,6 +59,10 @@ jobs:
           python examples/training_quiz.py --mode one_shanten --difficulty intermediate --seed 9 --print-only
           python examples/training_quiz.py --mode tenpai_discard --difficulty challenge --seed 42 --print-only
           python examples/training_quiz.py --mode pure_suit_waits --difficulty challenge --seed 12 --print-only
+      - name: Smoke-test paired three-tier AI benchmark
+        run: |
+          python examples/benchmark_ai.py --seed-start 0 --seeds 4 --json-out /tmp/mahtrain-ai-benchmark.json
+          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-benchmark.json',encoding='utf8')); assert d['usable_positions'] >= 4; assert all(d['levels'][k]['decisions']==d['usable_positions'] for k in ('basic','advanced','challenge'))"
       - name: Smoke-test deterministic four-seat opening
         run: |
           python examples/four_player_opening_demo.py --seed 42 --turns 8
