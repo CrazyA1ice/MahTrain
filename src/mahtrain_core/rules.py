@@ -139,7 +139,13 @@ def tian_ting_qualifies(
     Only compare valid post-discard/post-call 13-effective-tile checkpoints.
     The caller must provide a truthful game-action history; real matches must
     derive these snapshots from the state machine rather than user inputs.
-    Peng/kong does not automatically disqualify, but a changed wait set does.
+    A PENG cancels tian ting even if the wait set remains unchanged.
+    A KONG alone does not cancel it (unless the wait set changes). Upgrading
+    a peng to bu_gang cannot restore a tian ting that was already lost.
+
+    Snapshots may include 'action' or 'actions_since_previous' to record
+    actions already applied. A real match must submit an authoritative full
+    trace; never infer qualification from a final hand alone.
     """
     if is_dealer:
         return False
@@ -147,6 +153,19 @@ def tian_ting_qualifies(
     if not initial_waits:
         return False
     for snapshot in checkpoints:
+        actions = [
+            snapshot.get("action"),
+            *snapshot.get("actions_since_previous", ()),
+        ]
+        if any(action in ("peng", "bu_gang") for action in actions):
+            return False
+        # Already-peng'd melds are disqualifying even if the action was
+        # omitted from this snapshot. Bu_gang presupposes an earlier peng.
+        if any(
+            meld.get("type") in ("peng", "bu_gang")
+            for meld in snapshot.get("melds", ())
+        ):
+            return False
         current = set(winning_tiles(
             snapshot["concealed"], snapshot.get("melds", ()), missing_suit
         ))
