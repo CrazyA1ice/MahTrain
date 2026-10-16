@@ -23,6 +23,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from mahtrain_core import SoloTrainingSession, FourPlayerOpening  # noqa: E402
 from mahtrain_core.ai import MahjongAgent, AI_LEVELS  # noqa: E402
 from mahtrain_core.ai_tournament import tournament  # noqa: E402
+from mahtrain_core.ai_independent_benchmark import independent_benchmark  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
 from mahtrain_core.training_levels import DIFFICULTIES
 from mahtrain_core.error_focus import (
@@ -217,17 +218,58 @@ def _replay_worker(token: str, seed_start: int, seeds: int) -> None:
                 })
 
 
+def _independent_worker(token: str, seed_start: int, seeds: int) -> None:
+    def progress(done: int, total: int) -> None:
+        with _LOCK:
+            job=_AI_REPLAY_JOBS.get(token)
+            if job is not None:
+                job["completed_games"]=done
+
+    try:
+        result=independent_benchmark(seed_start,seeds,on_match=progress)
+    except Exception as exc:
+        with _LOCK:
+            if token in _AI_REPLAY_JOBS:
+                _AI_REPLAY_JOBS[token].update({
+                    "status":"error",
+                    "error":"独立基线评测失败："+str(exc)[:180],
+                })
+    else:
+        with _LOCK:
+            if token in _AI_REPLAY_JOBS:
+                _AI_REPLAY_JOBS[token].update({
+                    "status":"done","result":result,
+                    "completed_games":result["games"],
+                })
+
+
 def _replay_summary(job: dict) -> dict:
     response={
         "status":job["status"],
         "completed_games":job["completed_games"],
-        "total_games":job["seeds"]*3,
+        "total_games":job["seeds"]*(4 if job.get("mode")=="baseline" else 3),
         "seed_start":job["seed_start"],
         "seeds":job["seeds"],
     }
     if job["status"]=="error":
         response["error"]=job["error"]
-    if job["status"]=="done":
+    if job["status"]=="done" and job.get("mode")=="baseline":
+        result=job["result"]
+        response["overview"]={
+            "protocol":result["protocol"],
+            "independent_shuffle_seeds":result["independent_shuffle_seeds"],
+            "games":result["games"],
+            "opponents":result["opponents"],
+            "terminal_phase_counts":result["terminal_phase_counts"],
+            "levels":result["levels"],
+            "paired_differences_vs_baseline":result[
+                "paired_differences_vs_baseline"],
+            "interval_status":result["interval_status"],
+            "intervals":result["intervals"],
+            "per_seed":result["per_seed"],
+            "limitations":result["limitations"],
+        }
+    elif job["status"]=="done":
         result=job["result"]
         response["overview"]={
             "games":result["games"],
@@ -248,6 +290,40 @@ def _replay_summary(job: dict) -> dict:
 
 def _process(action: str, payload: dict) -> dict:
     with _LOCK:
+        if action == "ai_baseline_start":
+            seed_start=payload.get("seed_start",11)
+            seeds=payload.get("seeds",1)
+            if (type(seed_start) is not int or
+                not 0 <= seed_start < 2**32 or
+                type(seeds) is not int or not 1 <= seeds <= 2 or
+                seed_start+seeds > 2**32):
+                raise ValueError("独立基线：种子需为uint32，网页限1或2个独立种子")
+            if any(job["status"]=="running"
+                   for job in _AI_REPLAY_JOBS.values()):
+                raise ValueError("已有AI试验在运行，等待结束再开始")
+            if len(_AI_REPLAY_JOBS)>=_MAX_REPLAY_JOBS:
+                done=next((key for key,job in _AI_REPLAY_JOBS.items()
+                           if job["status"]!="running"),None)
+                if done is None:
+                    raise ValueError("复盘任务已满")
+                _AI_REPLAY_JOBS.pop(done)
+            token=secrets.token_urlsafe(24)
+            _AI_REPLAY_JOBS[token]={
+                "mode":"baseline","status":"running",
+                "completed_games":0,"seed_start":seed_start,"seeds":seeds,
+            }
+            threading.Thread(
+                target=_independent_worker,args=(token,seed_start,seeds),
+                daemon=True,
+            ).start()
+            return {"baseline_token":token,
+                    "baseline":_replay_summary(_AI_REPLAY_JOBS[token])}
+        if action == "ai_baseline_status":
+            token=payload.get("baseline_token")
+            job=_AI_REPLAY_JOBS.get(token) if type(token) is str else None
+            if job is None or job.get("mode")!="baseline":
+                raise ValueError("独立基线评测任务不存在")
+            return {"baseline":_replay_summary(job)}
         if action == "ai_replay_start":
             seed_start=payload.get("seed_start",11)
             seeds=payload.get("seeds",1)
@@ -271,7 +347,7 @@ def _process(action: str, payload: dict) -> dict:
                 _AI_REPLAY_JOBS.pop(idle)
             token=secrets.token_urlsafe(24)
             _AI_REPLAY_JOBS[token]={
-                "status":"running","completed_games":0,
+                "mode":"replay","status":"running","completed_games":0,
                 "seed_start":seed_start,"seeds":seeds,
             }
             threading.Thread(
@@ -283,7 +359,7 @@ def _process(action: str, payload: dict) -> dict:
         if action in ("ai_replay_status","ai_replay_match"):
             token=payload.get("replay_token")
             job=_AI_REPLAY_JOBS.get(token) if type(token) is str else None
-            if job is None:
+            if job is None or job.get("mode")!="replay":
                 raise ValueError("复盘任务不存在，请重新开始")
             if action=="ai_replay_status":
                 return {"replay":_replay_summary(job)}
