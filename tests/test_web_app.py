@@ -61,15 +61,18 @@ class WebUI(unittest.TestCase):
         css, kind = self.get("/app.css")
         self.assertIn(b".kong-area", css)
         self.assertIn(b".win-diagnosis", css)
-        self.assertIn(b"width:64px;height:88px", css)
-        self.assertIn(b"tile_art.js", html)
+        self.assertIn(b".tile-atlas-face", css)
+        self.assertIn(b"preview-section", html)
+        self.assertIn(b"preview-button", html)
         self.assertIn(b"sound.js", html)
         self.assertIn(b"win-diagnosis", html)
         self.assertIn(b"sound-toggle", html)
-        artwork, art_kind = self.get("/tile_art.js")
-        self.assertIn("javascript", art_kind)
-        self.assertIn(b"MahTrainTiles", artwork)
-        self.assertIn(b"createElementNS", artwork)
+        atlas, atlas_kind = self.get("/assets/tiles/640x420.jpeg")
+        self.assertEqual(atlas_kind, "image/jpeg")
+        self.assertTrue(atlas.startswith(b"\\xff\\xd8\\xff"))
+        self.assertIn(b"atlasFace", code)
+        self.assertIn(b"backgroundPosition", code)
+        self.assertIn(b"showDealtPreview", code)
         sounds, sound_kind = self.get("/sound.js")
         self.assertIn("javascript", sound_kind)
         self.assertIn(b"AudioContext", sounds)
@@ -99,7 +102,12 @@ class WebUI(unittest.TestCase):
         self.assertEqual(err.exception.code, 415)
 
     def test_local_session_api_flow_and_hidden_wall(self):
-        response = self.post({"action": "new", "seed": 17, "rounds": 2})
+        preview = self.post({"action": "preview", "seed": 17, "rounds": 2})
+        self.assertEqual(len(preview["initial_hand"]), 13)
+        self.assertNotIn("token", preview)
+        self.assertNotIn("wall", preview)
+        response = self.post({"action": "new", "seed": 17, "rounds": 2,
+                              "missing_suit": "p"})
         token = response["token"]
         self.assertGreater(len(token), 20)
         state = response["state"]
@@ -108,6 +116,7 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("seed", state)
         self.assertNotIn("analysis", state)
         self.assertEqual(len(state["hand"]), 13)
+        self.assertEqual(state["hand"], preview["initial_hand"])
         self.assertIn("win_status", state)
         self.assertIn("missing_suit_tile_count", state["win_status"])
         second = self.post({"action": "draw", "token": token})
@@ -131,6 +140,26 @@ class WebUI(unittest.TestCase):
         self.assertEqual(saved["state"]["completed_rounds"], 1)
         self.assertNotIn("wall", saved["state"])
         self.assertNotIn("analysis", saved["state"])
+
+    def test_must_select_missing_suit_after_preview(self):
+        for value in (None, "", "invalid"):
+            with self.subTest(value=value), self.assertRaises(HTTPError) as err:
+                self.post({"action":"new", "seed":12, "missing_suit":value})
+            self.assertEqual(err.exception.code,400)
+
+    def test_preview_reports_suit_counts_and_tianque_without_hidden_wall(self):
+        preview = self.post({"action":"preview", "seed":31})
+        cards = preview["initial_hand"]
+        counts = preview["suit_counts"]
+        self.assertEqual(len(cards),13)
+        self.assertEqual(sum(counts.values()),13)
+        for suit in ("m","s","p"):
+            self.assertEqual(counts[suit],sum(t[0]==suit for t in cards))
+        absent=[s for s in ("m","s","p") if counts[s]==0]
+        self.assertEqual(preview["absent_suits"],absent)
+        self.assertEqual(preview["tianque"],bool(absent))
+        self.assertNotIn("wall",preview)
+        self.assertNotIn("correct_answer",preview)
 
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
