@@ -293,3 +293,31 @@
 .solo-error-item button{margin-top:auto}
 @media(max-width:650px){.solo-error-summary{padding:13px}
 .solo-error-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}}
+
+
+/* Four-seat M3 opening DEMO (scripted opponents, no claim scoring). */
+.table-demo{margin:20px 0 24px;padding:25px 28px}
+.table-demo .panel-title h3{font-size:20px}
+.table-demo-toolbar{display:flex;align-items:end;gap:12px;flex-wrap:wrap;
+  background:#f3f8f3;padding:14px 16px;border-radius:11px;margin:14px 0}
+.table-demo-toolbar label{display:grid;gap:5px;font-size:12px;color:#657e6b}
+.table-demo-toolbar input{max-width:240px;background:#fff;border:1px solid #c6dace;
+  border-radius:8px;padding:10px;font:inherit;color:#30533b}
+.table-demo #table-error:empty{display:none}
+.table-demo #table-stage-title{font-size:17px;color:#285741;margin:13px 0 7px}
+.table-demo #table-hand{margin:13px 0;padding:17px 13px}
+.table-demo #table-hand .tile{width:64px;height:85px}
+.table-demo #table-hand .tile.table-selected{outline:3px solid #e5b356;
+  outline-offset:1px;transform:translateY(-5px)}
+.table-controls{display:flex;gap:9px;flex-wrap:wrap;margin:13px 0;align-items:center}
+.table-controls .review-intro{flex-basis:100%}
+.table-public{background:#f8fbf7;border:1px solid #e5eee6;
+  border-radius:12px;padding:12px 17px}
+.table-discard-log{display:flex;flex-wrap:wrap;align-items:center;gap:9px;
+  padding:13px 0 4px;margin-top:9px;border-top:1px solid #e2e9de}
+.table-discard-log strong{width:100%;font-size:13px;color:#38634b}
+.table-discard-item{display:flex;flex-direction:column;align-items:center;gap:3px}
+.table-discard-item span{font-size:10px;color:#768a7c}
+.table-discard-item .tile{width:42px;height:55px}
+@media(max-width:650px){.table-demo{padding:16px 12px}
+.table-demo #table-hand .tile{width:49px;height:67px}}
