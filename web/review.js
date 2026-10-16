@@ -3,6 +3,8 @@
    information or current unsubmitted candidate analyses to this component. */
 (function(){
   const $=id=>document.getElementById(id);
+  let onlyMistakes=false;
+  let lastSessionId=null;
   function el(tag,css,text){
     const e=document.createElement(tag);
     if(css)e.className=css;
@@ -90,10 +92,47 @@
     }
     return container;
   }
+  function downloadCsv(report,tileName){
+    const header=["回合","摸牌","动作","是否最优","本轮最优动作","切后向听",
+      "有效进张枚数","下一摸模型概率","较上轮向听变化","较上轮进张变化","判题解析"];
+    const formatTile=t=>t==="win"?"胡牌":tileName(t);
+    const values=(report.round_review||[]).map(r=>{
+      const delta=r.change_from_previous_discard;
+      return [
+        r.round,r.drawn_tile?formatTile(r.drawn_tile):"",
+        formatTile(r.choice),r.correct?"是":"否",
+        r.best_actions.map(formatTile).join(" / "),
+        r.shanten??"",r.effective_tile_count??"",
+        r.next_draw_probability??"",delta?.shanten??"",
+        delta?.effective_tile_count??"",r.explanation,
+      ];
+    });
+    const quote=v=>{
+      let raw=String(v??"");
+      // Avoid CSV formula evaluation if a spreadsheet opens a text column.
+      if(/^[=+@\-]/.test(raw) && !/^-?[0-9]+(\.[0-9]+)?$/.test(raw))
+        raw="'"+raw;
+      return '"'+raw.replaceAll('"','""')+'"';
+    };
+    const csv="\uFEFF"+[header,...values].map(row=>row.map(quote).join(",")).join("\r\n");
+    const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+    const link=document.createElement("a");
+    link.href=url;
+    link.download="MahTrain_切牌复盘_"+report.session_id+".csv";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+
   function render(report,tileName){
     const panel=$("report-panel");
     const root=$("report");
-    if(!report?.completed_rounds){panel.hidden=true;root.replaceChildren();return;}
+    if(!report?.completed_rounds){
+      panel.hidden=true;root.replaceChildren();onlyMistakes=false;
+      lastSessionId=null;return;
+    }
+    if(lastSessionId!==report.session_id){onlyMistakes=false;lastSessionId=report.session_id;}
     panel.hidden=false;
     root.replaceChildren();
     $("report-title").textContent=report.finished?"训练结束 · 完整复盘":"训练进行中 · 已完成回合";
@@ -136,9 +175,22 @@
     root.append(barChart(report.round_review||[]));
     const title=el("div","review-table-title");
     title.append(el("h4","","逐轮切牌复盘"));
-    title.append(el("span","review-small","点击每轮展开手牌、最优选择、有效进张明细与解析"));
+    title.append(el("span","review-small","点击每轮展开最优选择、进张明细及解析"));
     root.append(title);
-    root.append(detailedRows(report.round_review||[],tileName));
+    const controls=el("div","review-controls");
+    const filter=el("button","review-control"+(onlyMistakes?" active":""),
+      onlyMistakes?"显示全部回合":"只看待改进回合");
+    filter.type="button";
+    filter.addEventListener("click",()=>{onlyMistakes=!onlyMistakes;render(report,tileName);});
+    const exportButton=el("button","review-control","导出逐轮CSV");
+    exportButton.type="button";
+    exportButton.addEventListener("click",()=>downloadCsv(report,tileName));
+    controls.append(filter,exportButton);
+    root.append(controls);
+    const reviewed=onlyMistakes?(report.round_review||[]).filter(x=>!x.correct):
+       (report.round_review||[]);
+    if(reviewed.length)root.append(detailedRows(reviewed,tileName));
+    else root.append(el("p","review-intro","当前没有需要改进的回合。"));
     root.append(el("p","review-footnote",
       "说明：牌效概率仅以当轮自己手牌与已公开弃牌为已知信息估算，并非真实牌墙的精确未来概率；跨轮变化还受到新摸牌、可见牌变化影响，不能将其全部归因于上一轮切牌。"));
     if(report.finished)root.append(el("p","review-finished",
