@@ -55,7 +55,7 @@ class RuleCases(unittest.TestCase):
                     self.fail(f"unknown case kind: {kind}")
 
     def test_case_inventory(self):
-        self.assertEqual(len(self.cases), 26)
+        self.assertEqual(len(self.cases), 29)
         self.assertEqual(len({c["id"] for c in self.cases}), 26)
 
     def test_missing_suit_applies_to_win_and_waits(self):
