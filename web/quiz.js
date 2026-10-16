@@ -138,6 +138,7 @@
         quiz_token:token,selection:answer,
       })).result;
       submitted=true;renderQuestion();summarize(result);
+      await window.MahTrainQuizHistory?.refresh();
       window.MahTrainSound?.play(result.correct?"win":"discard");
     }catch(err){showError(err.message);}
     finally{busy=false;}
@@ -148,11 +149,13 @@
       question=null;token=null;selection.clear();submitted=false;
       $("quiz-question").replaceChildren();
       $("quiz-feedback").replaceChildren();
+      void window.MahTrainQuizHistory?.refresh();
     });
     $("quiz-level").addEventListener("change",()=>{
       question=null;token=null;selection.clear();submitted=false;
       $("quiz-question").replaceChildren();
       $("quiz-feedback").replaceChildren();
+      void window.MahTrainQuizHistory?.refresh();
     });
   }
   window.MahTrainQuiz={init};
