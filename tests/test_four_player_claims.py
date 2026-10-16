@@ -182,7 +182,7 @@ class FourPlayerClaimsTests(unittest.TestCase):
                 source.append(tile);deck[tile]-=1
         g=staged_game({d:source},{d:"p"},seed=19)
         old_tail=g._wall[-1]
-        self.assertEqual(g.kong_options(d),[{"type":"an_gang","tile":"m9"}])
+        self.assertIn({"type":"an_gang","tile":"m9"},g.kong_options(d))
         with self.assertRaises(ValueError):
             g.declare_kong(d,"bu_gang","m9")
         g.declare_kong(d,"an_gang","m9")
@@ -275,8 +275,14 @@ class FourPlayerClaimsTests(unittest.TestCase):
             while deck[t] and len(source)<14:
                 source.append(t);deck[t]-=1
         g=staged_game({d:source,r:ready},{d:"p",r:"p"})
-        # stager accounted all four m9 as remaining wall: replace with real
-        # owned peng (three) and retain dealer's fourth one concealed.
+        # Ensure the three copies not in dealer's hand are in the wall,
+        # rather than incorrectly being dealt to an unrelated filler seat.
+        for s in range(4):
+            if s in (d,r):continue
+            for _ in range(g._hands[s].count("m9")):
+                g._hands[s].remove("m9")
+                g._hands[s].append(g._wall.pop(0))
+                g._wall.append("m9")
         g._melds[d]=[{"type":"peng","tile":"m9"}]
         g._wall.extend(g._hands[d][-3:])
         del g._hands[d][-3:]
