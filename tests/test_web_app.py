@@ -934,6 +934,87 @@ class WebUI(unittest.TestCase):
             self.post({"action":"ai_replay_status",
                        "replay_token":"unknown"})
 
+    def test_m39_baseline_dashboard_token_isolation_and_safe_aggregate(self):
+        lv={
+            level:{
+                "exposures":4,"wins":0,"deal_ins":0,"discards":10,
+                "minimum_shanten":10,"local_optimal":9,
+                "win_event_fraction":0,"min_shanten_fraction":1,
+                "local_optimal_fraction":.9,
+            } for level in ("baseline","basic","advanced","challenge")
+        }
+        summary={
+            "protocol":"independent_shape_baseline_four_seat_rotation_v1",
+            "independent_shuffle_seeds":1,"games":4,
+            "opponents":["baseline","basic","advanced","challenge"],
+            "terminal_phase_counts":{"finished":0,"wall_exhausted":4},
+            "levels":lv,
+            "paired_differences_vs_baseline":{
+                x:{"win_event_fraction":0,
+                   "min_shanten_fraction":0,"local_optimal_fraction":0}
+                for x in ("basic","advanced","challenge")},
+            "interval_status":"insufficient_independent_seeds_need_5",
+            "intervals":None,
+            "per_seed":[{"seed":11,"rotations":4,"levels":lv}],
+            "limitations":["not full settlement"],
+            "matches":[{
+                "assignment":["baseline","basic","advanced","challenge"],
+                "trace":[{"secret":"opponent_hand"}],
+                "public_replay":[{"future_wall":"m9"}],
+            }],
+        }
+        def cheap(seed_start,seeds,*,on_match=None):
+            self.assertEqual((seed_start,seeds),(11,1))
+            if on_match:on_match(4,4)
+            return summary
+        with patch.object(web_server,"independent_benchmark",side_effect=cheap):
+            opened=self.post({"action":"ai_baseline_start","seed_start":11,
+                              "seeds":1})
+            token=opened["baseline_token"]
+            self.assertGreater(len(token),20)
+            self.assertEqual(opened["baseline"]["total_games"],4)
+            outcome=None
+            for _ in range(40):
+                outcome=self.post({"action":"ai_baseline_status",
+                                   "baseline_token":token})["baseline"]
+                if outcome["status"]=="done":break
+                sleep(.01)
+            self.assertEqual(outcome["status"],"done")
+        overview=outcome["overview"]
+        self.assertEqual(overview["games"],4)
+        self.assertEqual(overview["opponents"][0],"baseline")
+        self.assertEqual(overview["intervals"],None)
+        for private in ("secret","opponent_hand","future_wall","trace",
+                        "public_replay","matches"):
+            self.assertNotIn(private,str(overview))
+        with self.assertRaises(HTTPError):
+            self.post({"action":"ai_replay_status","replay_token":token})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"ai_replay_match","replay_token":token,
+                       "match_index":0})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"ai_baseline_status","baseline_token":"bad"})
+        page,_=self.get("/")
+        js,mime=self.get("/ai_baseline.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b'id="ai-baseline-panel"',page)
+        self.assertIn(b'src="/ai_baseline.js"',page)
+        self.assertIn(b"ai_baseline_start",js)
+        self.assertIn(b"paired_differences_vs_baseline",js)
+        self.assertIn(b".ai-baseline-summary",css)
+        self.assertIn("javascript",mime)
+
+    def test_m39_rejects_invalid_baseline_requests_without_starting(self):
+        for bad in (
+            {"seeds":0},{"seeds":3},{"seeds":True},{"seeds":"1"},
+            {"seed_start":-1},{"seed_start":2**32},
+            {"seed_start":True},{"seed_start":2**32-1,"seeds":2},
+        ):
+            with self.subTest(payload=bad),self.assertRaises(HTTPError):
+                self.post({"action":"ai_baseline_start",**bad})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"ai_baseline_status"})
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
