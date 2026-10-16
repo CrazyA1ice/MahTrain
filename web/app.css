@@ -174,3 +174,33 @@
 .retry-controls{display:flex;justify-content:flex-start;flex-wrap:wrap;gap:10px;margin-top:14px}
 @media(max-width:620px){.retry-panel{padding:18px 13px}.retry-compare{grid-template-columns:1fr}
 .retry-hand .tile,.retry-choices .tile{width:51px;height:68px}}
+
+
+/* M2.5 local SQLite dashboard; works without any external stylesheet. */
+.history-panel{margin:20px 0 24px;padding:26px 28px}
+.history-panel .panel-title h3{font-size:21px}
+.history-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:17px}
+.history-metric{background:#edf5ef;border-radius:10px;padding:15px;display:grid;gap:7px}
+.history-metric span{font-size:12px;color:#6a8b74}
+.history-metric strong{font-size:23px;color:#2c5a43}
+.history-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;margin-top:13px}
+.history-entry{border:1px solid #e0e8de;background:#fcfefb;border-radius:12px;
+  padding:15px;display:grid;gap:11px;align-content:space-between}
+.history-entry-top{display:grid;gap:6px}
+.history-entry-top strong{color:#28513e;font-size:14px}
+.history-entry-top span{color:#698477;font-size:12px}
+.history-detail{margin-top:20px}
+.history-detail-title{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;flex-wrap:wrap}
+.history-detail-title h4{font-size:17px;color:#2a4c3d;margin:0}
+.history-rounds{display:grid;gap:8px;margin:14px 0}
+.history-round{border:1px solid #dde9df;border-radius:8px}
+.history-round summary{cursor:pointer;padding:10px 13px;font-size:13px;
+  color:#31553f;font-weight:650;background:#f4faf5}
+.history-round-body{padding:9px 15px}
+.history-delete{font:inherit;font-size:12px;color:#9c4539;background:#fff9f7;
+  border:1px solid #e2ada4;border-radius:8px;padding:9px 12px;cursor:pointer}
+.history-delete:hover{background:#fdece9}
+@media(max-width:650px){.history-panel{padding:18px 13px}
+.history-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+.history-metric strong{font-size:19px}}
