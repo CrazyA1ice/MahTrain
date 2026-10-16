@@ -47,10 +47,30 @@ def make_ready(
             hand = [f"{suit}{r}" for r in ranks[:6] for _ in range(2)]
             hand.append(f"{suit}{ranks[6]}")
             family = "seven_pairs"
+        elif difficulty != "basic" and rng.random() < .75:
+            # Three melds + pair + a two-tile wait shape = 13 tiles.
+            # Patterns exercise edge, closed/gap, and two-sided waits.
+            hand = []
+            for _ in range(3):
+                hand.extend(_meld(rng, rng.choice(allowed), True))
+            pair = f"{rng.choice(allowed)}{rng.randint(1, 9)}"
+            hand.extend((pair, pair))
+            wait_suit = rng.choice(allowed)
+            style = rng.choice(("edge_wait", "closed_wait", "two_sided_wait"))
+            if style == "edge_wait":
+                ranks = rng.choice(((1, 2), (8, 9)))
+            elif style == "closed_wait":
+                start = rng.randint(1, 7)
+                ranks = (start, start + 2)
+            else:
+                start = rng.randint(2, 7)
+                ranks = (start, start + 1)
+            hand.extend(f"{wait_suit}{rank}" for rank in ranks)
+            family = style
         else:
             sequence_first = difficulty in ("intermediate", "challenge")
             hand = []
-            for i in range(4):
+            for _ in range(4):
                 hand.extend(_meld(rng, rng.choice(allowed), sequence_first))
             hand.append(f"{rng.choice(allowed)}{rng.randint(1,9)}")
             family = "sequence_melds" if sequence_first else "mixed_melds"
