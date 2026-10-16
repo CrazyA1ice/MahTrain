@@ -231,28 +231,7 @@ function renderFeedback(feedback) {
 }
 
 function renderReport(report) {
-  const panel=$("#report-panel");
-  if (!report) {panel.hidden=true; return;}
-  panel.hidden=false;
-  const root=$("#report");
-  root.replaceChildren();
-  const grid=node("div","report-grid");
-  const metrics=[
-    ["完成轮数",report.completed_rounds],
-    ["最优正确率",(report.accuracy*100).toFixed(1)+"%"],
-    ["退向听次数",report.shanten_regression_rounds],
-    ["暗杠次数",report.kong_count],
-  ];
-  metrics.forEach(([title,value])=>{
-    const cell=node("div");
-    cell.append(node("strong","",value));
-    cell.append(node("span","",title));
-    grid.append(cell);
-  });
-  root.append(grid);
-  root.append(node("p","",
-    report.finished_reason==="self_drawn_win"?"本次已确认自摸胡牌，训练提前结束。":
-    "本次训练完成，可更换种子再练习。"));
+  window.MahTrainReview.render(report, tileName);
 }
 
 function render(state,feedback=null,report=null) {
