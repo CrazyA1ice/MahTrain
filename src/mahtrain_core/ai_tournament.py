@@ -13,6 +13,7 @@ from time import perf_counter_ns
 from typing import Any
 
 from .ai import AI_LEVELS, MahjongAgent, visible_tiles
+from .ai_baseline import ShapeBaselineAgent
 from .efficiency import analyze_discards
 from .four_player import FourPlayerOpening
 from .ai_seed_stats import analyze_seed_clusters
@@ -31,7 +32,7 @@ def seat_assignment(rotation: int) -> list[str]:
     return [AI_LEVELS[(seat + rotation) % 3] for seat in range(4)]
 
 
-def _take_action(game: FourPlayerOpening, agents: dict[int, MahjongAgent],
+def _take_action(game: FourPlayerOpening, agents: dict[int, Any],
                  trace: list[dict[str, Any]],
                  durations: dict[str, list[float]]) -> None:
     phase = game.phase
@@ -144,6 +145,9 @@ def explain_public_action(action: dict[str, Any],
         if missing and action["tile"][0]==missing:
             code="discard_missing"
             explanation="本次切掉已公开的定缺花色。三档策略目前都优先处理定缺牌；无法据此证明这一切是全局最优。"
+        elif level=="baseline":
+            code="baseline_shape_policy"
+            explanation="独立牌形基线按自己的同牌及邻牌数量选择孤立牌；不使用向听数、有效进张评估器或对手暗牌。"
         elif level=="basic":
             code="basic_discard"
             explanation="入门档在可选切牌范围内按种子随机选择；不公开用到的自家暗手和私有牌效数据。"
@@ -241,15 +245,27 @@ def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict
 
 
 def simulate_match(seed: int, rotation: int = 0,
-                   *, max_actions: int = 800) -> dict[str, Any]:
+                   *, max_actions: int = 800,
+                   lineup: list[str] | None = None) -> dict[str, Any]:
     if type(seed) is not int or not 0 <= seed < 2**32:
         raise ValueError("seed must be an unsigned 32-bit integer")
     if type(max_actions) is not int or not 40 <= max_actions <= 5000:
         raise ValueError("max_actions must be 40..5000")
-    assignment=seat_assignment(rotation)
+    if lineup is None:
+        assignment=seat_assignment(rotation)
+    else:
+        if (type(lineup) is not list or len(lineup)!=4 or
+            any(type(level) is not str or level not in (*AI_LEVELS,"baseline")
+                for level in lineup) or len(set(lineup))!=4):
+            raise ValueError("independent lineup needs 4 distinct AI policies")
+        assignment=list(lineup)
     game=FourPlayerOpening(seed)  # Kong payouts remain unpriced by default.
-    agents={seat:MahjongAgent(assignment[seat],seed=seed,seat=seat)
-            for seat in range(4)}
+    agents={
+        seat:(ShapeBaselineAgent(seed=seed,seat=seat)
+              if assignment[seat]=="baseline" else
+              MahjongAgent(assignment[seat],seed=seed,seat=seat))
+        for seat in range(4)
+    }
     trace=[]
     frames=[]
     durations=defaultdict(list)
