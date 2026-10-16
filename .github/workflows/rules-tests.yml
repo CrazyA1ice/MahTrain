@@ -103,8 +103,8 @@ jobs:
           if-no-files-found: warn
       - name: Smoke-test five-policy ablation seat balance
         run: |
-          python examples/benchmark_ablation_ai.py --seed-start 11 --seeds 1 --json-out /tmp/mahtrain-ai-ablation.json --csv-out /tmp/mahtrain-ai-ablation.csv
-          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-ablation.json',encoding='utf8')); assert d['games']==5; assert d['independent_shuffle_seeds']==1; assert len(d['opponents'])==5; assert all(d['levels'][x]['exposures']==4 for x in d['opponents']); assert all(m['physical_count']==108 for m in d['matches']); assert d['intervals'] is None"
+          python examples/benchmark_ablation_ai.py --seed-start 11 --seeds 1 --json-out /tmp/mahtrain-ai-ablation.json --csv-out /tmp/mahtrain-ai-ablation.csv --contrast-csv-out /tmp/mahtrain-ai-contrast.csv --html-out /tmp/mahtrain-ai-ablation.html
+          python -c "import json; d=json.load(open('/tmp/mahtrain-ai-ablation.json',encoding='utf8')); assert d['games']==5; assert d['independent_shuffle_seeds']==1; assert len(d['opponents'])==5; assert all(d['levels'][x]['exposures']==4 for x in d['opponents']); assert all(m['physical_count']==108 for m in d['matches']); assert d['intervals'] is None; assert d['seed_analysis']['distinct_seed_count']==1; assert d['seed_analysis']['leave_one_seed_out'] is None"
       - name: Archive five-policy ablation result
         if: always()
         uses: actions/upload-artifact@v4
@@ -113,6 +113,8 @@ jobs:
           path: |
             /tmp/mahtrain-ai-ablation.json
             /tmp/mahtrain-ai-ablation.csv
+            /tmp/mahtrain-ai-contrast.csv
+            /tmp/mahtrain-ai-ablation.html
           if-no-files-found: warn
       - name: Smoke-test deterministic four-seat opening
         run: |
@@ -122,3 +124,46 @@ jobs:
           python examples/solo_14_rounds.py --seed 17 --rounds 2 --auto
           python examples/solo_14_rounds.py --seed 17 --rounds 14 --auto
           python examples/solo_14_rounds.py --seed 17 --rounds 14 --auto --auto-kong
+
+  five-seed-ablation-report:
+    # Runs on PRs or manually, not on every main-branch push.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run five independent shuffle seeds and produce offline report
+        run: |
+          python examples/benchmark_ablation_ai.py --seed-start 30 --seeds 5 --json-out /tmp/mahtrain-m311.json --csv-out /tmp/mahtrain-m311-policy.csv --contrast-csv-out /tmp/mahtrain-m311-contrasts.csv --html-out /tmp/mahtrain-m311-report.html
+      - name: Validate five seed clusters, seat exposures, intervals and HTML
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('/tmp/mahtrain-m311.json').read_text(encoding='utf8'))
+          s=d['seed_analysis']
+          assert d['games']==25 and d['independent_shuffle_seeds']==5
+          assert s['distinct_seed_count']==5 and len(s['per_seed_differences'])==5
+          assert d['interval_status']=='exploratory_only' and d['intervals']
+          assert s['leave_one_seed_out'] is not None
+          assert all(d['levels'][x]['exposures']==20 for x in d['opponents'])
+          assert all(m['physical_count']==108 for m in d['matches'])
+          assert all(sum(c.values())==5 for compare in s['direction_counts'].values() for c in compare.values())
+          html=Path('/tmp/mahtrain-m311-report.html').read_text(encoding='utf8')
+          assert '<svg role="img"' in html and '<script' not in html
+          assert Path('/tmp/mahtrain-m311-contrasts.csv').is_file()
+          PY
+      - name: Archive five-seed HTML and structured reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-ablation-multiseed-py311
+          path: |
+            /tmp/mahtrain-m311.json
+            /tmp/mahtrain-m311-policy.csv
+            /tmp/mahtrain-m311-contrasts.csv
+            /tmp/mahtrain-m311-report.html
+          if-no-files-found: warn

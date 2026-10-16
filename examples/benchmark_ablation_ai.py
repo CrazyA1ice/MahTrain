@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/"src"))
 from mahtrain_core.ai_ablation_benchmark import ablation_benchmark  # noqa: E402
+from mahtrain_core.ai_ablation_report import render_ablation_html  # noqa: E402
 
 NAMES = {
     "baseline": "独立牌形基线",
@@ -21,17 +22,21 @@ NAMES = {
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="M3.10：五策略、每洗牌种子五局四座次消融实验（非正式胜率）")
+        description="M3.11：五策略、多种子敏感性分析与离线报告（非正式胜率）")
     parser.add_argument("--seed-start", type=int, default=11)
     parser.add_argument("--seeds", type=int, default=1)
     parser.add_argument("--json-out", type=Path)
     parser.add_argument("--csv-out", type=Path)
+    parser.add_argument("--contrast-csv-out", type=Path,
+                        help="按独立种子输出每个策略差值（单位：百分点）")
+    parser.add_argument("--html-out", type=Path,
+                        help="单文件离线图表，无脚本、无暗手或未来牌墙")
     args = parser.parse_args()
     try:
         report = ablation_benchmark(args.seed_start, args.seeds)
     except (ValueError, RuntimeError) as exc:
         parser.error(str(exc))
-    print("MahTrain M3.10：有效进张、弱风险规则受控消融")
+    print("MahTrain M3.11：多种子受控消融与稳健性")
     print("独立种子：", report["independent_shuffle_seeds"],
           "；轮换完整牌局：", report["games"])
     print("策略             参与    胡牌事件    放铳    最低向听率    局部最优率")
@@ -45,6 +50,17 @@ def main() -> None:
     for key, value in report["paired_differences"].items():
         print(key, value)
     print("区间状态：", report["interval_status"])
+    analysis = report["seed_analysis"]
+    print("独立种子：", analysis["distinct_seed_count"],
+          "；统计单位：", analysis["unit"])
+    for key, counts in analysis["direction_counts"].items():
+        c = counts["win_event_fraction"]
+        print("跨种子胡牌事件差值方向：", key,
+              f"正{c['positive']} / 负{c['negative']} / "
+              f"相同{c['tied']} / 未定义{c['undefined']}")
+    print("留一种子敏感性：",
+          "已计算（仅描述性）" if analysis["leave_one_seed_out"] is not None
+          else "不足5独立种子，不计算")
     if args.csv_out:
         args.csv_out.parent.mkdir(parents=True, exist_ok=True)
         columns = ["seed", "policy", "exposures", "wins", "deal_ins",
@@ -59,6 +75,29 @@ def main() -> None:
                         **seed["levels"][level],
                     })
         print("逐种子 CSV：", args.csv_out)
+    if args.contrast_csv_out:
+        args.contrast_csv_out.parent.mkdir(parents=True, exist_ok=True)
+        metrics = ("win_event_fraction", "min_shanten_fraction",
+                   "local_optimal_fraction")
+        columns = ["seed", "contrast", *(m+"_delta_pp" for m in metrics)]
+        with args.contrast_csv_out.open(
+                "w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.DictWriter(fh, fieldnames=columns)
+            writer.writeheader()
+            for group in analysis["per_seed_differences"]:
+                for contrast, values in group["differences"].items():
+                    writer.writerow({
+                        "seed": group["seed"], "contrast": contrast,
+                        **{metric+"_delta_pp": (
+                            round(100*values[metric], 2)
+                            if values[metric] is not None else "")
+                            for metric in metrics},
+                    })
+        print("逐种子策略差值 CSV：", args.contrast_csv_out)
+    if args.html_out:
+        args.html_out.parent.mkdir(parents=True, exist_ok=True)
+        args.html_out.write_text(render_ablation_html(report), encoding="utf-8")
+        print("离线可视化 HTML：", args.html_out)
     if args.json_out:
         args.json_out.parent.mkdir(parents=True, exist_ok=True)
         args.json_out.write_text(
