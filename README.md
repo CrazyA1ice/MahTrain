@@ -24,6 +24,14 @@
 
 `src/mahtrain_core/rules.py`：判胡、七对/金钩钓等部分番型、定缺、听牌集合、天听历史校验及计番。\n\n`src/mahtrain_core/efficiency.py`：13有效张向听数、有效进张（剩余牌种/枚数）、下一摸改善/胡牌概率、14有效张候选切牌与并列「局部最优切」排序。全部为纯 Python 标准库代码。**暂未实现**连续多摸动态概率、完整四人对战、计分账本、AI和前端页面。
 
+本地运行切牌分析示例：
+
+```bash
+python examples/analyze_hand.py
+```
+
+示例打印各合法切牌的切后向听数、有效进张、下一摸概率及并列「局部最优切」。已在 GitHub Actions 的 Python 3.11 / 3.13 环境通过单元测试，测试记录：[Sichuan Rules Kernel Tests](https://github.com/CrazyA1ice/MahTrain/actions/runs/38838059744)。
+
 本地运行固定牌例测试：
 
 ```bash
