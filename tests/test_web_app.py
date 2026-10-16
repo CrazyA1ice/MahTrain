@@ -419,6 +419,50 @@ class WebUI(unittest.TestCase):
         self.assertIn("采用推荐".encode(),code)
         self.assertIn(b"MahTrainQuizHistory",code)
 
+    def test_error_diagnosis_and_verified_focus_api(self):
+        # No client-provided seed or arbitrary correct-answer claimed.
+        for mode,focus in (
+            ("pure_suit_waits","missing_wait"),
+            ("pure_suit_waits","extra_wait"),
+            ("pure_suit_discard","missed_win"),
+            ("pure_suit_discard","false_win"),
+        ):
+            with self.subTest(mode=mode,focus=focus):
+                data=self.post({"action":"quiz_new","mode":mode,
+                    "difficulty":"basic","focus":focus})
+                question=data["question"]
+                self.assertEqual(question["focus"],focus)
+                self.assertNotIn("seed",question)
+                self.assertNotIn("best_actions",question)
+                self.assertNotIn("correct_tiles",question)
+                choice=([] if question["answer_type"]=="tile_set"
+                        else question["choices"][0])
+                graded=self.post({"action":"quiz_answer",
+                    "quiz_token":data["quiz_token"],"selection":choice})
+                self.assertIn("error_types",graded["result"])
+                self.assertIn("weaknesses",graded["progress"])
+                self.assertIn("counts",graded["progress"]["weaknesses"])
+        with self.assertRaises(HTTPError) as err:
+            self.post({"action":"quiz_new","mode":"pure_suit_waits",
+                "difficulty":"basic","focus":"missed_win"})
+        self.assertEqual(err.exception.code,400)
+
+    def test_auto_focus_strategy_and_frontend_weakness_controls(self):
+        data=self.post({"action":"quiz_new","mode":"pure_suit_waits",
+            "difficulty":"basic","focus":"auto"})
+        q=data["question"]
+        self.assertEqual(q["training_strategy"],"adaptive_weakness")
+        self.assertFalse(q["focus_applied"] if "focus" not in q
+                         else not q["focus_applied"])
+        self.assertNotIn("seed",q)
+        page,_=self.get("/")
+        code,_=self.get("/quiz_history.js")
+        main,_=self.get("/quiz.js")
+        self.assertIn(b'id="quiz-weaknesses"',page)
+        self.assertIn("开启薄弱项强化".encode(),code)
+        self.assertIn(b'activeStrategy',main)
+        self.assertIn(b'error_labels',main)
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
