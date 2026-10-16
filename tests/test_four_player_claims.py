@@ -268,9 +268,11 @@ class FourPlayerClaimsTests(unittest.TestCase):
         deck=Counter({t:4 for t in TILES})
         for t in ready:deck[t]-=1
         deck["m9"]-=4
+        # Start with a legal 14-tile dealer and move three concealed
+        # cards to wall after installing the peng meld.
         source=["m9"]
         for t in TILES:
-            while deck[t] and len(source)<11:
+            while deck[t] and len(source)<14:
                 source.append(t);deck[t]-=1
         others={r:ready}
         for s in range(4):
@@ -284,6 +286,8 @@ class FourPlayerClaimsTests(unittest.TestCase):
         # stager accounted all four m9 as remaining wall: replace with real
         # owned peng (three) and retain dealer's fourth one concealed.
         g._melds[d]=[{"type":"peng","tile":"m9"}]
+        g._wall.extend(g._hands[d][-3:])
+        del g._hands[d][-3:]
         for _ in range(3):g._wall.remove("m9")
         g._assert_physical_tiles()
         self.assertEqual(g._effective(d),14)
