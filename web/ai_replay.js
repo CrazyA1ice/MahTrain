@@ -324,7 +324,7 @@
           row.local_optimal_fraction??""].join(","));
       }
     }
-    const blob=new Blob(["\\uFEFF"+csv.join("\\r\\n")+"\\r\\n"],{
+    const blob=new Blob([String.fromCharCode(0xFEFF)+csv.join(String.fromCharCode(13,10))+String.fromCharCode(13,10)],{
       type:"text/csv;charset=utf-8"});
     const url=URL.createObjectURL(blob);
     const a=document.createElement("a");
