@@ -28,7 +28,7 @@ def discard(round_no,chosen,eff,prob,shanten,best=("m1",),
         "analysis":{
             "status":"choose_discard",
             "candidates":[
-                {"discard":best[0],"shanten":shanten-shanten_loss,
+                {"discard":best[0],"shanten":shanten-(shanten_loss or 0),
                  "effective_tile_count":eff+ukeire_loss,
                  "next_draw_probability":prob+.01}
             ],
@@ -79,7 +79,7 @@ class ReviewTests(unittest.TestCase):
         self.assertIsNone(got["rounds"][1]["shanten"])
         self.assertIsNone(got["rounds"][1]["next_draw_probability"])
         self.assertEqual(got["rounds"][1]["best_actions"],["win"])
-        self.assertIsNone(got["progress"]["shanten_change"])
+        self.assertEqual(got["progress"]["shanten_change"],0)
 
     def test_ignored_win_is_counted_without_breaking_trend(self):
         h=[discard(1,"m1",4,.04,1),discard(2,"m9",7,.07,0,best=("win",),selected_good=False,
@@ -104,8 +104,8 @@ class ReviewTests(unittest.TestCase):
         self.assertEqual(first["shanten"],feedback["selected_candidate"]["shanten"])
         self.assertEqual(first["effective_tile_count"],
                          feedback["selected_candidate"]["effective_tile_count"])
-        self.assertNotIn("wall",str(report))
-        self.assertNotIn("future_wall",str(report))
+        self.assertNotIn("wall",report)
+        self.assertNotIn("future_wall",report)
         self.assertFalse(report["finished"])
 
 
