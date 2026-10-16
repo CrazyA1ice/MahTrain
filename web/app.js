@@ -306,3 +306,4 @@ $("#sound-toggle").addEventListener("click",()=>{
 window.MahTrainUI = {getToken:()=>token, tileElement, tileName};
 window.MahTrainHistory?.init();
 window.MahTrainQuiz?.init();
+window.MahTrainQuizHistory?.init();
