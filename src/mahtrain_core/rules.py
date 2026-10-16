@@ -109,6 +109,40 @@ def is_legal_win(
     )
 
 
+
+def diagnose_win(
+    concealed: Sequence[str],
+    melds: Sequence[Mapping[str, str]] = (),
+    missing_suit: str = "p",
+) -> dict[str, Any]:
+    """Public rule explanation without claiming a not-yet-discarded win.
+
+    Recognizes standard meld+pair and concealed seven-pairs structures,
+    separately from the mandatory declared-missing-suit constraint. For an
+    incomplete 13-effective-tile hand, no win is offered.
+    """
+    counts = _validate(concealed, melds, missing_suit)
+    missing_count = sum(
+        value for tile, value in counts.items() if tile[0] == missing_suit
+    )
+    structural = (
+        _standard_win(concealed, len(melds))
+        or _seven_pairs(concealed, len(melds))
+    )
+    legal = structural and missing_count == 0
+    if missing_count:
+        reason = "missing_suit_not_cleared"
+    elif structural:
+        reason = "legal_win"
+    else:
+        reason = "incomplete_hand"
+    return {
+        "legal_win": legal,
+        "structural_win": structural,
+        "missing_suit_tile_count": missing_count,
+        "reason_code": reason,
+    }
+
 def winning_tiles(
     concealed: Sequence[str],
     melds: Sequence[Mapping[str, str]] = (),
