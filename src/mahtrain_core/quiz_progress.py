@@ -12,6 +12,7 @@ from typing import Any
 
 from .training import MODES, RULE_VERSION
 from .training_levels import DIFFICULTIES
+from .error_focus import ERROR_LABELS, FOCUS_BY_MODE, diagnose_quiz
 
 MIN_RECOMMENDATION_SAMPLES = 5
 RECENT_WINDOW = 10
@@ -116,6 +117,12 @@ class QuizProgressMixin:
                 FROM quiz_attempts
                 WHERE mode=? ORDER BY created_at DESC,answer_id DESC LIMIT ?
             """, (mode,limit)).fetchall()
+            # All difficulties of this mode, last 30 FIRST attempts only.
+            errors = db.execute("""
+                SELECT result_json FROM quiz_attempts
+                WHERE mode=? AND correct=0
+                ORDER BY created_at DESC,answer_id DESC LIMIT 30
+            """, (mode,)).fetchall()
         level_totals = {
             level:{"total":0,"correct":0,"accuracy":None}
             for level in DIFFICULTIES
@@ -148,7 +155,30 @@ class QuizProgressMixin:
             reason=f"近{completed}题正确率{accuracy:.0%}，不高于40%，建议返回上一档巩固。"
         else:
             reason=f"近{completed}题正确率{accuracy:.0%}，当前建议保持此难度。"
+        counts = {label:0 for label in FOCUS_BY_MODE[mode]}
+        other = 0
+        for err_row in errors:
+            graded=json.loads(err_row["result_json"])
+            causes=graded.get("error_types")
+            if causes is None:
+                causes=diagnose_quiz(mode,graded)  # pre-v0.10 archive
+            for cause in set(causes):
+                if cause in counts:
+                    counts[cause]+=1
+                else:
+                    other+=1
+        order=sorted(counts, key=lambda k:(-counts[k],
+              FOCUS_BY_MODE[mode].index(k)))
+        weakness={
+            "sample_wrong":len(errors),
+            "window":30,
+            "counts":counts,
+            "labels":{key:ERROR_LABELS[key] for key in counts},
+            "other_error_count":other,
+            "top_focus":order[0] if order and counts[order[0]] else None,
+        }
         return {
+            "weaknesses":weakness,
             "mode":mode,"difficulty":difficulty,
             "level_totals":level_totals,
             "recent":{"attempts":completed,"correct":correct,"accuracy":accuracy,
