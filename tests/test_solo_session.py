@@ -30,7 +30,7 @@ class HandSortingTests(unittest.TestCase):
         groups = grouped_hand(unsorted)
         self.assertEqual([g["suit"] for g in groups], ["m", "s", "p"])
         self.assertEqual([g["tiles"] for g in groups], [
-            ["m9", "m3", "m3"], ["s9", "s2"], ["p8", "p1"]
+            ["m3", "m3", "m9"], ["s2", "s9"], ["p1", "p8"]
         ])
 
     def test_single_suit_and_bad_tiles(self):
