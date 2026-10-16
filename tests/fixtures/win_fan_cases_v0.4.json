@@ -1,6 +1,6 @@
 {
   "schema_version": "0.4",
-  "description": "固定实牌结构 + 单独标记的事件条件；事件资格布尔量必须在完整状态机中核验，不能凭结算手牌独立认证。",
+  "description": "固定实牌结构 + 单独标记的事件条件；事件资格布尔量必须在完整状态机中核验，不能凭结算手牌独立认证。 v0.4: 天听碰牌立即取消，杠本身不取消（需维持听口）。",
   "tile_encoding": "m=万 s=条 p=筒; 1-9",
   "cases": [
     {
@@ -831,6 +831,147 @@
       "missing_suit": "s",
       "is_dealer": true,
       "checkpoints": [],
+      "expect": false
+    },
+    {
+      "id": "P27_tian_ting_peng_cancels_even_with_same_wait",
+      "kind": "tian_ting",
+      "starting_13": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "is_dealer": false,
+      "checkpoints": [
+        {
+          "concealed": [
+            "m4",
+            "m4",
+            "m4",
+            "p1",
+            "p1",
+            "p1",
+            "p4",
+            "p4",
+            "p4",
+            "m9"
+          ],
+          "melds": [
+            {
+              "type": "peng",
+              "tile": "m1"
+            }
+          ],
+          "action": "peng"
+        }
+      ],
+      "expect": false
+    },
+    {
+      "id": "P28_tian_ting_bu_gang_after_peng_cannot_restore",
+      "kind": "tian_ting",
+      "starting_13": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "is_dealer": false,
+      "checkpoints": [
+        {
+          "concealed": [
+            "m4",
+            "m4",
+            "m4",
+            "p1",
+            "p1",
+            "p1",
+            "p4",
+            "p4",
+            "p4",
+            "m9"
+          ],
+          "melds": [
+            {
+              "type": "bu_gang",
+              "tile": "m1"
+            }
+          ],
+          "action": "bu_gang"
+        }
+      ],
+      "expect": false
+    },
+    {
+      "id": "P29_tian_ting_peng_in_historical_actions_cancels",
+      "kind": "tian_ting",
+      "starting_13": [
+        "m1",
+        "m1",
+        "m1",
+        "m4",
+        "m4",
+        "m4",
+        "p1",
+        "p1",
+        "p1",
+        "p4",
+        "p4",
+        "p4",
+        "m9"
+      ],
+      "missing_suit": "s",
+      "is_dealer": false,
+      "checkpoints": [
+        {
+          "concealed": [
+            "m9"
+          ],
+          "melds": [
+            {
+              "type": "an_gang",
+              "tile": "m1"
+            },
+            {
+              "type": "an_gang",
+              "tile": "m4"
+            },
+            {
+              "type": "an_gang",
+              "tile": "p1"
+            },
+            {
+              "type": "an_gang",
+              "tile": "p4"
+            }
+          ],
+          "actions_since_previous": [
+            "peng",
+            "an_gang"
+          ]
+        }
+      ],
       "expect": false
     }
   ]
