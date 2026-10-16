@@ -144,7 +144,7 @@ def explain_public_action(action: dict[str, Any],
         missing=suits[seat] if suits is not None else None
         if missing and action["tile"][0]==missing:
             code="discard_missing"
-            explanation="本次切掉已公开的定缺花色。三档策略目前都优先处理定缺牌；无法据此证明这一切是全局最优。"
+            explanation="本次切掉已公开的定缺花色。四种对照策略都优先处理定缺牌；这一行为不能单独证明切牌为全局最优。"
         elif level=="baseline":
             code="baseline_shape_policy"
             explanation="独立牌形基线按自己的同牌及邻牌数量选择孤立牌；不使用向听数、有效进张评估器或对手暗牌。"
