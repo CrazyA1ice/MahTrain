@@ -3,6 +3,8 @@
 from .rules import is_legal_win, score_win, tian_ting_qualifies, winning_tiles
 from .efficiency import analyze_discards, effective_draws, shanten_13
 from .training import MODES, generate_question, grade_answer
+from .presentation import sort_hand, grouped_hand, format_hand
+from .session import SoloTrainingSession
 
 __all__ = [
     "is_legal_win",
@@ -15,4 +17,8 @@ __all__ = [
     "MODES",
     "generate_question",
     "grade_answer",
+    "sort_hand",
+    "grouped_hand",
+    "format_hand",
+    "SoloTrainingSession",
 ]
