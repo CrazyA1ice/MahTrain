@@ -211,9 +211,13 @@
         score.append(el("p","review-intro","尚未发生合法胡牌，因此四家胡牌余额均为0。"));
       }
       if(state.pending_kong_payments?.length){
+        const unsettled=state.pending_kong_payments.filter(
+          x=>x.status==="unpriced").length;
+        const voided=state.pending_kong_payments.filter(
+          x=>x.status==="voided").length;
         score.append(el("p","match-unpriced",
-          "杠钱待定："+state.pending_kong_payments.length+
-          "笔（底分与杠作废撤销规则尚需确认，暂未计入余额）。"));
+          "杠钱尚未入账："+unsettled+"笔待定，"+
+          voided+"笔杠上炮作废（底分和撤销细则待确认，未产生虚构退款）。"));
       }
       score.append(el("p","review-footnote",
         "此处展示已确认的胡牌付款，不是现金账户；流局查花猪、大叫尚未实现。"));
