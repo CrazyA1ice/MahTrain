@@ -157,7 +157,7 @@ class WebUI(unittest.TestCase):
             self.assertEqual(counts[suit],sum(t[0]==suit for t in cards))
         absent=[s for s in ("m","s","p") if counts[s]==0]
         self.assertEqual(preview["absent_suits"],absent)
-        self.assertEqual(preview["tianque"],bool(absent))
+        self.assertEqual(preview["tianque"],len(absent)==1)
         self.assertNotIn("wall",preview)
         self.assertNotIn("correct_answer",preview)
 
