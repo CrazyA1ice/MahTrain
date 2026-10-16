@@ -12,7 +12,7 @@ from statistics import mean
 from time import perf_counter_ns
 from typing import Any
 
-from .ai import AI_LEVELS, MahjongAgent, visible_tiles
+from .ai import AI_LEVELS, ABLATION_LEVELS, MahjongAgent, visible_tiles
 from .ai_baseline import ShapeBaselineAgent
 from .efficiency import analyze_discards
 from .four_player import FourPlayerOpening
@@ -154,6 +154,12 @@ def explain_public_action(action: dict[str, Any],
         elif level=="advanced":
             code="advanced_policy"
             explanation="进阶档的切牌策略优先降低切后向听数；此处只说明算法规则，不公布本家隐藏向听数。"
+        elif level=="challenge_no_ukeire":
+            code="ablation_without_ukeire"
+            explanation="消融实验：保留向听与公开副露弱风险规则，但不使用公开有效进张排序。"
+        elif level=="challenge_no_risk":
+            code="ablation_without_risk"
+            explanation="消融实验：保留向听和公开有效进张排序，不使用副露花色压力平局项。"
         else:
             code="challenge_policy"
             explanation="挑战档优先向听、再考虑公开信息有效进张；完全并列才参考公开副露的弱风险信号。此处不声称风险已准确预测。"
@@ -255,7 +261,7 @@ def simulate_match(seed: int, rotation: int = 0,
         assignment=seat_assignment(rotation)
     else:
         if (type(lineup) is not list or len(lineup)!=4 or
-            any(type(level) is not str or level not in (*AI_LEVELS,"baseline")
+            any(type(level) is not str or level not in (*AI_LEVELS,*ABLATION_LEVELS,"baseline")
                 for level in lineup) or len(set(lineup))!=4):
             raise ValueError("independent lineup needs 4 distinct AI policies")
         assignment=list(lineup)
