@@ -6,6 +6,8 @@ import tempfile
 import sys
 import threading
 import unittest
+from unittest.mock import patch
+from time import sleep
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError
@@ -818,6 +820,106 @@ class WebUI(unittest.TestCase):
         with self.assertRaises(HTTPError):
             self.post({"action":"match_discard",
                        "match_token":created["match_token"],"seat":2,"tile":"m1"})
+
+    def test_m37_async_replay_http_summary_and_public_frames(self):
+        frame={
+            "action":{"phase":"dealer_discard","seat":0,
+                      "level":"basic","action":"discard","tile":"m1"},
+            "board":{
+                "phase":"claim_window","turn":0,"dealer":0,
+                "wall_count":54,"hand_counts":[13,13,13,13],
+                "missing_suits":["p","s","p","m"],
+                "won":[False]*4,"melds":[[],[],[],[]],
+                "discards":[{"seat":0,"tile":"m1","index":1}],
+                "winners":[],
+            },
+        }
+        example={
+            "seed":11,"rotation":0,"dealer":0,
+            "assignment":["basic","advanced","challenge","basic"],
+            "terminal_phase":"wall_exhausted","actions":1,
+            "winners":[],"wall_remaining":0,
+            "partial_win_balances":[0]*4,
+            "trace":[{"action":"discard","legal_options":["hu"],
+                      "opponent_hand":["m9"]*13}],
+            "public_replay":[frame],
+            "public_events":[{"type":"draw","tile":"m9"}],
+        }
+        result={
+            "games":3,"terminal_phase_counts":{"finished":0,
+                                               "wall_exhausted":3},
+            "levels":{level:{
+                "seat_exposures":4,"win_events":0,"deal_in_events":0,
+                "discard_min_shanten_fraction":1,
+                "discard_local_optimal_fraction":1,
+                "mean_shanten_regret":0,
+            } for level in ("basic","advanced","challenge")},
+            "limitations":["non-final settlement"],
+            "matches":[{**example,"rotation":n} for n in range(3)],
+        }
+        def cheap_tournament(start,count,*,on_match=None):
+            self.assertEqual(start,11)
+            self.assertEqual(count,1)
+            if on_match:on_match(1,3)
+            return result
+        with patch.object(web_server,"tournament",side_effect=cheap_tournament):
+            opened=self.post({"action":"ai_replay_start",
+                              "seed_start":11,"seeds":1})
+            token=opened["replay_token"]
+            self.assertGreater(len(token),20)
+            self.assertEqual(opened["replay"]["total_games"],3)
+            latest=None
+            for _ in range(40):
+                latest=self.post({"action":"ai_replay_status",
+                                  "replay_token":token})["replay"]
+                if latest["status"]=="done":
+                    break
+                sleep(.01)
+            self.assertEqual(latest["status"],"done")
+        self.assertEqual(latest["overview"]["games"],3)
+        self.assertEqual(len(latest["overview"]["matches"]),3)
+        self.assertNotIn("trace",str(latest))
+        response=self.post({"action":"ai_replay_match",
+                            "replay_token":token,"match_index":0})
+        public=response["match"]
+        self.assertEqual(public["privacy"],
+                         "public_board_and_public_action_only")
+        self.assertEqual(public["steps"],[frame])
+        self.assertNotIn("trace",public)
+        self.assertNotIn("public_events",public)
+        self.assertNotIn("legal_options",str(public))
+        self.assertNotIn("opponent_hand",str(public))
+        self.assertNotIn("future_wall",str(public))
+        self.assertNotIn('"m9"',str(public))
+        for bad in (-1,3,"0",True,None):
+            with self.subTest(index=bad),self.assertRaises(HTTPError):
+                self.post({"action":"ai_replay_match",
+                           "replay_token":token,"match_index":bad})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"ai_replay_match",
+                       "replay_token":"forged","match_index":0})
+        html,_=self.get("/")
+        js,mime=self.get("/ai_replay.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b'id="ai-replay-panel"',html)
+        self.assertIn(b'src="/ai_replay.js"',html)
+        self.assertIn(b"ai_replay_status",js)
+        self.assertIn(b"ai_replay_match",js)
+        self.assertIn(b".ai-replay-board",css)
+        self.assertIn("javascript",mime)
+
+    def test_m37_replay_parameters_and_capacity(self):
+        for bad in (
+            {"seed_start":-1},{"seed_start":True},
+            {"seed_start":2**32},{"seed_start":"11"},
+            {"seeds":0},{"seeds":3},{"seeds":True},
+            {"seed_start":2**32-1,"seeds":2},
+        ):
+            with self.subTest(payload=bad),self.assertRaises(HTTPError):
+                self.post({"action":"ai_replay_start",**bad})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"ai_replay_status",
+                       "replay_token":"unknown"})
 
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
