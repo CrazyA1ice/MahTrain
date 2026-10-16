@@ -36,6 +36,7 @@ _HISTORY = HistoryStore(Path(os.environ.get("MAHTRAIN_HISTORY_DB",
 _SESSIONS: dict[str, SoloTrainingSession] = {}
 _QUIZZES: dict[str, dict] = {}
 _TABLE_DEMOS: dict[str, FourPlayerOpening] = {}
+_MATCH_SESSIONS: dict[str, FourPlayerOpening] = {}
 _LOCK = threading.RLock()
 _MAX_SESSIONS = 32
 _STATIC = {
@@ -48,6 +49,7 @@ _STATIC = {
     "/quiz.js": ROOT / "web" / "quiz.js",
     "/quiz_history.js": ROOT / "web" / "quiz_history.js",
     "/four_player.js": ROOT / "web" / "four_player.js",
+    "/match.js": ROOT / "web" / "match.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
@@ -106,8 +108,125 @@ def _demo_auto_until_human(game: FourPlayerOpening) -> None:
     raise RuntimeError("demo autoplay failed to reach human turn")
 
 
+def _match_script_until_human(game: FourPlayerOpening) -> None:
+    """Three transparently scripted seats. Human is seat 0 only.
+
+    Script responds with legal HU > gang > peng. It never reads hidden data
+    to decide the human's response; only own private state is inspected.
+    The human's optional HU/peng/ming_gang/rob response is never skipped.
+    """
+    for _ in range(512):
+        phase=game.phase
+        if phase in ("exchange_select", "missing_select",
+                     "finished", "wall_exhausted"):
+            return
+        if phase in ("claim_window", "rob_kong_window"):
+            for seat in range(4):
+                if game._won[seat]:
+                    continue
+                if phase=="claim_window":
+                    if game._pending_discard["seat"]==seat:
+                        continue
+                    if seat in game._responses:
+                        continue
+                    available=game.claim_options(seat)
+                else:
+                    if game._pending_kong["seat"]==seat:
+                        continue
+                    if seat in game._responses:
+                        continue
+                    available=game.rob_options(seat)
+                if seat==0 and len(available)>1:
+                    return  # show human an actual yes/no response prompt
+                if seat==0:
+                    pick="pass"
+                else:
+                    pick=next((x for x in ("hu","ming_gang","peng")
+                               if x in available),"pass")
+                if phase=="claim_window":
+                    game.respond_discard(seat,pick)
+                else:
+                    game.respond_rob_kong(seat,pick)
+                if game.phase!=phase:
+                    break
+            else:
+                # Window still open (e.g. no eligible human) cannot spin.
+                if game.phase==phase:
+                    raise RuntimeError("scripted responses did not settle")
+            continue
+        if phase=="await_draw":
+            game.draw(game.turn)
+            continue
+        if phase in ("await_discard","dealer_discard"):
+            if game.turn==0:
+                return
+            seat=game.turn
+            if game.private_view(seat)["can_self_draw_win"]:
+                game.declare_self_win(seat)
+                continue
+            kongs=game.kong_options(seat)
+            if kongs:
+                choice=kongs[0]
+                game.declare_kong(seat,choice["type"],choice["tile"])
+                continue
+            hand=game.private_view(seat)["hand"]
+            missing=game.missing_suits[seat]
+            tile=next((t for t in hand if t.startswith(missing)),hand[0])
+            game.discard(seat,tile)
+            continue
+        raise RuntimeError("unexpected M3.1 match phase: "+str(phase))
+    raise RuntimeError("M3.1 script exceeded 512 transitions")
+
+
 def _process(action: str, payload: dict) -> dict:
     with _LOCK:
+        if action == "match_new":
+            seed=payload.get("seed",42)
+            if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
+                raise ValueError("M3.1 四人试验局种子须为0至2^32-1")
+            game=FourPlayerOpening(seed)
+            token=secrets.token_urlsafe(24)
+            if len(_MATCH_SESSIONS)>=32:
+                _MATCH_SESSIONS.pop(next(iter(_MATCH_SESSIONS)))
+            _MATCH_SESSIONS[token]=game
+            return {"match_token":token,"match":game.private_view(0)}
+        if action in ("match_exchange","match_missing","match_discard",
+                      "match_claim","match_kong","match_rob","match_win"):
+            token=payload.get("match_token")
+            game=(_MATCH_SESSIONS.get(token) if type(token) is str else None)
+            if game is None:
+                raise ValueError("试验对局不存在，请重新开局")
+            if action=="match_exchange":
+                game.select_exchange(0,payload.get("tiles"))
+                for s in (1,2,3):
+                    game.select_exchange(s,_demo_exchange_choice(
+                        game.private_view(s)["hand"]))
+            elif action=="match_missing":
+                game.select_missing(0,payload.get("suit"))
+                for s in (1,2,3):
+                    cards=game.private_view(s)["hand"]
+                    suit=min(("m","s","p"),key=lambda x:(
+                        sum(t.startswith(x) for t in cards),
+                        ("m","s","p").index(x)
+                    ))
+                    game.select_missing(s,suit)
+                _match_script_until_human(game)
+            elif action=="match_discard":
+                game.discard(0,payload.get("tile"))
+                _match_script_until_human(game)
+            elif action=="match_claim":
+                game.respond_discard(0,payload.get("choice"))
+                _match_script_until_human(game)
+            elif action=="match_rob":
+                game.respond_rob_kong(0,payload.get("choice"))
+                _match_script_until_human(game)
+            elif action=="match_kong":
+                game.declare_kong(0,payload.get("kind"),payload.get("tile"))
+                _match_script_until_human(game)
+            elif action=="match_win":
+                game.declare_self_win(0)
+                _match_script_until_human(game)
+            return {"match_token":token,"match":game.private_view(0)}
         if action == "table_new":
             seed = payload.get("seed", 42)
             if type(seed) is not int or not 0 <= seed <= 2**32-1:
