@@ -69,3 +69,67 @@
 .tile.missing-tile {border:1px solid #d2ddcf;outline:2px solid #efc56a}
 .tile.selectable:hover {border:1px solid #d2ddcf}
 .tile.mini .tile-atlas-face,.kong-four .tile-atlas-face {width:94%;height:94%}
+
+
+/* Round review beneath the training table. */
+.report-panel{margin-top:22px;padding:26px 28px}
+.report-panel .panel-title{margin-bottom:20px}
+.report-panel .panel-title h3{font-size:21px;letter-spacing:-.3px}
+.review-stat{background:#edf5ef;padding:16px 18px;border:1px solid #dbe9df;
+             border-radius:11px;min-width:0}
+.review-stat-label{font-size:12px;color:#678575;display:block;line-height:1.5}
+.review-stat strong{color:#285443;font-size:24px;margin-top:6px;display:block}
+.review-trend{margin:22px 0 12px;border:1px solid #e1e9e0;border-radius:14px;
+              padding:18px 20px;background:#fbfdfa}
+.review-trend h4,.review-chart h4,.review-table-title h4{
+  margin:0 0 11px;font-size:17px;color:#234536}
+.review-intro{font-size:13px;color:#506e5c;line-height:1.8;margin:6px 0}
+.review-attention{background:#fff2dd;border-radius:7px;padding:9px 11px;
+                  color:#926331;font-size:13px;margin:9px 0 0}
+.review-chart{padding:16px 20px;background:#f6faf6;border-radius:14px;
+              border:1px solid #e1e9e0;margin:12px 0 23px}
+.review-bars{min-height:145px;display:flex;align-items:flex-end;justify-content:space-around;
+             gap:9px;border-bottom:1px solid #c9d8cc;padding:8px 8px 0;overflow-x:auto}
+.review-bar-item{min-width:31px;flex:1 0 31px;display:flex;align-items:center;flex-direction:column;gap:4px;
+                 justify-content:flex-end}
+.review-bar-number{font-size:11px;color:#486d58;white-space:nowrap}
+.review-bar{width:min(32px,75%);border-radius:5px 5px 0 0;background:#40946c;min-height:3px}
+.review-bar.suboptimal{background:#c59f6b}
+.review-bar.winning{height:20px;width:20px;border-radius:50%;background:#efb755}
+.review-bar-caption{font-size:11px;color:#728676;padding-bottom:6px}
+.review-footnote{font-size:12px;color:#829387;line-height:1.7;margin:10px 0 0}
+.review-table-title{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.review-small{font-size:12px;color:#829387}
+.review-round-list{display:grid;gap:9px;margin-top:13px}
+.review-round{border:1px solid #dfe9df;border-radius:11px;overflow:hidden;background:#fff}
+.review-round[open]{box-shadow:0 4px 17px #1438220d}
+.review-round summary{cursor:pointer;display:grid;grid-template-columns:42px minmax(165px,1.2fr) 68px minmax(170px,.85fr) 16px;
+                      align-items:center;gap:11px;padding:13px 15px;list-style:none}
+.review-round summary::-webkit-details-marker{display:none}
+.review-round summary:hover{background:#f5f9f6}
+.review-index{color:#8da396;font-size:13px;font-weight:800}
+.review-choice{font-size:14px;font-weight:650;color:#2f523e}
+.review-result{display:inline-block;padding:5px 7px;border-radius:7px;font-size:12px;
+               width:max-content;white-space:nowrap}
+.review-ok{background:#e8f5e9;color:#2f7650}
+.review-warn{background:#fff0e1;color:#a06b34}
+.review-mini-stat{color:#647d6e;font-size:12px}
+.review-chevron{color:#88a18d;font-size:18px}
+.review-round[open] .review-chevron{transform:rotate(180deg)}
+.review-round-body{background:#fbfdfb;border-top:1px solid #e0e8e1;padding:11px 18px}
+.review-detail-line{font-size:13px;color:#536b59;line-height:1.7;margin:7px 0;overflow-wrap:anywhere}
+.review-detail-line b{color:#31553f}
+.review-finished{font-size:13px;color:#2e674a;background:#e8f4e9;
+                  padding:12px 15px;border-radius:10px}
+@media(max-width:790px){
+  .review-round summary{grid-template-columns:36px minmax(130px,1fr) 58px 16px;
+                        gap:5px;padding:11px 10px}
+  .review-mini-stat{grid-column:2/4;grid-row:2;margin-top:2px}
+  .review-chevron{grid-column:4;grid-row:1}
+  .report-panel{padding:18px 13px}
+  .review-chart{padding:12px}
+}
+@media(max-width:420px){
+  .review-stat strong{font-size:19px}
+  .review-bar-item{min-width:25px;flex-basis:25px}
+}
