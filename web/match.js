@@ -159,6 +159,66 @@
     }
     if(!state.discards.length)discards.append(el("p","review-intro","暂无弃牌。"));
     publicInfo.append(discards);
+    const tian=state.tian_ting;
+    if(tian){
+      const status=tian.reason==="not_initialized"?"尚未定缺，等待判定":
+        tian.eligible?"天听资格有效":
+        ({dealer_not_eligible:"庄家不具备天听资格",
+          not_initially_listening:"起手未听牌",
+          peng_called:"碰牌后天听资格取消",
+          waiting_set_changed:"摸切后听口变化，天听资格取消"}[tian.reason]||"天听资格无效");
+      publicInfo.append(el("p","match-tian-status",
+        "本人天听："+status+" · 稳定听口检查"+
+        (tian.checkpoints||0)+"次"+
+        (tian.initial_waits.length?" · 原始听口："+tian.initial_waits.map(tileName).join("、"):"")));
+    }
+    const ledger=state.win_ledger;
+    if(ledger){
+      const score=el("section","match-ledger");
+      score.append(el("h4","","四家胡牌结算账本（不含杠钱）"));
+      score.append(el("p","review-footnote",
+        "房间系数"+ledger.room_coefficient+
+        " · 最终番数封顶"+ledger.fan_cap+
+        " · 零和校验："+(ledger.zero_sum?"通过":"异常")));
+      const balances=el("div","match-balances");
+      ledger.balances.forEach((v,i)=>{
+        const item=el("div","match-balance");
+        item.append(el("span","",i+"号"+(state.won[i]?" · 已胡":"")));
+        item.append(el("strong",v>=0?"match-positive":"match-negative",
+          (v>=0?"+":"")+v));
+        balances.append(item);
+      });
+      score.append(balances);
+      if(ledger.wins.length){
+        const details=el("div","match-score-rows");
+        for(const win of ledger.wins){
+          const row=el("div","match-score-entry");
+          const kind={self_draw:"自摸",ron:"点炮胡",rob_kong:"抢杠胡"}[win.kind]||win.kind;
+          row.append(el("strong","",win.winner+"号"+kind+
+            " · "+win.main_pattern));
+          row.append(el("span","",
+            "原始"+win.raw_fan+"番 → 封顶"+
+            win.effective_fan+"番 / ×"+win.multiplier));
+          row.append(el("span","",
+            "付款："+win.payers.map(x=>x+"号").join("、")+
+            "各付"+win.amount_per_payer+"；赢家共得"+win.total_received));
+          row.append(el("small","","附加番："+(
+            Object.entries(win.bonuses).map(([key,v])=>key+" +"+v).join("、")||"无")));
+          details.append(row);
+        }
+        score.append(details);
+      }else{
+        score.append(el("p","review-intro","尚未发生合法胡牌，因此四家胡牌余额均为0。"));
+      }
+      if(state.pending_kong_payments?.length){
+        score.append(el("p","match-unpriced",
+          "杠钱待定："+state.pending_kong_payments.length+
+          "笔（底分与杠作废撤销规则尚需确认，暂未计入余额）。"));
+      }
+      score.append(el("p","review-footnote",
+        "此处展示已确认的胡牌付款，不是现金账户；流局查花猪、大叫尚未实现。"));
+      publicInfo.append(score);
+    }
     const winners=state.winners;
     if(winners.length)publicInfo.append(el("p","match-win-note",
       "已胡牌："+winners.map(x=>x.seat+"号"+(
@@ -183,7 +243,10 @@
   function init(){
     $("match-new").addEventListener("click",()=>{
       const seed=Number($("match-seed").value);
-      action("match_new",{seed});
+      action("match_new",{seed,
+        room_coefficient:Number($("match-coefficient").value),
+        fan_cap:Number($("match-fan-cap").value),
+      });
     });
   }
   window.MahTrainMatch={init};
