@@ -5,6 +5,7 @@ import copy
 import json
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
@@ -91,6 +92,36 @@ class AIBenchmarkTests(unittest.TestCase):
             sample_views(0,1001)
         with self.assertRaises(ValueError):
             sample_views(True,2)
+
+    def test_challenge_uses_open_meld_pressure_only_as_equal_ukeire_tiebreak(self):
+        hand=["m1","m1","m2","m2","m3","m3","m4",
+              "s1","s1","s2","s2","s3","s3","s4"]
+        view={
+            "seat":0,"hand":hand,"own_melds":[],"phase":"dealer_discard",
+            "missing_suits":["p","p","p","p"],
+            "won":[False,False,False,False],
+            "melds":[[],[{"type":"peng","tile":"m5"},
+                          {"type":"peng","tile":"m7"}],[],[]],
+            "discards":[],
+        }
+        candidates=[
+            {"discard":tile,"effective_tile_count":(8 if tile in ("m1","s1") else 1)}
+            for tile in sorted(set(hand))
+        ]
+        decision=MahjongAgent("challenge",seed=1,seat=0)
+        with patch("mahtrain_core.ai._cut_shanten",return_value=1),patch(
+            "mahtrain_core.ai.analyze_discards",
+            return_value={"candidates":candidates}):
+            self.assertEqual(decision.discard(view),"s1")
+            # A larger effective-draw count must override weak risk proxy.
+            prioritized=[
+                {**row,"effective_tile_count":(
+                    9 if row["discard"]=="m1" else row["effective_tile_count"]
+                )} for row in candidates
+            ]
+            with patch("mahtrain_core.ai.analyze_discards",
+                       return_value={"candidates":prioritized}):
+                self.assertEqual(decision.discard(view),"m1")
 
     def test_public_open_meld_suit_pressure_only_active_and_visible(self):
         game=FourPlayerOpening(42)
