@@ -9,6 +9,7 @@
   <script src="/sound.js" defer></script>
   <script src="/review.js" defer></script>
   <script src="/retry.js" defer></script>
+  <script src="/history.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -66,6 +67,14 @@
         </div>
         <section id="report-panel" class="panel report-panel" hidden><div class="panel-title"><h3 id="report-title">逐轮切牌复盘与牌效总结</h3><small id="report-subtitle">已完成的回合实时记录</small></div><div id="report" aria-live="polite"></div></section>
         <section id="retry-panel" class="panel retry-panel" hidden><div class="panel-title"><h3>错题重练 · 再做一次</h3><small>仅复习本局答错的回合，不影响原牌墙和成绩</small></div><div id="retry-board" aria-live="polite"></div></section>
+      </section>
+      <section id="history-panel" class="panel history-panel">
+        <div class="panel-title"><h3>本地历史训练与错题本</h3><button id="history-refresh" type="button" class="review-control">刷新历史</button></div>
+        <p class="review-footnote">已完成训练自动保存到本机 SQLite，重启服务后仍能查看旧成绩、逐轮复盘和错题重练。本地原型不含账号或云同步。</p>
+        <div id="history-summary" class="history-summary"></div>
+        <p id="history-progress" class="review-intro"></p>
+        <div id="history-list" class="history-list" aria-live="polite"></div>
+        <div id="history-detail" class="history-detail" aria-live="polite"></div>
       </section>
       <div id="prompt-layer" class="prompt-layer" hidden><div class="prompt-card" role="dialog" aria-modal="true" aria-labelledby="prompt-title"><div class="eyebrow" id="prompt-kicker">ACTION AVAILABLE</div><h2 id="prompt-title">操作提示</h2><p id="prompt-message"></p><div id="prompt-tiles" class="prompt-tiles"></div><div id="prompt-buttons" class="prompt-buttons"></div></div></div>
     </main>
