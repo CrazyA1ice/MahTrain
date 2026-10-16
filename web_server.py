@@ -21,6 +21,8 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from mahtrain_core import SoloTrainingSession  # noqa: E402
+from mahtrain_core.training import MODES, generate_question, grade_answer
+from mahtrain_core.training_levels import DIFFICULTIES
 from mahtrain_core.history import HistoryStore  # noqa: E402
 
 # Override MAHTRAIN_HISTORY_DB to relocate the local, single-user SQLite file.
@@ -29,6 +31,7 @@ _HISTORY = HistoryStore(Path(os.environ.get("MAHTRAIN_HISTORY_DB",
                                      str(ROOT / "data" / "mahtrain_history.sqlite3"))))
 
 _SESSIONS: dict[str, SoloTrainingSession] = {}
+_QUIZZES: dict[str, dict] = {}
 _LOCK = threading.RLock()
 _MAX_SESSIONS = 32
 _STATIC = {
@@ -38,6 +41,7 @@ _STATIC = {
     "/review.js": ROOT / "web" / "review.js",
     "/retry.js": ROOT / "web" / "retry.js",
     "/history.js": ROOT / "web" / "history.js",
+    "/quiz.js": ROOT / "web" / "quiz.js",
     "/tile_art.js": ROOT / "web" / "tile_art.js",
     "/sound.js": ROOT / "web" / "sound.js",
 }
@@ -94,6 +98,34 @@ def _process(action: str, payload: dict) -> dict:
                 _SESSIONS.pop(next(iter(_SESSIONS)))
             _SESSIONS[token] = game
             return {"token": token, "state": game.public_state()}
+        if action == "quiz_new":
+            mode, difficulty = payload.get("mode"), payload.get("difficulty")
+            if mode not in MODES or difficulty not in DIFFICULTIES:
+                raise ValueError("invalid quiz mode or difficulty")
+            seed = secrets.randbits(32)
+            question = generate_question(mode, seed, difficulty=difficulty)
+            quiz_token = secrets.token_urlsafe(24)
+            if len(_QUIZZES) >= 128:
+                _QUIZZES.pop(next(iter(_QUIZZES)))
+            _QUIZZES[quiz_token] = {
+                "seed": seed, "mode": mode, "difficulty": difficulty,
+                "question_id": question["question_id"], "submitted": False,
+            }
+            return {"quiz_token": quiz_token, "question": question}
+        if action == "quiz_answer":
+            quiz_token = payload.get("quiz_token")
+            record = _QUIZZES.get(quiz_token) if type(quiz_token) is str else None
+            if record is None:
+                raise ValueError("quiz expired or missing")
+            if record["submitted"]:
+                raise ValueError("this question has already been answered")
+            result = grade_answer(
+                record["mode"], record["seed"], payload.get("selection"),
+                difficulty=record["difficulty"],
+                question_id=record["question_id"],
+            )
+            record["submitted"] = True
+            return {"result": result}
         if action == "history_retry_question":
             return {"question": _HISTORY.retry_question(
                 payload.get("archive_id"), payload.get("round")
