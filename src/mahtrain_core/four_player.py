@@ -72,7 +72,7 @@ class FourPlayerOpening:
                     4 if meld["type"] in _KONG_TYPES else 3
                 ))
         physical.update(item["tile"] for item in self._discards
-                        if not item.get("claimed_by") and not item.get("robbed"))
+                        if "claimed_by" not in item)
         if physical != Counter({tile: 4 for tile in TILES}):
             raise RuntimeError("physical 108-tile conservation violated")
 
@@ -341,14 +341,11 @@ class FourPlayerOpening:
         winners.sort(key=lambda s:(s-source)%4)
         if winners:
             self._hands[source].remove(tile)
+            # The fourth tile was never added to the peng. Record it as a
+            # physical discard claimed for hu (potential multiple winners).
             self._discards.append({"seat":source,"tile":tile,
                                    "index":len(self._discards)+1,
-                                   "robbed":True})
-            # Robbed physical fourth tile MUST remain conserved:
-            # the discard record is a real tile although 'robbed' denotes
-            # the supplementary kong was cancelled.
-            self._discards[-1].pop("robbed")
-            self._discards[-1]["won_by"]=list(winners)
+                                   "rob_kong":True,"won_by":list(winners)})
             for seat in winners:
                 self._won[seat]=True
                 self._winners.append({"seat":seat,"source":source,
@@ -414,7 +411,11 @@ class FourPlayerOpening:
             "missing_suits":(None if self.phase in
                 ("exchange_select","missing_select") else list(self.missing_suits)),
             "hand_counts":[len(h) for h in self._hands],
-            "melds":[[dict(m) for m in groups] for groups in self._melds],
+            "melds":[[
+                {"type":m["type"], "tile":(
+                    None if m["type"]=="an_gang" else m["tile"]
+                )} for m in groups
+            ] for groups in self._melds],
             "won":list(self._won),
             "winners":[dict(w) for w in self._winners],
             "wall_count":len(self._wall),
@@ -439,6 +440,7 @@ class FourPlayerOpening:
         view.update({
             "seat":seat,
             "hand":sort_hand(self._hands[seat]),
+            "own_melds":[dict(m) for m in self._melds[seat]],
             "sealed_exchange":list(self._exchange_offers[seat])
                 if seat in self._exchange_offers else None,
             "sealed_missing":self._missing_offers.get(seat),
@@ -460,6 +462,6 @@ class FourPlayerOpening:
         self._assert_physical_tiles()
         return {"wall":len(self._wall),
                 "hands":[len(h) for h in self._hands],
-                "discards":sum(not d.get("claimed_by") for d in self._discards),
+                "discards":sum("claimed_by" not in d for d in self._discards),
                 "melds":sum(len(m) for m in self._melds),
                 "total":108}
