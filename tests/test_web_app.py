@@ -467,6 +467,43 @@ class WebUI(unittest.TestCase):
         self.assertIn(b'activeStrategy',main)
         self.assertIn(b'error_labels',main)
 
+    def test_solo_error_report_and_deep_link_appear_without_future_answer(self):
+        created=self.post({"action":"new","seed":17,"rounds":2,
+                           "missing_suit":"p"})
+        token=created["token"]
+        state=self.post({"action":"draw","token":token})
+        self.assertIsNone(state["report"],
+                          "the pending answer must not be included")
+        while state["state"]["phase"] in ("offer_win","offer_kong"):
+            mode=state["state"]["phase"]
+            state=self.post({"action":"win" if mode=="offer_win" else "kong",
+                             "token":token,**({"accept":False}
+                             if mode=="offer_win" else {"tile":None})})
+        selection=state["state"]["choices"][0]
+        result=self.post({"action":"discard","token":token,"tile":selection})
+        report=result["report"]
+        self.assertIn("error_summary",report)
+        self.assertEqual(len(report["round_review"]),1)
+        item=report["round_review"][0]
+        self.assertIn("error_types",item)
+        self.assertIn("error_labels",item)
+        self.assertEqual(bool(item["error_types"]),not item["correct"])
+        self.assertEqual(report["error_summary"]["error_rounds"],
+                         int(not item["correct"]))
+        self.assertNotIn("wall",report)
+        self.assertNotIn("future_wall",report)
+        page,_=self.get("/")
+        ui,mime=self.get("/review.js")
+        archive_ui,_=self.get("/history.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b"report-panel",page)
+        self.assertIn(b"showErrors",ui)
+        self.assertIn(b"startFocus",ui)
+        self.assertIn(b"error_labels",ui)
+        self.assertIn(b"error_summary",archive_ui)
+        self.assertIn(b".solo-error-summary",css)
+        self.assertIn("javascript",mime)
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
