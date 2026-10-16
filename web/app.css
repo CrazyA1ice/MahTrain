@@ -515,3 +515,130 @@
 .ai-baseline-summary .ai-replay-score:first-child h5{color:#7c6129}
 @media(max-width:1040px){.ai-baseline-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.ai-baseline-summary{grid-template-columns:1fr}}
+
+
+/* M3.14: four-sided human vs AI table. All styles are scoped to match mode.
+   Felt, wood border, card backs and wall are CSS-only; no asset upload needed. */
+.match-board-scroll{
+  overflow-x:auto;overscroll-behavior-inline:contain;width:100%;
+  margin:12px 0 18px;padding:4px 0 10px;
+}
+.match-board-scroll:focus-visible{outline:3px solid #ccab60;outline-offset:3px}
+.match-board{
+  display:grid;
+  grid-template-areas:". top ." "left center right" "bottom bottom bottom";
+  grid-template-columns:140px minmax(0,1fr) 140px;
+  grid-template-rows:minmax(115px,auto) minmax(340px,auto) minmax(150px,auto);
+  min-width:940px;gap:10px;
+  padding:16px 16px 20px;
+  background:radial-gradient(ellipse at 50% 42%,#307861 0%,#21604e 65%,#144635 100%);
+  border:12px ridge #775236;border-radius:22px;color:#f5f9ed;
+  box-shadow:inset 0 0 0 3px #b68a53,0 14px 26px #14291c30;
+}
+.match-board .match-seat{
+  min-width:0;min-height:0;border:2px solid transparent;
+  border-radius:13px;padding:10px;background:#071d161c;
+  display:flex;flex-direction:column;gap:6px;
+}
+.match-seat--top{grid-area:top;align-items:center}
+.match-seat--left{grid-area:left;align-items:center;justify-content:center}
+.match-seat--right{grid-area:right;align-items:center;justify-content:center}
+.match-seat--bottom{grid-area:bottom;align-items:center}
+.match-board .match-seat.is-active{
+  border-color:#f5ca75;background:#e9bd6a21;
+  box-shadow:0 0 0 2px #f3d38d38,inset 0 0 16px #e6c16515;
+}
+.match-board .match-seat.is-won{opacity:.75;background:#0c252294}
+.match-seat-name,.match-self-header{font-size:13px;font-weight:750;color:#f4e2ad}
+.match-seat-status{color:#c9e6d2;font-size:11px;text-align:center}
+.match-seat-backs{display:flex;flex-wrap:wrap;justify-content:center;gap:3px}
+.match-seat--left .match-seat-backs,.match-seat--right .match-seat-backs{
+  display:grid;grid-template-columns:repeat(3,19px);
+  justify-content:center;align-content:center;max-height:250px;
+}
+.match-tile-back{
+  display:inline-block;flex:0 0 21px;width:21px;height:30px;
+  background:repeating-linear-gradient(45deg,#529d83 0 3px,#31765d 3px 6px);
+  border:2px solid #d3e0d4;border-radius:4px;
+  box-shadow:inset 0 0 0 2px #27624b,0 2px 0 #0e372b;
+}
+.match-seat--left .match-tile-back,.match-seat--right .match-tile-back{
+  width:19px;height:27px;min-width:0;
+}
+.match-seat-melds{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;max-width:100%}
+.match-seat-meld{display:grid;gap:3px;justify-items:center;
+  padding:5px;border:1px solid #d8ebd044;border-radius:7px;background:#123b3194}
+.match-seat-meld small{font-size:10px;color:#f2ddb3}
+.match-meld-tiles{display:flex;gap:2px;align-items:center}
+.match-board .match-seat-meld .tile{width:27px;height:37px}
+.match-board .match-seat-meld .match-tile-back{width:23px;height:35px;flex-basis:23px}
+.match-empty-melds{font-size:11px;color:#adcfbd}
+.match-seat--bottom{padding:12px 14px}
+.match-seat--bottom #match-hand{
+  display:flex;flex-wrap:nowrap;justify-content:center;align-items:flex-start;
+  gap:4px;min-height:85px;max-width:100%;overflow-x:auto;overflow-y:hidden;
+  margin:5px 0 9px;padding:6px 4px 13px;
+}
+.match-seat--bottom #match-hand .tile{width:55px;height:74px;flex-shrink:0}
+.match-seat--bottom #match-hand .tile.selectable{cursor:pointer}
+.match-board-center{
+  grid-area:center;display:grid;min-width:0;min-height:340px;
+  grid-template-areas:". rt ." "rl wall rr" ". rb .";
+  grid-template-columns:minmax(110px,1fr) minmax(120px,1.15fr) minmax(110px,1fr);
+  grid-template-rows:minmax(94px,auto) minmax(134px,auto) minmax(94px,auto);
+  gap:8px;
+}
+.match-river{min-width:0;border:1px solid #e1f4e029;
+  border-radius:9px;background:#0f463844;padding:6px;
+  display:flex;flex-direction:column;gap:4px;align-items:center}
+.match-river--top{grid-area:rt}
+.match-river--left{grid-area:rl}
+.match-river--right{grid-area:rr}
+.match-river--bottom{grid-area:rb}
+.match-river-title{font-size:11px;color:#eedaa3;white-space:nowrap}
+.match-river-tiles{display:grid;grid-template-columns:repeat(6,max-content);
+  justify-content:center;align-content:start;gap:3px;
+  max-width:100%;max-height:202px;overflow:auto}
+.match-river--left .match-river-tiles,
+.match-river--right .match-river-tiles{grid-template-columns:repeat(3,max-content)}
+.match-river-cell{display:flex;align-items:center;justify-content:center;
+  position:relative;min-width:28px;min-height:39px;border-radius:4px}
+.match-board .match-river-cell .tile{width:28px;height:39px;border-radius:4px}
+.match-river-cell.is-claimed{border:1px dashed #d9dcc280;
+  background:#122f2580;color:#f5e1ad}
+.match-river-claimed{font-size:9px;line-height:1.2;text-align:center}
+.match-river-cell.is-latest{outline:2px solid #f9c865;outline-offset:1px}
+.match-river-cell.is-winning-discard{box-shadow:0 0 0 3px #ff8d6a}
+.match-river-empty{font-size:11px;color:#a8c7ba;grid-column:1/-1}
+.match-wall{
+  grid-area:wall;position:relative;isolation:isolate;
+  display:flex;flex-direction:column;justify-content:center;align-items:center;
+  background:#153f33;border:2px solid #b18b52;border-radius:12px;
+  padding:12px 7px;color:#dfeee4;text-align:center;overflow:hidden;
+}
+.match-wall>span,.match-wall>small,.match-wall>strong{
+  z-index:1;position:relative;text-shadow:0 2px 5px #071c18}
+.match-wall>span{font-size:12px;color:#efdbb4}
+.match-wall>strong{font-size:37px;color:#ffe1a0;font-variant-numeric:tabular-nums}
+.match-wall>small{font-size:9px;color:#b4c8b7;line-height:1.4}
+.match-wall.is-exhausted>strong{color:#f5aa99}
+.match-wall-decor{
+  position:absolute;inset:7px;display:flex;flex-direction:column;
+  justify-content:space-between;opacity:.30;pointer-events:none;
+}
+.match-wall-row{
+  height:12px;display:block;border-radius:3px;
+  background:repeating-linear-gradient(90deg,
+    #e2efdc 0 11px,#36745a 11px 13px);
+  box-shadow:0 2px 0 #0b2f25;
+}
+@media(max-width:980px){
+  .match-board{min-width:940px}
+  .match-board-scroll{padding-bottom:12px}
+  .match-board-scroll::after{content:"窄屏可左右滑动查看完整牌桌";
+    display:block;font-size:11px;color:#637e6b;padding:7px 2px}
+}
+@media(max-width:650px){
+  .match-board{padding:10px;gap:7px}
+  .match-seat--bottom #match-hand .tile{width:53px;height:71px}
+}
