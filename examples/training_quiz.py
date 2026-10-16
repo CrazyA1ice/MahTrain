@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mahtrain_core import MODES, generate_question, grade_answer, format_hand, sort_hand  # noqa: E402
+from mahtrain_core.training_levels import DIFFICULTIES, LEVEL_LABELS
 
 CHINESE = {"m": "万", "s": "条", "p": "筒"}
 TITLES = {
@@ -67,17 +68,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="MahTrain 简易命令行训练")
     parser.add_argument("--mode", choices=MODES, default="tenpai_discard")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--difficulty", choices=DIFFICULTIES, default="basic")
     parser.add_argument(
         "--print-only", action="store_true",
         help="只输出公开题目，适合 CI 演示；不泄露答案且不等待输入",
     )
     args = parser.parse_args(argv)
     try:
-        question = generate_question(args.mode, args.seed)
+        question = generate_question(args.mode, args.seed, difficulty=args.difficulty)
     except (ValueError, RuntimeError) as exc:
         parser.error(str(exc))
 
-    print("MahTrain：", TITLES[args.mode])
+    print("MahTrain：", TITLES[args.mode], " · ", LEVEL_LABELS[args.difficulty])
     print("题号：", question["question_id"])
     print("规则：", question["rule_version"])
     print("定缺：", CHINESE[question["missing_suit"]])
@@ -97,7 +99,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             selection = input("请选择切牌（例如 m9）或输入 win 胡牌：").strip()
         report = grade_answer(
-            args.mode, args.seed, selection, question_id=question["question_id"]
+            args.mode, args.seed, selection, question_id=question["question_id"],
+            difficulty=args.difficulty
         )
     except (EOFError, KeyboardInterrupt):
         print("\n已退出")
