@@ -115,6 +115,29 @@
       (summary.last_shanten??"—")+
       "；有效进张 "+(summary.first_effective_tile_count??"—")+" → "+
       (summary.last_effective_tile_count??"—")+" 张。"));
+    if(report.error_summary){
+      const errors=report.error_summary;
+      const block=el("section","solo-error-summary");
+      block.append(el("h4","","历史错因分析"));
+      block.append(el("p","review-intro","非最优回合："+errors.error_rounds+
+        "，主要错因："+(errors.primary_label||"无")+
+        "。旧记录的错因可能在读取时重新归类，但不修改原评分。"));
+      const grid=el("div","solo-error-grid");
+      for(const key of ["missed_win","shanten_regression","ukeire_loss","other_error"]){
+        const entry=errors.counts[key];
+        if(!entry)continue;
+        const row=el("div","solo-error-item");
+        row.append(el("strong","",entry.label),
+          el("span","",entry.count+"轮"));
+        if(entry.count && errors.recommendations.some(x=>x.error_type===key)){
+          row.append(btn("练习这一弱项","review-control",
+            ()=>window.MahTrainReview.startFocus(key)));
+        }
+        grid.append(row);
+      }
+      block.append(grid);
+      board.append(block);
+    }
     const rows=el("div","history-rounds");
     for(const round of report.round_review||[]){
       const details=el("details","history-round");
@@ -127,6 +150,9 @@
       if(!round.is_win)textline(panel,"切后牌效：",
         "向听 "+round.shanten+"，进张 "+round.effective_tile_count+
         " 张，下摸模型概率 "+percent(round.next_draw_probability));
+      if(round.error_labels?.length){
+        textline(panel,"该轮错因：",round.error_labels.join("、"));
+      }
       textline(panel,"原因：",round.explanation);
       if(!round.correct){
         panel.append(btn("重新练这道题","review-control",()=>startRetry(round.round)));
