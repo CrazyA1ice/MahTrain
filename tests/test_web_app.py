@@ -661,6 +661,63 @@ class WebUI(unittest.TestCase):
             with self.subTest(bad=bad),self.assertRaises(HTTPError):
                 self.post({"action":"match_new","seed":bad})
 
+    def test_m32_hu_ledger_and_tian_ting_visible_only_for_own_seat(self):
+        started=self.post({"action":"match_new","seed":42,
+                           "room_coefficient":200,"fan_cap":3})
+        token=started["match_token"]
+        state=started["match"]
+        self.assertEqual(state["win_ledger"]["room_coefficient"],200)
+        self.assertEqual(state["win_ledger"]["fan_cap"],3)
+        self.assertEqual(state["win_ledger"]["balances"],[0,0,0,0])
+        self.assertTrue(state["win_ledger"]["zero_sum"])
+        self.assertNotIn("opponent_tian_ting",state)
+        self.assertEqual(state["tian_ting"]["reason"],"not_initialized")
+        hand=state["hand"]
+        selected=next([t for t in hand if t[0]==s][:3] for s in "msp"
+                      if sum(x[0]==s for x in hand)>=3)
+        changed=self.post({"action":"match_exchange",
+                           "match_token":token,"tiles":selected})["match"]
+        self.assertEqual(changed["tian_ting"]["reason"],"not_initialized")
+        live=self.post({"action":"match_missing","match_token":token,
+                        "suit":"p"})["match"]
+        self.assertNotEqual(live["tian_ting"]["reason"],"not_initialized")
+        self.assertIsInstance(live["tian_ting"]["initial_waits"],list)
+        self.assertIn("win_ledger",live)
+        self.assertIn("pending_kong_payments",live)
+        self.assertTrue(live["win_ledger"]["zero_sum"])
+        self.assertEqual(sum(live["win_ledger"]["balances"]),0)
+        self.assertNotIn("_wall",str(live))
+        self.assertNotIn("_hands",str(live))
+        # The client cannot submit arbitrary scores or see another seat's
+        # secret baseline via any server endpoint.
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_pay","match_token":token,
+                       "winner":0,"amount":999999})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_detail",
+                       "match_token":token,"seat":1})
+        page,_=self.get("/")
+        js,mime=self.get("/match.js")
+        self.assertIn(b'id="match-coefficient"',page)
+        self.assertIn(b'id="match-fan-cap"',page)
+        self.assertIn(b"match-balances",js)
+        self.assertIn(b"tian_ting",js)
+        self.assertIn(b"pending_kong_payments",js)
+        self.assertIn(b"raw_fan",js)
+        self.assertIn("javascript",mime)
+
+    def test_m32_rejects_invalid_room_parameters(self):
+        for settings in (
+            {"room_coefficient":0},
+            {"room_coefficient":True},
+            {"room_coefficient":-1},
+            {"fan_cap":-1},
+            {"fan_cap":13},
+            {"fan_cap":True},
+        ):
+            with self.subTest(settings=settings),self.assertRaises(HTTPError):
+                self.post({"action":"match_new","seed":42,**settings})
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
