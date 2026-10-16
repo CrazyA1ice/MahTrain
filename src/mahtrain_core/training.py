@@ -17,6 +17,7 @@ from typing import Any, Sequence
 from .efficiency import analyze_discards, shanten_13, effective_draws
 from .rules import SUITS, TILES, TILE_INDEX, is_legal_win, winning_tiles
 from .presentation import sort_hand, grouped_hand
+from .training_levels import DIFFICULTIES, LEVEL_LABELS, make_ready, make_one_shanten
 
 MODES = (
     "one_shanten", "tenpai_discard", "pure_suit_waits", "pure_suit_discard"
@@ -139,22 +140,73 @@ def _make_hand(mode: str, rng: random.Random, force_winning: bool = False) -> tu
     raise RuntimeError("failed to generate a verified problem within the search budget")
 
 
-def _question_id(mode: str, seed: int, hand: Sequence[str], missing: str) -> str:
-    payload = f"{RULE_VERSION}|{mode}|{seed}|{missing}|{','.join(hand)}"
+def _make_hand_level(
+    mode: str, rng: random.Random, difficulty: str, force_winning: bool
+) -> tuple[list[str], str, str]:
+    """Build and verify targeted higher-level pattern families."""
+    if difficulty == "basic":
+        hand, missing = _make_hand(mode, rng, force_winning)
+        return hand, missing, "基础刻子与简单搭子"
+    for _ in range(MAX_ATTEMPTS * 2):
+        if mode == "one_shanten":
+            base, missing, family = make_one_shanten(
+                rng, difficulty=difficulty
+            )
+            if shanten_13(base, missing_suit=missing) != 1:
+                continue
+        else:
+            pure = mode in ("pure_suit_waits", "pure_suit_discard")
+            base, missing, family = make_ready(
+                rng, pure=pure, difficulty=difficulty
+            )
+            if not winning_tiles(base, missing_suit=missing):
+                continue
+        if mode == "pure_suit_waits":
+            return base, missing, family
+        if mode == "pure_suit_discard" and force_winning:
+            winners = winning_tiles(base, missing_suit=missing)
+            if winners:
+                hand = [*base, rng.choice(winners)]
+                if is_legal_win(hand, missing_suit=missing):
+                    return hand, missing, family
+        allowed = (base[0][0],) if mode == "pure_suit_discard" else SUITS
+        target = 1 if mode == "one_shanten" else 0
+        for tile in _draw_candidates(rng, base, allowed):
+            hand = [*base, tile]
+            if is_legal_win(hand, missing_suit=missing):
+                continue
+            if _minimum_cut_shanten(hand, missing) == target:
+                return hand, missing, family
+    raise RuntimeError(
+        "unable to generate a verified question of this difficulty"
+    )
+
+
+def _question_id(
+    mode: str, seed: int, hand: Sequence[str], missing: str, difficulty: str
+) -> str:
+    payload = (
+        f"{RULE_VERSION}|{mode}|{difficulty}|{seed}|{missing}|{','.join(hand)}"
+    )
     return hashlib.sha256(payload.encode("ascii")).hexdigest()[:20]
 
 
-def generate_question(mode: str, seed: int) -> dict[str, Any]:
+def generate_question(
+    mode: str, seed: int, *, difficulty: str = "basic"
+) -> dict[str, Any]:
     """Public question without answer, correct cut, waits or efficiency ranking.
 
     The caller/server retains seed for grading and replay; it must not return
     the seed to the learner in a real online session.
     """
     _check_args(mode, seed)
-    hand, missing = _make_hand(
-        mode, random.Random(seed), force_winning=(mode == "pure_suit_discard" and seed % 5 == 0)
+    if difficulty not in DIFFICULTIES:
+        raise ValueError("unsupported training difficulty")
+    hand, missing, family = _make_hand_level(
+        mode, random.Random(seed), difficulty,
+        force_winning=(mode == "pure_suit_discard" and seed % 5 == 0),
     )
-    # Uniform 理牌 display: 万/条/筒 grouped, 9→1 within each suit.
+    # Uniform 理牌 display: 万/条/筒 grouped, 1→9 within each suit.
     # The hand and choices are display-only copies, not new tile draws.
     hand = sort_hand(hand)
     choices = (
@@ -165,7 +217,9 @@ def generate_question(mode: str, seed: int) -> dict[str, Any]:
     if mode == "pure_suit_discard":
         choices = [*choices, "win"]
     return {
-        "question_id": _question_id(mode, seed, hand, missing),
+        "question_id": _question_id(mode, seed, hand, missing, difficulty),
+        "difficulty": difficulty,
+        "difficulty_label": LEVEL_LABELS[difficulty],
         "mode": mode,
         "rule_version": RULE_VERSION,
         "concealed": hand,
@@ -175,6 +229,15 @@ def generate_question(mode: str, seed: int) -> dict[str, Any]:
         "answer_type": "tile_set" if mode == "pure_suit_waits" else "single_action",
         "reveals_answer": False,
     }
+
+
+def family_from_question(mode: str, seed: int, difficulty: str) -> str:
+    """Reveal only after grading; never include in public question."""
+    _, _, family = _make_hand_level(
+        mode, random.Random(seed), difficulty,
+        force_winning=(mode == "pure_suit_discard" and seed % 5 == 0),
+    )
+    return family
 
 
 def _validate_selection(question: dict[str, Any], selection: Any) -> Any:
@@ -194,14 +257,15 @@ def _validate_selection(question: dict[str, Any], selection: Any) -> Any:
 
 
 def grade_answer(
-    mode: str, seed: int, selection: Any, *, question_id: str | None = None
+    mode: str, seed: int, selection: Any, *,
+    question_id: str | None = None, difficulty: str = "basic"
 ) -> dict[str, Any]:
     """Replay the authoritative seed, then reveal full, justified feedback.
 
     Invalid input raises ValueError. A legal but suboptimal answer returns
     correct=False, and all genuinely tied optima count as correct.
     """
-    question = generate_question(mode, seed)
+    question = generate_question(mode, seed, difficulty=difficulty)
     if question_id is not None and question_id != question["question_id"]:
         raise ValueError("question_id does not match the authoritative seed")
     chosen = _validate_selection(question, selection)
@@ -215,6 +279,8 @@ def grade_answer(
         extras = [t for t in chosen if t not in correct_tiles]
         return {
             "question_id": question["question_id"],
+            "difficulty": difficulty,
+            "construction_family": family_from_question(mode, seed, difficulty),
             "correct": chosen == correct_tiles,
             "your_selection": chosen,
             "correct_tiles": correct_tiles,
@@ -248,6 +314,8 @@ def grade_answer(
         reason = "虽然没有退向听，但有其他切法保留更多有效进张枚数。"
     return {
         "question_id": question["question_id"],
+        "difficulty": difficulty,
+        "construction_family": family_from_question(mode, seed, difficulty),
         "correct": correct,
         "your_selection": chosen,
         "best_actions": best_actions,
