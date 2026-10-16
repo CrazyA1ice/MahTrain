@@ -68,6 +68,9 @@ async function request(action, extras={}) {
     if (result.state) {
       currentState = result.state;
       render(currentState, result.feedback, result.report);
+      if(currentState.phase === "finished" && (action==="discard" || action==="win")){
+        window.MahTrainHistory?.refresh();
+      }
       if (action === "draw") playSound("draw");
       else if (action === "discard") playSound("discard");
       else if (action === "win" && extras.accept === true) playSound("win");
@@ -301,3 +304,4 @@ $("#sound-toggle").addEventListener("click",()=>{
 
 // Controlled view helpers for the independent mistake-replay panel.
 window.MahTrainUI = {getToken:()=>token, tileElement, tileName};
+window.MahTrainHistory?.init();
