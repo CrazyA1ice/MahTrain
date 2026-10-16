@@ -67,6 +67,14 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"sound.js", html)
         self.assertIn(b"win-diagnosis", html)
         self.assertIn(b"sound-toggle", html)
+        self.assertIn(b"/review.js", html)
+        self.assertIn(b"report-title", html)
+        review_code, review_kind = self.get("/review.js")
+        self.assertIn("javascript", review_kind)
+        self.assertIn(b"MahTrainReview", review_code)
+        self.assertIn(b"review-round", review_code)
+        self.assertIn(b"review-trend", css)
+        self.assertIn(b"width:94%;height:94%", css)
         atlas, atlas_kind = self.get("/assets/tiles/640x420.jpeg")
         self.assertEqual(atlas_kind, "image/jpeg")
         self.assertTrue(atlas.startswith(b"\xff\xd8\xff"))
@@ -135,11 +143,26 @@ class WebUI(unittest.TestCase):
         graded = self.post({"action": "discard", "token": token, "tile": tile})
         self.assertIn("correct", graded["feedback"])
         self.assertEqual(graded["state"]["completed_rounds"], 1)
+        self.assertIsNotNone(graded["report"])
+        self.assertEqual(len(graded["report"]["round_review"]), 1)
+        self.assertFalse(graded["report"]["finished"])
+        self.assertIn("progress_summary", graded["report"])
+        self.assertEqual(
+            graded["report"]["round_review"][0]["choice"], tile)
+        self.assertEqual(
+            graded["report"]["round_review"][0]["effective_tile_count"],
+            graded["feedback"]["selected_candidate"]["effective_tile_count"])
         state_info, _ = self.get("/api/state?" + urlencode({"token": token}))
         saved = json.loads(state_info)
         self.assertEqual(saved["state"]["completed_rounds"], 1)
         self.assertNotIn("wall", saved["state"])
         self.assertNotIn("analysis", saved["state"])
+        self.assertEqual(len(saved["report"]["round_review"]), 1)
+        # Following draw is unsubmitted: only historical graded analysis appears.
+        next_draw = self.post({"action":"draw","token":token})
+        self.assertEqual(len(next_draw["report"]["round_review"]),1)
+        self.assertNotIn("analysis",next_draw["state"])
+        self.assertNotIn("wall",next_draw["state"])
 
     def test_must_select_missing_suit_after_preview(self):
         for value in (None, "", "invalid"):
