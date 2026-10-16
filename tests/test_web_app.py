@@ -306,6 +306,57 @@ class WebUI(unittest.TestCase):
         css,_=self.get("/app.css")
         self.assertIn(b".history-panel",css)
 
+    def test_quiz_modes_levels_and_trusted_grading(self):
+        for mode in ("one_shanten", "tenpai_discard",
+                     "pure_suit_waits", "pure_suit_discard"):
+            for difficulty in ("basic", "intermediate", "challenge"):
+                with self.subTest(mode=mode,difficulty=difficulty):
+                    data=self.post({"action":"quiz_new","mode":mode,
+                                    "difficulty":difficulty})
+                    question=data["question"]
+                    self.assertEqual(question["mode"],mode)
+                    self.assertEqual(question["difficulty"],difficulty)
+                    self.assertNotIn("seed",question)
+                    self.assertNotIn("best_actions",question)
+                    self.assertNotIn("correct_tiles",question)
+                    self.assertGreater(len(data["quiz_token"]),20)
+                    answer=([] if question["answer_type"]=="tile_set"
+                            else question["choices"][0])
+                    response=self.post({"action":"quiz_answer",
+                        "quiz_token":data["quiz_token"],"selection":answer})
+                    self.assertIn("correct",response["result"])
+                    with self.assertRaises(HTTPError) as err:
+                        self.post({"action":"quiz_answer",
+                            "quiz_token":data["quiz_token"],"selection":answer})
+                    self.assertEqual(err.exception.code,400)
+
+    def test_quiz_rejects_bad_levels_and_invalid_answer_without_consuming(self):
+        for difficulty in ("invalid", "", None):
+            with self.assertRaises(HTTPError) as err:
+                self.post({"action":"quiz_new","mode":"one_shanten",
+                           "difficulty":difficulty})
+            self.assertEqual(err.exception.code,400)
+        data=self.post({"action":"quiz_new","mode":"tenpai_discard",
+                        "difficulty":"intermediate"})
+        with self.assertRaises(HTTPError):
+            self.post({"action":"quiz_answer","quiz_token":data["quiz_token"],
+                       "selection":"p100"})
+        self.assertIn("correct",self.post({"action":"quiz_answer",
+            "quiz_token":data["quiz_token"],"selection":
+                data["question"]["choices"][0]})["result"])
+
+    def test_quiz_page_has_picture_tile_and_level_controls(self):
+        html,_=self.get("/")
+        js,kind=self.get("/quiz.js")
+        self.assertIn(b'id="quiz-mode"',html)
+        self.assertIn(b'id="quiz-level"',html)
+        self.assertIn(b'src="/quiz.js"',html)
+        self.assertIn("javascript",kind)
+        self.assertIn(b"tileElement",js)
+        self.assertIn(b"quiz_answer",js)
+        css,_=self.get("/app.css")
+        self.assertIn(b".quiz-center",css)
+
     def test_fake_token_cannot_grab_other_session(self):
         with self.assertRaises(HTTPError) as err:
             self.post({"action": "draw", "token": "fabricated"})
