@@ -13,6 +13,7 @@ from typing import Any
 
 from .efficiency import analyze_discards, effective_draws
 from .review import build_round_review
+from .retry import MistakeRetry
 from .presentation import grouped_hand, sort_hand
 from .rules import SUITS, TILES, _meld_tiles, is_legal_win, diagnose_win
 
@@ -44,6 +45,7 @@ class SoloTrainingSession:
         self._declined_kongs: set[str] = set()
         self._kong_this_turn = False
         self._finished_reason: str | None = None
+        self._mistake_retry = MistakeRetry(self)
         self._rounds = rounds
         self.missing_suit = (
             missing_suit if missing_suit is not None else
@@ -163,6 +165,8 @@ class SoloTrainingSession:
                 "round": len(self._history) + 1,
                 "drawn_tile": self._round_draw,
                 "hand_before": before,
+                "melds_before": [dict(m) for m in self._melds],
+                "visible_tiles_before": list(self._discards),
                 "choice": "win",
                 "correct": True,
                 "best_actions": ["win"],
@@ -260,6 +264,8 @@ class SoloTrainingSession:
             "round": len(self._history) + 1,
             "drawn_tile": self._round_draw,
             "hand_before": before,
+            "melds_before": [dict(m) for m in self._melds],
+            "visible_tiles_before": list(self._discards),
             "choice": action,
             "correct": correct,
             "best_actions": best,
@@ -286,6 +292,15 @@ class SoloTrainingSession:
         return {**feedback, "session_phase": self._phase,
                 "wall_remaining_count": len(self._wall),
                 "hand_after": sort_hand(self._hand)}
+
+    def retry_list(self) -> dict[str, Any]:
+        return self._mistake_retry.list()
+
+    def retry_question(self, round_number: int) -> dict[str, Any]:
+        return self._mistake_retry.question(round_number)
+
+    def retry_submit(self, round_number: int, action: str) -> dict[str, Any]:
+        return self._mistake_retry.grade(round_number, action)
 
     def report(self) -> dict[str, Any]:
         total = len(self._history)
