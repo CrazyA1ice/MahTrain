@@ -8,6 +8,7 @@ No simulated full-match win rates or unverified skill-ranking claims.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ def main() -> None:
     parser.add_argument("--seed-start",type=int,default=0)
     parser.add_argument("--seeds",type=int,default=12)
     parser.add_argument("--json-out",type=Path)
+    parser.add_argument("--csv-out",type=Path, help="逐牌面切牌评测 CSV")
     args=parser.parse_args()
     try:
         report=benchmark(seed_start=args.seed_start,seeds=args.seeds)
@@ -42,6 +44,20 @@ def main() -> None:
     print("说明：每档在完全相同手牌上独立作一次切牌决策；"
           "部分牌例是有实体牌守恒的无缺门对照场景。"
           "耗时随机器变化；这些数字不是实战胡牌率或胜率。")
+    if args.csv_out is not None:
+        args.csv_out.parent.mkdir(parents=True,exist_ok=True)
+        fields=["level","seed","scenario","chosen","chosen_shanten",
+                "minimum_shanten","chosen_effective_copies",
+                "best_effective_copies_at_minimum","best_shanten",
+                "best_ukeire","shanten_regret",
+                "ukeire_regret_if_best_shanten","decision_ms"]
+        with args.csv_out.open("w",newline="",encoding="utf-8-sig") as stream:
+            writer=csv.DictWriter(stream,fieldnames=fields)
+            writer.writeheader()
+            for level in ("basic","advanced","challenge"):
+                for record in report["levels"][level]["decisions_detail"]:
+                    writer.writerow({"level":level,**record})
+        print("CSV 逐牌面记录：",args.csv_out)
     if args.json_out is not None:
         args.json_out.parent.mkdir(parents=True,exist_ok=True)
         args.json_out.write_text(
