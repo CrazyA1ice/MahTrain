@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 
-from mahtrain_core.ai_tournament import seat_assignment, simulate_match, tournament
+from mahtrain_core.ai_tournament import (seat_assignment, simulate_match, tournament, explain_public_action)
 
 
 class FourAgentTrialTests(unittest.TestCase):
@@ -133,6 +133,40 @@ class FourAgentTrialTests(unittest.TestCase):
                         ))
             self.assertIsNone(
                 match["public_replay"][0]["board"]["missing_suits"])
+
+    def test_m38_public_explanations_do_not_depend_on_hidden_tiles(self):
+        sample=self.result["matches"][0]["public_replay"]
+        self.assertTrue(any(frame["action"]["action"]=="discard" for frame in sample))
+        for frame in sample:
+            rationale=frame["explanation"]
+            self.assertEqual(set(rationale),{"code","text","scope"})
+            self.assertEqual(rationale["scope"],"public_policy_only")
+            self.assertIsInstance(rationale["text"],str)
+            self.assertGreater(len(rationale["text"]),10)
+            for secret in ("opponent_hands","future_wall","legal_options",
+                           "shanten_after","effective_copies"):
+                self.assertNotIn(secret,rationale)
+            if frame["action"]["action"]=="response_submitted":
+                self.assertEqual(rationale["code"],"sealed_response")
+            if frame["action"]["action"]=="declare_missing":
+                self.assertIn(rationale["code"],
+                              ("sealed_missing","missing_revealed"))
+        board={"missing_suits":["p","s","p","m"],
+               "opponent_hands":[["m9"]*13]*3}
+        action={"action":"discard","seat":0,"level":"challenge","tile":"p8"}
+        self.assertEqual(
+            explain_public_action(action,board),
+            explain_public_action(
+                {**action,"private_ukeire":999},
+                {**board,"opponent_hands":[["p8"]*13]*3,
+                 "future_wall":["p8"]*70},
+            ),
+        )
+        self.assertEqual(
+            explain_public_action(action,board)["code"],"discard_missing")
+        self.assertEqual(
+            explain_public_action({"action":"response_submitted","seat":2},board)[
+                "code"],"sealed_response")
 
     def test_json_and_sanitized_summary(self):
         output=json.dumps(self.result,ensure_ascii=False)
