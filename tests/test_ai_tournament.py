@@ -91,8 +91,21 @@ class FourAgentTrialTests(unittest.TestCase):
             self.assertEqual(match["public_replay"][-1]["board"]["phase"],
                              match["terminal_phase"])
             for index,frame in enumerate(match["public_replay"]):
-                self.assertEqual(frame["action"]["action"],
-                                 match["trace"][index]["action"])
+                original=match["trace"][index]
+                if original["phase"] in ("claim_window","rob_kong_window"):
+                    if frame["board"]["phase"]==original["phase"]:
+                        self.assertEqual(frame["action"]["action"],
+                                         "response_submitted")
+                        self.assertNotIn("resolution",frame["action"])
+                    else:
+                        self.assertEqual(frame["action"]["action"],
+                                         "response_resolved")
+                        self.assertIn("resolution",frame["action"])
+                    self.assertNotIn(original["action"],
+                                     ("response_submitted","response_resolved"))
+                else:
+                    self.assertEqual(frame["action"]["action"],
+                                     original["action"])
                 self.assertNotIn("shanten_after",frame["action"])
                 self.assertNotIn("legal_options",frame["action"])
                 self.assertNotIn("effective_copies",frame["action"])
