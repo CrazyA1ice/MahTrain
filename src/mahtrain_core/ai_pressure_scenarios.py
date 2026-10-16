@@ -49,7 +49,9 @@ def pressure_scenario_view(name: str) -> dict[str, Any]:
                     {"type": "peng", "tile": "s2"}]
     view = {
         "seat": 0,
-        "phase": "dealer_discard",
+        # Mid-game draw/discard, not the dealer's first turn: opponents
+        # could only have completed the public pungs after earlier discards.
+        "phase": "await_discard",
         "hand": sorted(HAND, key=TILE_INDEX.__getitem__),
         "own_melds": [],
         # The exposed pungs are not of the opponent's declared missing suit.
