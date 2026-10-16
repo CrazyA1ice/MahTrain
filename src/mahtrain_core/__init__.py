@@ -1,5 +1,14 @@
-"""MahTrain Sichuan rules/牌效计算子模块（开发中）。"""
+"""MahTrain: 四川麻将训练与对战所共用的牌型/牌效算法（持续开发中）。"""
 
 from .rules import is_legal_win, score_win, tian_ting_qualifies, winning_tiles
+from .efficiency import analyze_discards, effective_draws, shanten_13
 
-__all__ = ["is_legal_win", "score_win", "tian_ting_qualifies", "winning_tiles"]
+__all__ = [
+    "is_legal_win",
+    "score_win",
+    "tian_ting_qualifies",
+    "winning_tiles",
+    "shanten_13",
+    "effective_draws",
+    "analyze_discards",
+]
