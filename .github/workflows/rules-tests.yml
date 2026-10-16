@@ -51,6 +51,11 @@ jobs:
           python examples/training_quiz.py --mode tenpai_discard --seed 42 --print-only
           python examples/training_quiz.py --mode pure_suit_waits --seed 42 --print-only
           python examples/training_quiz.py --mode pure_suit_discard --seed 0 --print-only
+      - name: Smoke-test higher difficulty question families
+        run: |
+          python examples/training_quiz.py --mode one_shanten --difficulty intermediate --seed 9 --print-only
+          python examples/training_quiz.py --mode tenpai_discard --difficulty challenge --seed 42 --print-only
+          python examples/training_quiz.py --mode pure_suit_waits --difficulty challenge --seed 12 --print-only
       - name: Smoke-test continuous solo training
         run: |
           python examples/solo_14_rounds.py --seed 17 --rounds 2 --auto
