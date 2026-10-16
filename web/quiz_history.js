@@ -65,6 +65,33 @@
           $("quiz-level").dispatchEvent(new Event("change",{bubbles:true}));
         }));
     }
+    const weaknesses=p.weaknesses;
+    const area=$("quiz-weaknesses");
+    area.replaceChildren();
+    area.append(el("h4","","错因分析与专项强化"));
+    area.append(el("p","review-footnote",
+      "统计该模式最近最多30道首次答错的题；同题可能同时漏选和误选听口。"));
+    const entries=Object.entries(weaknesses.counts).sort((a,b)=>b[1]-a[1]);
+    const grid=el("div","quiz-weakness-grid");
+    for(const [key,count] of entries){
+      const item=el("div","quiz-weakness-item");
+      item.append(el("strong","",weaknesses.labels[key]),
+        el("span","",count+"次"));
+      item.append(button("专项练习","review-control",()=>{
+        window.MahTrainQuiz.focus(key);
+      }));
+      grid.append(item);
+    }
+    area.append(grid);
+    if(weaknesses.top_focus){
+      const top=weaknesses.labels[weaknesses.top_focus];
+      area.append(el("p","review-intro","近期主要错因："+top));
+      area.append(button("开启薄弱项强化 · 按错因频次出题",
+        "primary",()=>window.MahTrainQuiz.focus("auto")));
+    }else{
+      area.append(el("p","review-intro",
+        "该模式尚无已记录的错误，可以先自由选择专项练习。"));
+    }
     const list=$("quiz-attempt-list");
     list.replaceChildren();
     if(!p.attempts.length){
