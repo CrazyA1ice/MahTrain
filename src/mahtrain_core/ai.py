@@ -19,6 +19,8 @@ from .efficiency import shanten_13, analyze_discards
 from .rules import TILE_INDEX, TILES, SUITS
 
 AI_LEVELS = ("basic", "advanced", "challenge")
+# Evaluation-only controlled variants; not advertised as player difficulty tiers.
+ABLATION_VARIANTS = ("challenge_no_ukeire", "challenge_no_pressure")
 LABELS = {"basic": "入门", "advanced": "进阶", "challenge": "挑战"}
 
 
@@ -222,6 +224,12 @@ class MahjongAgent:
         best = [t for t,s in scored if s == minimum]
         if self.level == "advanced" or len(best) == 1:
             return best[0]
+        if self.level == "challenge_no_ukeire":
+            # Controlled ablation: remove effective-copy ranking, leaving
+            # only the weak PUBLIC exposure tie-break among min-shanten cuts.
+            return min(best, key=lambda t: (
+                public_suit_pressure(t, view), TILE_INDEX[t],
+            ))
         # Challenge: prefer maximum public-information-based effective copies.
         # analyze_discards validates known physical counts and uses NO wall.
         ranked = analyze_discards(
@@ -233,7 +241,8 @@ class MahjongAgent:
         }
         return min(best,key=lambda t:(
             -candidates[t]["effective_tile_count"],
-            public_suit_pressure(t,view),
+            (0 if self.level == "challenge_no_pressure"
+             else public_suit_pressure(t,view)),
             TILE_INDEX[t],
         ))
 
@@ -242,4 +251,24 @@ class MahjongAgent:
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
             "challenge":"向听及公开有效进张优先；完全相同时以公开副露花色压力做弱风险判别",
+        }[self.level]
+
+
+class AblationMahjongAgent(MahjongAgent):
+    """M3.10 controlled variants: all non-discard behaviors match challenge.
+
+    Not a new public difficulty tier. Keeps identical seed/RNG and opening,
+    claim and kong policies so only the designated discard tie-break differs.
+    """
+
+    def __init__(self, variant: str, *, seed: int, seat: int) -> None:
+        if type(variant) is not str or variant not in ABLATION_VARIANTS:
+            raise ValueError("unknown AI ablation variant")
+        super().__init__("challenge", seed=seed, seat=seat)
+        self.level = variant
+
+    def policy_description(self) -> str:
+        return {
+            "challenge_no_ukeire": "向听优先；移除有效进张排序，向听并列时仅使用公开副露压力",
+            "challenge_no_pressure": "向听、公开有效进张优先；移除副露花色压力平局规则",
         }[self.level]
