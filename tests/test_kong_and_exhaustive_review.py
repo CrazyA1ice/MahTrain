@@ -159,7 +159,8 @@ class ExhaustiveReviewTests(unittest.TestCase):
 
     def test_exposed_missing_meld_suppresses_unconfirmed_preview(self):
         out=review_exhaustive_draw(
-            hands=[["m1"]*13,["m1"]*13,[],[]],
+            hands=[["m1"]*3+["m2"]*3+["s1"]*3+["s4"]*3+["s9"],
+                   ["m3"]*3+["m5"]*3+["s2"]*3+["s6"]*3+["s8"],[],[]],
             melds=[[{"type":"peng","tile":"p1"}],[],[],[]],
             missing_suits=["p","p","p","p"],
             won=[False,False,True,True],
