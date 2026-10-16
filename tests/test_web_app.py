@@ -695,6 +695,27 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"match_win",js)
         self.assertIn(b"match_kong",js)
 
+    def test_m315_match_readiness_and_private_draw_display(self):
+        page,_=self.get("/")
+        script,_=self.get("/match.js")
+        style,_=self.get("/app.css")
+        for node in (b'id="match-win-alert"',b'id="match-ready-hint"'):
+            self.assertIn(node,page)
+        for signal in (b"match-new-draw",b"ready_waits",
+                       b"ready_after_discards",b"discard_kind",
+                       b"from_draw",b"renderWinAlert",b"renderReadyHint"):
+            self.assertIn(signal,script)
+        for style_name in (b".match-new-draw",b".match-win-alert",
+                           b".match-ready-hint",b".match-discard-kind"):
+            self.assertIn(style_name,style)
+        created=self.post({"action":"match_new","seed":42})
+        state=created["match"]
+        self.assertIsNone(state["drawn_tile"])
+        self.assertEqual(state["ready_waits"],[])
+        self.assertEqual(state["ready_after_discards"],[])
+        self.assertNotIn("_drawn_tiles",str(state))
+        self.assertNotIn("_wall",str(state))
+
     def test_m32_hu_ledger_and_tian_ting_visible_only_for_own_seat(self):
         started=self.post({"action":"match_new","seed":42,
                            "room_coefficient":200,"fan_cap":3})
