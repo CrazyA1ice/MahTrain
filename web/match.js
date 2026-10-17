@@ -433,7 +433,8 @@
     $("match-round-report-note").textContent=
       "复盘依据真实公开事件与已入账胡牌账本；"+
       (moments.length>64?"关键动作较多，时间线仅列最后64条。":"")+
-      (wallEnd?" 牌山耗尽后的查花猪、查大叫仍属未入账预览。":"")+
+      (wallEnd?" 牌山耗尽后的查花猪、查大叫仍属未入账预览。":
+        " 流局查花猪、查大叫等赔付未入账，不属于本报告已入账积分。")+
       " 独立杠钱仅为可选试验积分，绝不计入胡牌余额。";
   }
   function renderTableSettlement(){
