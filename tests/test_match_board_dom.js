@@ -815,6 +815,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     x.className==="match-reaction-actions");
   assert.equal(dom["match-decision"].hidden,false,
     "claim must be selectable from table center");
+  assert.equal(dom["match-controls"].hidden,true,
+    "unused below-table claim toolbar must be completely hidden");
   assert.ok(reaction);
   assert.deepEqual(reaction.children.map(x=>x.textContent),[
     "胡 · 优先响应","明杠","碰","过 · 放弃本次响应"
