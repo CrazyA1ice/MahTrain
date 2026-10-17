@@ -1207,3 +1207,53 @@
 @media(max-width:640px){
   .match-archive-four-seats,.match-archives-balances{grid-template-columns:1fr}
 }
+
+/* M3.24: legible PUBLIC discards and melds. Keep the full table horizontally
+   scrollable instead of compressing tiles into unreadable tiny icons. */
+.match-board{
+  min-width:1250px;
+  grid-template-columns:200px minmax(0,1fr) 200px;
+  grid-template-rows:minmax(160px,auto) minmax(485px,auto) minmax(172px,auto);
+}
+.match-board-center{
+  min-height:485px;
+  grid-template-columns:minmax(160px,1fr) minmax(164px,1.2fr) minmax(160px,1fr);
+  grid-template-rows:minmax(136px,auto) minmax(205px,auto) minmax(136px,auto);
+}
+.match-river-tiles{max-height:355px;column-gap:5px;row-gap:13px}
+.match-river-cell{min-width:44px;min-height:62px}
+.match-board .match-river-cell .tile{width:44px;height:60px}
+.match-river-cell.is-claimed{min-width:44px;min-height:60px}
+.match-river-claimed{font-size:11px}
+.match-discard-kind{font-size:10px;bottom:-11px;padding:2px 3px}
+.match-board .match-seat-meld .tile{width:40px;height:54px}
+.match-board .match-seat-meld .match-tile-back{
+  width:38px;height:54px;flex-basis:38px;
+}
+.match-meld-tiles{gap:3px}
+.match-seat-meld{padding:6px 4px}
+.match-seat-meld small{font-size:11px}
+.match-seat--left .match-seat-melds,.match-seat--right .match-seat-melds{
+  max-height:380px;overflow-y:auto;overflow-x:hidden;
+}
+.match-extras{
+  display:flex;align-items:center;gap:13px;flex-wrap:wrap;
+  margin:12px 0 16px;padding:10px 13px;border-radius:10px;
+  background:#edf5ee;
+}
+.match-voice-switch{display:inline-flex;align-items:center;gap:7px;font-size:13px;
+  color:#2b553c;font-weight:650}
+.match-voice-switch input{width:17px;height:17px;accent-color:#34744f}
+.match-extras .review-footnote{margin:0;color:#547362;font-size:11px}
+.match-lab{width:100%;border-top:1px solid #cde0d0;padding-top:9px;font-size:12px}
+.match-lab summary{cursor:pointer;font-weight:700;color:#37664c}
+.match-lab-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:10px}
+.match-lab-row label{display:flex;align-items:center;gap:7px}
+.match-lab-row input[type=number]{width:155px;max-width:100%;padding:6px;
+  border:1px solid #c0d3c5;border-radius:6px}
+.match-lab p{line-height:1.6;color:#53715d;margin:8px 0 0}
+.match-again{margin:0 0 12px;padding:10px 16px}
+@media(max-width:980px){
+  .match-board{min-width:1250px}
+  .match-board-scroll::after{content:"牌面已放大，左右滑动查看完整四家牌桌"}
+}
