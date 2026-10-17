@@ -36,6 +36,7 @@
     busy=true;
     $("match-error").textContent="";
     const previousEvents=state?.events?.length||0;
+    const previousWinCount=state?.win_ledger?.wins?.length||0;
     let announcedByPlayback=false;
     try{
       const response=await fetch("/api/action",{
@@ -122,6 +123,16 @@
         }
       }
       render();
+      if(name==="match_new")renderScoreBursts([]);
+      else if(!announcedByPlayback){
+        // Disabled/empty replay still exposes ONLY already-booked ledger
+        // transfers, never guesses a payment from fan or a private tile.
+        const latest=(state.win_ledger?.wins||[]).slice(previousWinCount);
+        renderScoreBursts(latest.map(win=>({
+          seat:win.winner,amount:win.total_received,
+          payers:win.payers,amount_per_payer:win.amount_per_payer,
+        })));
+      }
     }catch(err){
       liveBoard=null;
       if(state)renderBoard();
@@ -162,6 +173,42 @@
     back.setAttribute("aria-hidden","true");
     return back;
   }
+  function renderScoreBursts(settlements){
+    const root=$("match-score-bursts");
+    root.replaceChildren();
+    const deltas=[0,0,0,0];
+    let hasPayment=false;
+    for(const entry of Array.isArray(settlements)?settlements:[]){
+      if(!entry||!Number.isInteger(entry.seat)||
+          entry.seat<0||entry.seat>3||
+          !Number.isSafeInteger(entry.amount)||entry.amount<0)continue;
+      // A verified winner credit remains renderable on older public events
+      // where the individual payer entries were not yet published.
+      deltas[entry.seat]+=entry.amount;
+      if(entry.amount>0)hasPayment=true;
+      const payers=entry.payers,unit=entry.amount_per_payer;
+      if(Array.isArray(payers)&&payers.length>=1&&payers.length<=3&&
+          new Set(payers).size===payers.length&&
+          payers.every(p=>Number.isInteger(p)&&p>=0&&p<=3&&p!==entry.seat)&&
+          Number.isSafeInteger(unit)&&unit>0&&
+          Number.isSafeInteger(unit*payers.length)&&
+          unit*payers.length===entry.amount){
+        for(const payer of payers)deltas[payer]-=unit;
+      }
+    }
+    root.hidden=!hasPayment;
+    if(!hasPayment)return;
+    for(let seat=0;seat<4;seat++){
+      if(!deltas[seat])continue;
+      const value=deltas[seat];
+      const badge=el("span","match-score-burst "+(value>0?
+        "is-credit":"is-debit"),(value>0?"+":"")+value);
+      badge.classList.add("match-score-burst--"+seat);
+      badge.setAttribute("aria-label",seat+"号本次真实胡牌净变化 "+
+        (value>0?"+":"")+value+"积分");
+      root.append(badge);
+    }
+  }
   function showPublicMotion(frame,step,total){
     voice?.announceFrame(frame);
     if(frame.board){
@@ -173,6 +220,14 @@
     root.classList.toggle("is-winning-motion",!!frame.isWin);
     root.classList.toggle("is-kong-motion",!!frame.isKong);
     root.classList.toggle("is-peng-motion",!!frame.isPeng);
+    const big=$("match-motion-big-action");
+    const actionTypes=frame.actionTypes||[frame.type];
+    big.textContent=frame.isWin?
+      (actionTypes.includes("multi_ron")?"一炮多响":
+        actionTypes.includes("self_draw_win")?"自摸":"胡"):
+      frame.isKong?"杠":frame.isPeng?"碰":"";
+    big.hidden=!big.textContent;
+    renderScoreBursts(frame.settlements||[]);
     $("match-motion-text").textContent=frame.label;
     const chain=$("match-motion-chain");
     chain.replaceChildren();

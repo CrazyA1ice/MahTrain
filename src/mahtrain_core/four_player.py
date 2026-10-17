@@ -213,6 +213,8 @@ class FourPlayerOpening:
         self._events.append({"type":"win_settlement","seat":seat,
                              "source":source,"kind":kind,
                              "amount":posted["total_received"],
+                             "amount_per_payer":posted["amount_per_payer"],
+                             "payers":list(posted["payers"]),
                              "effective_fan":posted["effective_fan"]})
         return posted
 

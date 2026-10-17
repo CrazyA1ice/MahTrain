@@ -233,9 +233,11 @@ function fakeClock(){
     events:[
       {type:"win_settlement",seat:1,source:0,
         kind:"ron",effective_fan:2,amount:800,
+        payers:[0],amount_per_payer:800,
         private_hand:["m1"]},
       {type:"win_settlement",seat:3,source:0,
         kind:"ron",effective_fan:1,amount:400,
+        payers:[0],amount_per_payer:400,
         future_wall:["p9"]},
       {type:"multi_ron",source:0,seats:[1,3],tile:"p5"},
     ],
@@ -247,6 +249,27 @@ function fakeClock(){
   assert.equal(frame.settlements.length,2);
   assert.deepEqual(frame.settlements.map(x=>x.amount),[800,400]);
   assert.deepEqual(frame.settlements.map(x=>x.seat),[1,3]);
+  assert.deepEqual(frame.settlements.map(x=>x.payers),[[0],[0]]);
+  assert.deepEqual(frame.settlements.map(x=>x.amount_per_payer),[800,400]);
+  const malformed=playback.normalizeSteps([{
+    events:[
+      {type:"win_settlement",seat:1,amount:1000,effective_fan:2,
+        payers:[0,0],amount_per_payer:500,private_hand:["hidden"]},
+      {type:"self_draw_win",seat:1}
+    ],board,
+  }]).frames[0];
+  assert.equal(malformed.settlements[0].amount,1000);
+  assert.deepEqual(malformed.settlements[0].payers,[],
+    "malformed payer list must not fabricate debit notices");
+  assert.equal(malformed.settlements[0].amount_per_payer,null);
+  const selfDraw=playback.normalizeSteps([{
+    events:[
+      {type:"win_settlement",seat:2,amount:1200,effective_fan:2,
+        payers:[0,1,3],amount_per_payer:400},
+      {type:"self_draw_win",seat:2}
+    ],board,
+  }]).frames[0];
+  assert.deepEqual(selfDraw.settlements[0].payers,[0,1,3]);
   assert.ok(!JSON.stringify(frame).includes("private_hand"));
   assert.ok(!JSON.stringify(frame).includes("future_wall"));
   const invalid=playback.normalizeSteps([{

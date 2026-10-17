@@ -53,6 +53,7 @@ const ids=[
   "match-playback-focus","match-playback-skip",
   "match-playback-note","match-motion","match-motion-text","match-motion-card",
   "match-motion-chain","match-motion-delta",
+  "match-motion-big-action","match-score-bursts",
   ...[0,1,2,3].flatMap(n=>["match-seat-"+n,"match-river-"+n])
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
@@ -529,9 +530,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   // authoritative payments, but is still ONE real public board frame.
   const postEvents=[
     {type:"win_settlement",seat:1,source:0,kind:"ron",
-      amount:16,effective_fan:1},
+      amount:16,effective_fan:1,payers:[0],amount_per_payer:16},
     {type:"win_settlement",seat:3,source:0,kind:"ron",
-      amount:8,effective_fan:1},
+      amount:8,effective_fan:1,payers:[0],amount_per_payer:8},
     {type:"multi_ron",source:0,seats:[1,3],tile:"m1"},
   ];
   const record=(winner,total,source=0)=>({
@@ -574,11 +575,23 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(payments.children[0].textContent.includes("+16"));
   assert.ok(payments.children[1].textContent.includes("3号胡牌"));
   assert.ok(payments.children[1].textContent.includes("+8"));
+  assert.equal(dom["match-motion-big-action"].textContent,"一炮多响");
+  const scoreBursts=dom["match-score-bursts"];
+  assert.equal(scoreBursts.hidden,false);
+  assert.equal(scoreBursts.children.length,3);
+  assert.ok(scoreBursts.children.some(x=>x.textContent==="-24"&&
+    x.classes.has("match-score-burst--0")));
+  assert.ok(scoreBursts.children.some(x=>x.textContent==="+16"&&
+    x.classes.has("match-score-burst--1")));
+  assert.ok(scoreBursts.children.some(x=>x.textContent==="+8"&&
+    x.classes.has("match-score-burst--3")));
   assert.equal(dom["match-table-settlement"].hidden,true);
   dom["match-playback-skip"].handlers.click();
   await settle();
   assert.equal(dom["match-round-report"].hidden,false);
   assert.equal(dom["match-table-settlement"].hidden,false);
+  assert.equal(dom["match-score-bursts"].hidden,false,
+    "verified transfers remain readable when replay finishes");
   assert.equal(dom["match-round-report-seats"].children.length,4);
   assert.equal(descendants(dom["match-round-report-wins"],
     x=>x.className==="match-win-record").length,2);
@@ -654,6 +667,11 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(dom["match-round-report"].hidden,false);
   assert.equal(dom["match-wall-count"].textContent,"52");
+  assert.equal(dom["match-score-bursts"].hidden,false,
+    "playback-off mode still shows the posted HU score delta");
+  assert.equal(dom["match-score-bursts"].children.length,2);
+  assert.ok(dom["match-score-bursts"].children.some(x=>x.textContent==="+16"));
+  assert.ok(dom["match-score-bursts"].children.some(x=>x.textContent==="-16"));
   assert.equal(dom["match-round-report-events"].children.length,5,
     "opening + two frames each across TWO successful turns");
   assert.equal(dom["match-review-preview-seats"].children.length,4);
