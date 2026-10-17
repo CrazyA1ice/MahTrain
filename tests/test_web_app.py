@@ -758,6 +758,30 @@ class WebUI(unittest.TestCase):
         _match_public_step(game,len(game._events),steps)
         self.assertEqual(len(steps),empty)
 
+    def test_m321_filterable_replay_uses_public_historical_frames(self):
+        page,_=self.get("/")
+        js,_=self.get("/match.js")
+        playback,_=self.get("/match_playback.js")
+        css,_=self.get("/app.css")
+        for name in ("match-review-seat-filter","match-review-type-filter",
+                     "match-review-inspector","match-review-selected",
+                     "match-review-board-status","match-review-preview-seats",
+                     "match-review-prev","match-review-next",
+                     "match-review-count"):
+            self.assertEqual(page.count(('id="%s"' % name).encode()),1)
+        for field in (b"appendReviewFrames",b"renderReviewInspector",
+                      b"renderReviewFiltered",b"MAX_REVIEW_STEPS",
+                      b"normalizeHistorySteps",b"filterReviewEntries",
+                      b"stepReview"):
+            self.assertIn(field,js)
+        for field in (b"normalizeBoard",b"openingFrame",
+                      b"normalizeHistorySteps",b"filterReviewEntries"):
+            self.assertIn(field,playback)
+        for field in (b".match-review-inspector",
+                      b".match-review-preview-seats",
+                      b".match-review-action.is-selected"):
+            self.assertIn(field,css)
+
     def test_m320_round_end_report_and_all_win_details(self):
         page,_=self.get("/")
         script,_=self.get("/match.js")
