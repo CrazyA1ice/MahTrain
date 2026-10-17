@@ -1242,7 +1242,7 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"module-inactive",nav)
         self.assertIn(b"match-archives-panel",nav)
         self.assertIn(b"match-panel",nav)
-        self.assertIn(b"MahTrainMatchStats?.render(response.scorecard)",archive)
+        self.assertIn(b"MahTrainMatchStats?.render(response.scorecard,document)",archive)
         self.assertIn(b"makeLinePoints",chart)
         self.assertIn(b"match-stats-cumulative",chart)
         self.assertIn(b"match-stats-outcomes",chart)
