@@ -1398,9 +1398,9 @@
   border:1px solid #d5e4d8;min-height:37px;cursor:pointer
 }
 .match-confirm-option input{accent-color:#257451;width:16px;height:16px}
-.match-stage.is-immersive #match-public{display:none}
-.match-stage.is-immersive .match-board-scroll{margin-top:5px}
-.match-stage.is-immersive .match-game-hud{background:#e8f3e8}
+#match-stage.is-immersive #match-public{display:none}
+#match-stage.is-immersive .match-board-scroll{margin-top:5px}
+#match-stage.is-immersive .match-game-hud{background:#e8f3e8}
 .match-board{
   background:
     radial-gradient(ellipse at center,#258a86 0%,#197569 47%,#105745 100%);
