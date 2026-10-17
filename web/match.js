@@ -11,6 +11,11 @@
   let pendingDiscard=null,immersive=false,largeTiles=false,midnightFelt=false;
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
+  function syncVoiceControls(){
+    const on=!!voice?.getEnabled();
+    $("match-voice-speed").disabled=!on;
+    $("match-voice-repeat").disabled=!voice?.canRepeat();
+  }
   let reviewHistory=[],reviewDropped=0,reviewSelected=null;
   const publicBoard=()=>liveBoard||state;
   const tileName=t=>window.MahTrainUI.tileName(t);
@@ -85,7 +90,8 @@
         }
       }
       if(name==="match_new"){
-        voice?.clear();
+        voice?.reset();
+        syncVoiceControls();
         if(playback){
           playback.cancel();
           $("match-playback").hidden=true;
@@ -96,6 +102,7 @@
         // events, never the complete historical event log or private draw.
         const events=(data.match.events||[]).slice(previousEvents);
         voice.announceEvents(window.MahTrainPlayback.normalize(events,96).frames);
+        syncVoiceControls();
       }
       liveBoard=null;
       if(name==="match_new"){
@@ -243,6 +250,7 @@
   }
   function showPublicMotion(frame,step,total){
     voice?.announceFrame(frame);
+    syncVoiceControls();
     if(frame.board){
       liveBoard=frame.board;
       renderBoard();
@@ -1172,7 +1180,18 @@
     toggleVoice.disabled=!voice?.supported;
     toggleVoice.addEventListener("change",()=>{
       voice?.setEnabled(toggleVoice.checked);
+      syncVoiceControls();
     });
+    const voiceSpeed=$("match-voice-speed");
+    voiceSpeed.value=voice?.getRate()||"normal";
+    voiceSpeed.addEventListener("change",()=>{
+      voiceSpeed.value=voice?.setRate(voiceSpeed.value)||"normal";
+    });
+    $("match-voice-repeat").addEventListener("click",()=>{
+      voice?.repeatLast();
+      syncVoiceControls();
+    });
+    syncVoiceControls();
     $("match-focus-toggle").addEventListener("click",()=>{
       immersive=!immersive;
       if(state)renderHUD();
