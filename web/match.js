@@ -1058,6 +1058,10 @@
       largeTiles=!largeTiles;
       if(state)renderHUD();
     });
+    // Prefer safer two-tap confirmation on touch-first phones and tablets.
+    // Desktop mouse keeps the fast existing one-click behavior by default.
+    $("match-confirm-discard").checked=
+      !!window.matchMedia?.("(pointer: coarse)")?.matches;
     $("match-confirm-discard").addEventListener("change",()=>{
       pendingDiscard=null;
       if(state)render();
