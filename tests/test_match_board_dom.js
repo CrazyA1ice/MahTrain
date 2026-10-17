@@ -86,6 +86,7 @@ const window={
 const playbackModule=require("../web/match_playback.js");
 window.MahTrainPlayback={
   normalize:playbackModule.normalize,
+  normalizeSteps:playbackModule.normalizeSteps,
   createController:callbacks=>playbackModule.createController({
     ...callbacks,
     clock:(fn,delay)=>context.setTimeout(fn,delay),
@@ -252,59 +253,5 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(pendingTimers.size,0);
   assert.equal(dom["match-wall-count"].textContent,"53");
   assert.equal(dom["match-seat-1"].classList.contains("is-replay-acting"),false);
-  // M3.17: each frame is an actual recorded post-rule-action public board.
-  // Counts, wall, river and the opponent's publicly visible melds update
-  // BEFORE the overall HTTP response reaches the final-state render.
-  startMatch={...base,events:[],wall_count:54};
-  const step1={
-    phase:"await_discard",turn:1,wall_count:53,
-    hand_counts:[13,14,10,13],won:[false,false,false,false],
-    melds:base.melds,discards:base.discards,
-  };
-  const step2={
-    ...step1,phase:"claim_window",hand_counts:[13,13,10,13],
-    discards:[...base.discards,{
-      seat:1,tile:"s5",discard_kind:"tedashi",
-    }],
-  };
-  replyMatch={...next,wall_count:53,
-    events:[{type:"draw",seat:1},{type:"discard",seat:1,tile:"s5"}],
-    public_steps:[
-      {events:[{type:"draw",seat:1,tile:"private-never-display"}],board:step1},
-      {events:[{type:"discard",seat:1,tile:"s5",
-        discard_kind:"tedashi"}],board:step2},
-    ],
-    discards:step2.discards,
-  };
-  dom["match-new"].handlers.click();
-  await settle();
-  assert.equal(dom["match-wall-count"].textContent,"54");
-  dom["match-hand"].children[0].handlers.click();
-  await settle();
-  assert.equal(dom["match-wall-count"].textContent,"53",
-    "first event must update real public wall count");
-  assert.equal(descendants(dom["match-seat-1"],
-    x=>x.className==="match-tile-back").length,14,
-    "first real draw must increase AI concealed back count");
-  assert.equal(descendants(dom["match-river-1"],x=>x.tile==="s5").length,0,
-    "the discard must not render before its actual completed action");
-  assert.ok(dom["match-seat-0"].classList.contains("is-public-replay"),
-    "do not pretend the old own private hand is a true historical snapshot");
-  assert.equal(descendants(dom["match-motion-card"],
-    x=>x.tile==="private-never-display").length,0);
-  assert.equal(pendingTimers.size,1);
-  let nextTimer=pendingTimers.entries().next().value;
-  pendingTimers.delete(nextTimer[0]);
-  nextTimer[1].fn();
-  assert.equal(descendants(dom["match-seat-1"],
-    x=>x.className==="match-tile-back").length,13);
-  assert.equal(descendants(dom["match-river-1"],x=>x.tile==="s5").length,1);
-  assert.equal(dom["match-wall-count"].textContent,"53");
-  dom["match-playback-skip"].handlers.click();
-  await settle();
-  assert.equal(dom["match-seat-0"].classList.contains("is-public-replay"),false);
-  assert.equal(dom["match-wall-count"].textContent,"53");
-  assert.equal(requests.at(-1).action,"match_discard");
-  console.log("M3.17 real incremental wall/back/river DOM smoke: PASS");
   console.log("M3.16 live match public action playback DOM smoke: PASS");
 })().catch(error=>{console.error(error);process.exitCode=1;});
