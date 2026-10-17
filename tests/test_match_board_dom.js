@@ -30,6 +30,9 @@ const ids=[
   "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
+  "match-own-score","match-table-settlement","match-table-settlement-title",
+  "match-table-round-phase","match-table-scores","match-table-wins",
+  "match-table-score-note",
   "match-self-melds","match-self-status","match-ready-hint","match-win-alert",
   "match-playback","match-playback-progress","match-playback-status",
   "match-playback-speed","match-playback-pause","match-playback-step",
@@ -378,6 +381,79 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-wall-count"].textContent,"52");
   assert.equal(requests.at(-1).action,"match_discard");
   dom["match-playback-focus"].checked=false;
+  // M3.19: a settled win appears INSIDE the four-sided board, with exact
+  // ledger balances, while the original full accounting remains below.
+  dom["match-playback-speed"].value="0";
+  startMatch={...base,won:[false,false,false,false],
+    win_ledger:{balances:[0,0,0,0],wins:[]},
+    kong_ledger:{base:null,balances:[0,0,0,0]}};
+  replyMatch={...next,
+    won:[false,true,false,false],
+    melds:[[],[{type:"peng",tile:"p3"},{type:"ming_gang",tile:"s2"}],
+      [{type:"an_gang",tile:null}],[]],
+    own_melds:[{type:"an_gang",tile:"m4"}],
+    win_ledger:{
+      balances:[-8,16,-8,0],
+      wins:[{winner:1,kind:"ron",main_pattern:"平胡",effective_fan:1,
+        total_received:16,payers:[0,2]}]
+    },
+    kong_ledger:{base:null,balances:[0,0,0,0]},
+  };
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-table-settlement"].hidden,true,
+    "do not announce settlement before any win has happened");
+  assert.equal(dom["match-own-score"].hidden,true);
+  dom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.equal(dom["match-table-settlement"].hidden,false);
+  const scores=dom["match-table-scores"];
+  assert.equal(scores.children.length,4);
+  assert.ok(descendants(scores,x=>x.textContent==="-8").length===2);
+  assert.ok(descendants(scores,x=>x.textContent==="+16").length===1);
+  assert.ok(descendants(dom["match-table-wins"],
+    x=>x.textContent.includes("1号点炮胡")).length===1);
+  assert.ok(descendants(dom["match-table-wins"],
+    x=>x.textContent.includes("实收 +16")).length===1);
+  assert.equal(dom["match-own-score"].hidden,false);
+  assert.ok(dom["match-own-score"].textContent.includes("-8"));
+  assert.ok(dom["match-seat-1"].classList.contains("is-won"));
+  assert.ok(descendants(dom["match-seat-1"],
+    x=>x.className==="match-seat-score").length===1);
+  assert.equal(descendants(dom["match-seat-1"],
+    x=>x.tile==="p3").length,3);
+  assert.equal(descendants(dom["match-seat-1"],
+    x=>x.tile==="s2").length,4);
+  assert.equal(descendants(dom["match-seat-2"],
+    x=>x.tile!==undefined).length,0,
+    "another seat's concealed kong identity stays hidden");
+  assert.equal(descendants(dom["match-seat-2"],
+    x=>x.className==="match-tile-back").length,14);
+
+  // The next request has a future win, but this must not be shown while
+  // public-only M3.17 frames are still being played.
+  dom["match-playback-speed"].value="450";
+  startMatch={...base,events:[],
+    win_ledger:{balances:[0,0,0,0],wins:[]}};
+  replyMatch={...replyMatch,
+    events:[{type:"draw",seat:1}],
+    public_steps:[{events:[{type:"draw",seat:1}],board:{
+      phase:"await_discard",turn:1,wall_count:53,
+      hand_counts:[13,14,10,13],won:[false,false,false,false],
+      melds:base.melds,discards:base.discards,
+    }}]
+  };
+  dom["match-new"].handlers.click();
+  await settle();
+  dom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.equal(dom["match-playback"].hidden,false);
+  assert.equal(dom["match-table-settlement"].hidden,true,
+    "future winning ledger must not leak into intermediate board frame");
+  dom["match-playback-skip"].handlers.click();
+  await settle();
+  assert.equal(dom["match-table-settlement"].hidden,false);
+  console.log("M3.19 in-table settlement and directional meld DOM smoke: PASS");
   console.log("M3.18 focused kong/win and manual-step live DOM smoke: PASS");
   console.log("M3.17 real wall/back/river incremental DOM smoke: PASS");
   console.log("M3.16 live match public action playback DOM smoke: PASS");
