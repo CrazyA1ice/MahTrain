@@ -1,0 +1,133 @@
+"use strict";
+// M3.31 fake-browser test: aggregate-only baseline official scores and CSV.
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+const vm=require("node:vm");
+
+class Element{
+  constructor(tag="div"){
+    this.tag=tag;this.children=[];this.textContent="";this.value="";
+    this.hidden=false;this.disabled=false;this.handlers={};this.style={};
+  }
+  append(...children){this.children.push(...children)}
+  replaceChildren(...children){this.children=[...children]}
+  addEventListener(event,handler){this.handlers[event]=handler}
+  click(){this.clicked=true}
+}
+const ids=[
+  "ai-baseline-start","ai-baseline-results","ai-baseline-error",
+  "ai-baseline-progress","ai-baseline-seed","ai-baseline-seeds",
+  "ai-baseline-summary","ai-baseline-caveat","ai-baseline-differences",
+  "ai-baseline-export","ai-baseline-official",
+  "ai-baseline-official-export","ai-baseline-official-caveat",
+  "ai-baseline-official-levels","ai-baseline-official-differences",
+];
+const nodes=Object.fromEntries(ids.map(id=>[id,new Element()]));
+nodes["ai-baseline-seed"].value="11";
+nodes["ai-baseline-seeds"].value="1";
+const opponents=["baseline","basic","advanced","challenge"];
+const levels=Object.fromEntries(opponents.map(name=>[name,{
+  exposures:4,wins:0,deal_ins:0,discards:3,minimum_shanten:2,
+  local_optimal:2,win_event_fraction:0,min_shanten_fraction:2/3,
+  local_optimal_fraction:2/3,
+}]));
+const comparison=Object.fromEntries(opponents.slice(1).map(level=>[level,{
+  win_event_fraction:0,min_shanten_fraction:0,local_optimal_fraction:0,
+}]));
+const officialTotals=[-120,-40,40,120];
+const rows=Object.fromEntries(opponents.map((level,index)=>[level,{
+  seat_exposures:4,official_total:officialTotals[index],
+  official_mean_per_exposure:officialTotals[index]/4,
+}]));
+const official={
+  protocol:"paired_initial_shuffle_4_rotation_official_a_v1",
+  room_coefficient:100,fan_cap:3,requested_seeds:1,valid_seeds:1,
+  excluded_seed_count:0,complete_games:4,
+  levels:rows,per_seed:[{seed:11,levels:rows}],
+  paired_differences_vs_baseline:{basic:20,advanced:40,challenge:60},
+  intervals:null,
+};
+const report={
+  opponents,levels,independent_shuffle_seeds:1,intervals:null,
+  paired_differences_vs_baseline:comparison,
+  per_seed:[{seed:11,levels}],official_score_analysis:official,
+};
+const requests=[];
+const fetch=async(_url,options)=>{
+  const action=JSON.parse(options.body).action;
+  requests.push(action);
+  if(action==="ai_baseline_start"){
+    return {ok:true,json:async()=>({baseline_token:"test-token"})};
+  }
+  if(action==="ai_baseline_status"){
+    return {ok:true,json:async()=>({baseline:{
+      status:"done",completed_games:4,total_games:4,overview:report,
+    }})};
+  }
+  throw Error("unexpected action: "+action);
+};
+let csv=null,exportClicks=0;
+const document={
+  getElementById(id){assert.ok(nodes[id],"missing DOM control "+id);return nodes[id]},
+  createElement(tag){
+    const node=new Element(tag);
+    if(tag==="a")node.click=()=>exportClicks++;
+    return node;
+  },
+};
+const ctx={window:{},document,fetch,
+  Blob:class{constructor(parts){csv=parts.join("")}},
+  URL:{createObjectURL:()=>"blob:public",revokeObjectURL(){}},
+  setTimeout(){},console};
+vm.runInNewContext(
+  fs.readFileSync(path.join(__dirname,"../web/ai_baseline.js"),"utf8"),
+  ctx,{filename:"ai_baseline.js"});
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+(async()=>{
+  ctx.window.MahTrainAIBaseline.init();
+  nodes["ai-baseline-start"].handlers.click();
+  for(let i=0;i<6;i++)await settle();
+  assert.deepEqual(requests,["ai_baseline_start","ai_baseline_status"]);
+  assert.equal(nodes["ai-baseline-results"].hidden,false);
+  assert.equal(nodes["ai-baseline-official"].hidden,false);
+  assert.equal(nodes["ai-baseline-official-levels"].children.length,4);
+  assert.equal(nodes["ai-baseline-official-differences"].children.length,3);
+  const notice=nodes["ai-baseline-official-caveat"].textContent;
+  assert.ok(notice.includes("核验1个"));
+  assert.ok(notice.includes("排除0个"));
+  assert.ok(notice.includes("少于5个"));
+  assert.ok(nodes["ai-baseline-official-levels"].children[0].children[0]
+    .textContent.includes("独立牌形基线"));
+  assert.ok(nodes["ai-baseline-official-levels"].children[3].children[1]
+    .children[2].children[1].textContent.includes("+30"));
+  assert.ok(nodes["ai-baseline-official-differences"].children[2]
+    .textContent.includes("+60"));
+  nodes["ai-baseline-official-export"].handlers.click();
+  assert.equal(exportClicks,1);
+  assert.ok(csv.includes("11,baseline,4,-120,-30"));
+  assert.ok(csv.includes("11,challenge,4,120,30"));
+  assert.ok(!csv.includes("future_wall"));
+  assert.ok(!csv.includes("opponent_hands"));
+  // All four rotations missing one verified wall should suppress
+  // official averages while retaining the original event-stat panel.
+  report.official_score_analysis={
+    ...official,valid_seeds:0,excluded_seed_count:1,
+    complete_games:0,per_seed:[],
+    levels:Object.fromEntries(opponents.map(level=>[level,{
+      seat_exposures:0,official_total:0,official_mean_per_exposure:null,
+    }])),
+    paired_differences_vs_baseline:{basic:null,advanced:null,challenge:null},
+  };
+  nodes["ai-baseline-start"].handlers.click();
+  for(let i=0;i<6;i++)await settle();
+  assert.equal(nodes["ai-baseline-official-levels"].children.length,4);
+  assert.ok(nodes["ai-baseline-official-caveat"].textContent.includes("排除1个"));
+  assert.ok(nodes["ai-baseline-official-levels"].children[0].children[1]
+    .children[2].children[1].textContent.includes("无已核验局"));
+  nodes["ai-baseline-official-export"].handlers.click();
+  assert.equal(exportClicks,2);
+  assert.equal(csv.trim().split("\r\n").length,1,
+    "unverified seed must not enter official-point CSV");
+  console.log("M3.31 4-policy official-score cards, exclusion, paired difference, CSV privacy: PASS");
+})().catch(error=>{console.error(error);process.exitCode=1});
