@@ -214,7 +214,12 @@
                   <option value="0">关闭播放</option>
                 </select>
               </label>
+              <label class="match-playback-focus-option">
+                <input id="match-playback-focus" type="checkbox">
+                只看碰杠胡及最终动作
+              </label>
               <button id="match-playback-pause" type="button" class="review-control">暂停</button>
+              <button id="match-playback-step" type="button" class="review-control" disabled>单步前进</button>
               <button id="match-playback-skip" type="button" class="review-control">跳过动画</button>
             </div>
             <p id="match-playback-note" class="review-footnote"></p>
@@ -229,7 +234,9 @@
               <div class="match-board-center">
                 <div id="match-motion" class="match-motion" aria-live="polite" hidden>
                   <strong id="match-motion-text"></strong>
+                  <div id="match-motion-chain" class="match-motion-chain"></div>
                   <div id="match-motion-card"></div>
+                  <p id="match-motion-delta" class="match-motion-delta"></p>
                 </div>
                 <div id="match-river-2" class="match-river match-river--top" aria-label="对家牌河"></div>
                 <div id="match-river-3" class="match-river match-river--left" aria-label="上家牌河"></div>
