@@ -27,15 +27,17 @@
       .filter(x=>x && ALLOWED.has(x.type));
     const omitted=Math.max(0,allowed.length-maxFrames);
     const tail=allowed.slice(omitted);
-    // allowlist each output field: never propagate an_gang tile, unrevealed
+    // allowlist each output field: only explicitly revealed an_gang tile, unrevealed
     // draws, pending responses, hands, future wall or private draw info.
     return {omitted,frames:tail.map(item=>{
       const winners=item.type==="multi_ron" || item.type==="rob_kong" ||
         item.type==="ron" ? item.seats : null;
       const seat=Number.isInteger(item.seat)?item.seat:
         Number.isInteger(item.source)?item.source:null;
-      const revealed=VISIBLE_TILE.has(item.type) &&
-        typeof item.tile==="string"?item.tile:null;
+      const revealed=(VISIBLE_TILE.has(item.type) ||
+        (item.type==="an_gang"&&item.revealed===true)) &&
+        typeof item.tile==="string"&&/^[msp][1-9]$/.test(item.tile)
+        ?item.tile:null;
       const winSeats=Array.isArray(winners)?
         winners.filter(x=>Number.isInteger(x)&&x>=0&&x<4):[];
       const isWin=["ron","multi_ron","rob_kong","self_draw_win"].includes(item.type);
@@ -73,8 +75,12 @@
     const melds=board.melds.map(groups=>groups.map(group=>{
       const type=["peng","ming_gang","an_gang","bu_gang"].includes(group?.type)
         ?group.type:"unknown";
-      return {type,tile:type==="an_gang"?null:
+      const exposedKong=type==="an_gang"&&group?.revealed===true&&
+        validTile(group?.tile);
+      const safe={type,tile:type==="an_gang"&&!exposedKong?null:
         validTile(group?.tile)?group.tile:null};
+      if(exposedKong)safe.revealed=true;
+      return safe;
     }));
     const discards=board.discards.filter(x=>seat(x?.seat)&&validTile(x?.tile))
       .map(x=>{
