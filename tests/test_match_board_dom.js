@@ -30,7 +30,7 @@ const ids=[
   "match-voice-status","match-voice-speed","match-voice-repeat",
   "match-enable-kong","match-kong-base","match-seed",
   "match-coefficient","match-fan-cap","match-self-draw-mode","match-ai-1","match-ai-2","match-ai-3",
-  "match-error","match-stage","match-title","match-status",
+  "match-error","match-stage","match-title","match-status","match-request-status",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
   "match-focus-toggle","match-large-tiles-toggle","match-skin-toggle",
   "match-back-color","match-self-missing-flag",
@@ -207,6 +207,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-voice-speed"].value="normal";
   dom["match-voice-speed"].handlers.change();
   assert.equal(dom["match-stage"].hidden,false);
+  assert.ok(dom["match-request-status"].textContent.includes("已同步"));
   assert.equal(dom["match-wall-count"].textContent,"54");
   assert.equal(dom["match-hand"].children.length,14);
   // Simulate a narrow handset scroll region; navigation is local only and
