@@ -50,6 +50,8 @@ function fakeClock(){
   const fresh=api.normalize([{type:"an_gang",seat:1,
     tile:"p6",revealed:true}]).frames[0];
   assert.equal(fresh.publicTile,"p6");
+  assert.equal(fresh.exposedKong,true);
+  assert.equal(old.exposedKong,false);
   const board={phase:"await_discard",turn:1,wall_count:46,
     hand_counts:[13,11,13,13],won:[false,false,false,false],
     melds:[[],[{type:"an_gang",tile:"p6",revealed:true}],[],[]],
@@ -64,6 +66,7 @@ function fakeClock(){
     board,
   }]).frames[0];
   assert.equal(replay.publicTile,"p6");
+  assert.equal(replay.announcements[0].exposedKong,true);
   assert.equal(replay.board.melds[1][0].revealed,true);
   assert.ok(!JSON.stringify(replay).includes("private-tail"));
   assert.ok(!JSON.stringify(replay).includes("top-secret"));
