@@ -9,6 +9,8 @@
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
   let playback=null,liveBoard=null;
+  const MAX_REVIEW_STEPS=512;
+  let reviewHistory=[],reviewDropped=0,reviewSelected=null;
   const publicBoard=()=>liveBoard||state;
   const tileName=t=>window.MahTrainUI.tileName(t);
   function el(tag,css,label){
@@ -40,6 +42,13 @@
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"对局操作失败");
+      // Preserve real, sanitized post-action boards EVEN when playback is
+      // disabled or focus mode skips animation frames. Never archive a
+      // remote private view or reconstruct intermediate wall contents.
+      const reviewSteps=name!=="match_new"&&state&&
+        Array.isArray(data.match.public_steps)
+        ?window.MahTrainPlayback.normalizeHistorySteps(
+          data.match.public_steps,state):[];
       // Replay only NEW public events from this response, never seek a wall
       // or a concealed AI draw. The trusted final state is applied once at
       // completion; intermediate historic hand/wall layouts are NOT forged.
@@ -76,7 +85,28 @@
         $("match-motion").hidden=true;
       }
       liveBoard=null;
-      token=data.match_token;state=data.match;choice.clear();render();
+      if(name==="match_new"){
+        reviewHistory=[];reviewDropped=0;reviewSelected=null;
+      }
+      token=data.match_token;state=data.match;choice.clear();
+      if(name==="match_new"){
+        const opening=window.MahTrainPlayback.openingFrame(state);
+        if(opening)appendReviewFrames([opening]);
+      }else if(reviewSteps.length){
+        appendReviewFrames(reviewSteps);
+      }else{
+        // An older server may expose no detailed public_steps. We can
+        // preserve its actual FINAL public board only, not invent frames.
+        const board=window.MahTrainPlayback.normalizeBoard(state);
+        const prior=reviewHistory[reviewHistory.length-1]?.board;
+        if(board&&JSON.stringify(board)!==JSON.stringify(prior)){
+          appendReviewFrames([{
+            ...window.MahTrainPlayback.openingFrame(board),
+            type:"state",label:"本次操作最终公开状态",
+          }]);
+        }
+      }
+      render();
     }catch(err){
       liveBoard=null;
       if(state)renderBoard();
@@ -367,6 +397,124 @@
     detail.append(body);
     container.append(detail);
   }
+  function appendReviewFrames(frames){
+    for(const frame of frames){
+      if(!frame?.board)continue;
+      reviewHistory.push({...frame,
+        sequence:reviewDropped+reviewHistory.length+1});
+      if(reviewHistory.length>MAX_REVIEW_STEPS){
+        reviewHistory.shift();
+        reviewDropped++;
+      }
+    }
+  }
+  function filteredHistory(){
+    const seat=$("match-review-seat-filter").value||"all";
+    const kind=$("match-review-type-filter").value||"all";
+    return window.MahTrainPlayback.filterReviewEntries(
+      reviewHistory,seat,kind);
+  }
+  function renderReviewInspector(visible){
+    const chosen=visible.find(x=>x.sequence===reviewSelected);
+    const inspector=$("match-review-inspector");
+    const contents=$("match-review-preview-seats");
+    contents.replaceChildren();
+    if(!chosen){
+      inspector.hidden=true;
+      $("match-review-prev").disabled=true;
+      $("match-review-next").disabled=true;
+      return;
+    }
+    inspector.hidden=false;
+    const idx=visible.indexOf(chosen);
+    $("match-review-prev").disabled=idx<=0;
+    $("match-review-next").disabled=idx>=visible.length-1;
+    $("match-review-selected").textContent=
+      "第"+chosen.sequence+"步 · "+chosen.label;
+    const board=chosen.board;
+    $("match-review-board-status").textContent=
+      "规则调用结束后的公开状态 · 牌山剩余"+board.wall_count+
+      "张 · 当前座位"+(board.turn??"—")+
+      "号 · 阶段 "+board.phase;
+    for(const seat of seats){
+      const sid=seat.id;
+      const box=el("section","match-review-seat");
+      if(board.won[sid])box.classList.add("is-won");
+      box.append(el("strong","",sid+"号 · "+seat.label+
+        (board.won[sid]?" · 已胡":"")));
+      box.append(el("span","",
+        "暗手 "+board.hand_counts[sid]+"张 · 公开副露"+
+        board.melds[sid].length+"组"));
+      const backs=el("div","match-review-backs");
+      for(let n=0;n<board.hand_counts[sid];n++)backs.append(tileBack());
+      box.append(backs);
+      const meld=el("div","match-review-melds");
+      renderMelds(meld,board.melds[sid],false);
+      box.append(meld);
+      const river=el("div","match-review-river");
+      for(const discard of board.discards.filter(x=>x.seat===sid)){
+        const item=el("span","match-review-river-tile");
+        if(discard.claimed_by!==undefined){
+          item.append(el("small","","已取走"));
+        }else item.append(card(discard.tile,null,false));
+        river.append(item);
+      }
+      box.append(river);
+      contents.append(box);
+    }
+  }
+  function renderReviewFiltered(){
+    if(!state||liveBoard)return;
+    const seat=$("match-review-seat-filter").value||"all";
+    const wins=state.win_ledger?.wins||[];
+    const shownWins=seat==="all"?wins:wins.filter(win=>
+      win.winner===Number(seat)||win.payers?.includes(Number(seat)));
+    const payouts=$("match-round-report-wins");
+    payouts.replaceChildren();
+    payouts.append(el("h5","",
+      "逐笔胡牌流水 · "+shownWins.length+"笔"+
+      (seat!=="all"?"（本座位赢家或付款者）":"")));
+    if(!shownWins.length)payouts.append(el("p","match-round-no-wins",
+      "此筛选条件下没有已入账胡牌。"));
+    for(const win of shownWins)
+      appendWinRecord(payouts,win,wins.indexOf(win));
+    const found=filteredHistory();
+    // A bounded DOM list; every retained snapshot remains reachable
+    // through the most-recent 200 matching items.
+    const visible=found.slice(-200);
+    $("match-review-count").textContent=
+      "匹配 "+found.length+" 步"+(found.length>200?
+        "；列表仅显示最后200步。":"")+
+      (reviewDropped?" 浏览器已省略最早"+reviewDropped+"个公开快照。":"");
+    const timeline=$("match-round-report-events");
+    timeline.replaceChildren();
+    for(const frame of visible){
+      const entry=button("第"+frame.sequence+"步 · "+frame.label,
+        "match-review-action",()=>{
+          reviewSelected=frame.sequence;
+          renderReviewFiltered();
+        });
+      if(frame.important)entry.classList.add("is-key");
+      if(frame.sequence===reviewSelected)entry.classList.add("is-selected");
+      timeline.append(entry);
+    }
+    if(!visible.some(x=>x.sequence===reviewSelected))
+      reviewSelected=visible.length?visible[visible.length-1].sequence:null;
+    // The first render must also visibly mark the default selected item.
+    for(const buttonNode of timeline.children){
+      if(buttonNode.textContent.startsWith("第"+reviewSelected+"步 · "))
+        buttonNode.classList.add("is-selected");
+    }
+    renderReviewInspector(visible);
+  }
+  function stepReview(direction){
+    const visible=filteredHistory().slice(-200);
+    const idx=visible.findIndex(x=>x.sequence===reviewSelected);
+    const next=visible[idx+direction];
+    if(!next)return;
+    reviewSelected=next.sequence;
+    renderReviewFiltered();
+  }
   function renderRoundReport(){
     const report=$("match-round-report");
     const terminal=!!state && !liveBoard &&
@@ -403,33 +551,7 @@
         "独立杠钱试验积分 "+signedScore(kong?.balances?.[id]??0)));
       summary.append(seatCard);
     }
-    const winnings=$("match-round-report-wins");
-    winnings.replaceChildren();
-    winnings.append(el("h5","","逐笔胡牌流水 · "+postedWins.length+"笔"));
-    if(!postedWins.length)winnings.append(
-      el("p","match-round-no-wins","本局没有已入账胡牌。"));
-    for(const [index,win] of postedWins.entries())
-      appendWinRecord(winnings,win,index);
-    const timeline=$("match-round-report-events");
-    timeline.replaceChildren();
-    const labels={
-      discard:"出牌",peng:"碰牌",ming_gang:"明杠",
-      an_gang:"暗杠（牌种保密）",bu_gang:"补杠",
-      kong_supplement:"杠后补摸",ron:"点炮胡",
-      multi_ron:"一炮多响",rob_kong:"抢杠胡",
-      self_draw_win:"自摸胡牌",win_settlement:"胡牌入账",
-    };
-    const moments=(state.events||[]).filter(event=>labels[event.type]);
-    for(const [index,event] of moments.slice(-64).entries()){
-      const seat=Number.isInteger(event.seat)?event.seat:
-        Number.isInteger(event.source)?event.source:null;
-      const who=seat===null?"多人/牌桌":seat+"号";
-      timeline.append(el("p","",
-        (moments.length>64?moments.length-64+index+1:index+1)+
-        " · "+who+" · "+labels[event.type]+
-        (event.type==="win_settlement"&&Number.isFinite(event.amount)?
-          " · 已入账 +"+event.amount:"")));
-    }
+    renderReviewFiltered();
     $("match-round-report-note").textContent=
       "复盘依据真实公开事件与已入账胡牌账本；"+
       (moments.length>64?"关键动作较多，时间线仅列最后64条。":"")+
@@ -785,6 +907,11 @@
     });
     $("match-playback-step").addEventListener("click",()=>playback.step());
     $("match-playback-skip").addEventListener("click",()=>playback.skip());
+    for(const id of ("match-review-seat-filter match-review-type-filter").split(" ")){
+      $(id).addEventListener("change",()=>renderReviewFiltered());
+    }
+    $("match-review-prev").addEventListener("click",()=>stepReview(-1));
+    $("match-review-next").addEventListener("click",()=>stepReview(1));
     $("match-enable-kong").addEventListener("change",()=>{
       $("match-kong-base").disabled=!$("match-enable-kong").checked;
     });
