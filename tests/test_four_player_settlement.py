@@ -30,6 +30,17 @@ class M32SettlementTests(unittest.TestCase):
         self.assertEqual(len(ledger["entries"]),2)
         self.assertEqual(len(ledger["wins"]),2)
         self.assertTrue(ledger["zero_sum"])
+        posted=[event for event in game.public_state()["events"]
+                if event["type"]=="win_settlement"]
+        self.assertEqual(len(posted),2)
+        for record in posted:
+            self.assertEqual(record["payers"],[dealer])
+            self.assertEqual(record["amount_per_payer"],800)
+            self.assertEqual(record["amount"],800)
+            self.assertIn(record["seat"],(s1,s2))
+            self.assertEqual(record["effective_fan"],3)
+            self.assertNotIn("hand",record)
+            self.assertNotIn("future_wall",record)
         for payout in ledger["wins"]:
             self.assertEqual(payout["raw_fan"],4)
             self.assertEqual(payout["effective_fan"],3)
@@ -54,6 +65,16 @@ class M32SettlementTests(unittest.TestCase):
         self.assertEqual(ledger["wins"][0]["main_pattern"],"heaven_win")
         self.assertEqual(ledger["wins"][0]["raw_fan"],4)
         self.assertEqual(ledger["wins"][0]["effective_fan"],3)
+        events=[event for event in g.public_state()["events"]
+                if event["type"]=="win_settlement"]
+        self.assertEqual(len(events),1)
+        self.assertEqual(events[0]["seat"],dealer)
+        self.assertEqual(events[0]["amount"],2400)
+        self.assertEqual(events[0]["amount_per_payer"],800)
+        self.assertEqual(sorted(events[0]["payers"]),
+                         sorted(s for s in range(4) if s!=dealer))
+        self.assertEqual(events[0]["amount"],
+                         len(events[0]["payers"])*events[0]["amount_per_payer"])
 
     def test_public_balances_have_explicit_unpriced_kong_limits(self):
         g=FourPlayerOpening(19)
