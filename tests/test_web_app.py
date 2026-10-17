@@ -729,6 +729,20 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".match-river-cell .tile{width:44px;height:60px}", css)
         self.assertIn(b".match-seat-meld .tile{width:40px;height:54px}", css)
 
+    def test_m330_controlled_ai_score_lab_is_public_and_visible(self):
+        html,_=self.get("/")
+        js,_=self.get("/ai_replay.js")
+        for ident in ("ai-replay-official-scores",
+                      "ai-replay-official-caveat",
+                      "ai-replay-official-levels",
+                      "ai-replay-official-differences",
+                      "ai-replay-official-download"):
+            self.assertEqual(html.count(('id="%s"' % ident).encode()),1)
+        self.assertIn(b"official_score_analysis",js)
+        self.assertIn(b"renderOfficialScores()",js)
+        self.assertIn(b"downloadOfficialScores",js)
+        self.assertNotIn(b"private_view",js)
+
     def test_m314_live_match_four_sided_table_markup_and_privacy(self):
         page,_=self.get("/")
         css,_=self.get("/app.css")
