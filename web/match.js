@@ -377,16 +377,17 @@
     ).join(" ｜ ")));
   }
   function settlementAvailable(){
-    return !liveBoard && Array.isArray(state?.win_ledger?.wins) &&
-      state.win_ledger.wins.length>0 &&
-      Array.isArray(state.win_ledger.balances);
+    return !liveBoard && Array.isArray(state?.win_ledger?.balances) &&
+      (state.win_ledger.wins.length>0 ||
+       (state.exhaustive_settlement?.posted===true &&
+        state.exhaustive_settlement.entries.length>0));
   }
   function signedScore(value){
     return (value>=0?"+":"")+value;
   }
   function seatScoreText(seat){
-    const amount=state.win_ledger.balances[seat];
-    return "胡牌积分 "+signedScore(amount);
+    const amount=state.settled_balances?.[seat]??state.win_ledger.balances[seat];
+    return "已入账积分 "+signedScore(amount);
   }
   function appendWinRecord(container,win,index){
     const type={self_draw:"自摸",ron:"点炮胡",rob_kong:"抢杠胡"}[win.kind]||
@@ -544,8 +545,10 @@
     const discarded=seats.map(seat=>
       state.discards.filter(item=>item.seat===seat.id).length);
     $("match-round-report-status").textContent=
-      "本局共"+postedWins.length+"笔胡牌入账 · "+
-      state.discards.length+"次公开弃牌 · 牌山剩余"+
+      "本局共"+postedWins.length+"笔胡牌入账"+
+      (state.exhaustive_settlement?.posted?
+        " · "+state.exhaustive_settlement.entries.length+"笔流局赔付入账":"")+
+      " · "+state.discards.length+"次公开弃牌 · 牌山剩余"+
       state.wall_count+"张";
     const summary=$("match-round-report-seats");
     summary.replaceChildren();
@@ -559,7 +562,10 @@
         "胡牌"+winnerCount+"次 · 弃牌"+discarded[id]+"张"+
         " · 公开副露"+state.melds[id].length+"组"));
       seatCard.append(el("b","match-round-seat-balance",
-        "胡牌积分 "+signedScore(ledger?.balances?.[id]??0)));
+        "胡牌积分 "+signedScore(ledger?.balances?.[id]??0)+
+        (state.exhaustive_settlement?.posted?
+          " · 流局 "+signedScore(state.exhaustive_settlement.balances[id])+
+          " · 已入账合计 "+signedScore(state.settled_balances[id]):"")));
       seatCard.append(el("small","",
         kong?.base===null?"独立杠钱：未启用定价":
         "独立杠钱试验积分 "+signedScore(kong?.balances?.[id]??0)));
@@ -569,8 +575,10 @@
     $("match-round-report-note").textContent=
       "胡牌积分依据服务器已入账账本；历史局面来自本次浏览器会话逐次保存的真实公开快照，刷新页面后不保留。"+
       (reviewDropped?"已省略最早"+reviewDropped+"个公开快照。":"")+
-      (wallEnd?" 牌山耗尽后的查花猪、查大叫仍属未入账预览。":
-        " 流局查花猪、查大叫等赔付未入账，不属于本报告已入账积分。")+
+      (wallEnd?(state.exhaustive_settlement?.posted?
+        " 方案A（仅未胡玩家参与）已完成流局零和结算。":
+        " 流局存在待核验事项或旧局记录，流局赔付未入账。"):
+        " 本局没有发生流局查花猪、查大叫结算。")+
       " 独立杠钱仅为可选试验积分，绝不计入胡牌余额。";
   }
   function renderTableSettlement(){
@@ -580,12 +588,14 @@
     if(!visible)return;
     const ledger=state.win_ledger;
     const terminal=state.phase==="finished"||state.phase==="wall_exhausted";
-    $("match-table-settlement-title").textContent="本局胡牌结算 · 已入账";
+    $("match-table-settlement-title").textContent=
+      state.exhaustive_settlement?.posted?
+      "本局胡牌 + 流局结算 · 已入账":"本局胡牌结算 · 已入账";
     $("match-table-round-phase").textContent=terminal?"摸切已结束":"对局进行中";
     const scores=$("match-table-scores");
     scores.replaceChildren();
     for(const seat of seats){
-      const amount=ledger.balances[seat.id];
+      const amount=state.settled_balances?.[seat.id]??ledger.balances[seat.id];
       const cell=el("div","match-table-score");
       cell.classList.add(amount>0?"is-credit":amount<0?"is-debit":"is-zero");
       cell.append(el("span","",seat.id+"号 · "+seat.label+
@@ -617,9 +627,12 @@
     history.append(all);
     const kongEnabled=state.kong_ledger?.base!=null;
     $("match-table-score-note").textContent=
-      "以上仅为胡牌已入账积分"+(kongEnabled?
-        "；独立杠钱另以试验积分记账，不计入此栏":"，不含独立杠钱")+
-      "；流局查花猪、查大叫仍未正式入账。";
+      (state.exhaustive_settlement?.posted?
+        "以上为胡牌 + 方案A流局已入账合计":
+        "以上仅为胡牌已入账积分")+
+      (kongEnabled?"；独立杠钱试验积分另列，不计入此栏":
+        "；不含独立杠钱")+
+      (state.exhaustive_settlement?.posted?"。":"；无正式流局结算。");
   }
   function renderWall(){
     const remaining=publicBoard().wall_count;
@@ -729,7 +742,7 @@
         "请点击自己的麻将切牌。其他三家由各自策略AI操作，合法胡牌将即时计入部分积分。"));
     }else{
       controls.append(el("p","review-intro",
-        "本局摸切已结束。胡牌部分已入账，杠钱仅按可选模拟底分计入，流局赔付仍需确认。可以重新开一局。"));
+        "本局摸切已结束。胡牌已入账；牌山耗尽时按方案A处理流局赔付（如牌形未核验则暂缓），杠钱仍为独立模拟。可以重新开一局。"));
     }
     const publicInfo=$("match-public");publicInfo.replaceChildren();
     if(state.missing_suits){
@@ -811,7 +824,7 @@
           voided+"笔杠上炮作废（底分和撤销细则待确认，未产生虚构退款）。"));
       }
       score.append(el("p","review-footnote",
-        "胡牌零和流水已入账；独立杠钱只有明确勾选后才模拟入账，流局赔付只提供预览。"));
+        "胡牌零和流水已入账；方案A在合法流局后单独结算，独立杠钱只有明确勾选后才模拟入账。"));
       publicInfo.append(score);
     }
     const kongLedger=state.kong_ledger;
@@ -850,56 +863,49 @@
       }
       const net=state.combined_balances||[0,0,0,0];
       k.append(el("p","match-net",
-        "胡牌 + 模拟杠钱余额："+net.map((n,i)=>
+        "胡牌 + 流局正式结算 + 模拟杠钱余额："+net.map((n,i)=>
           i+"号"+(n>=0?"+":"")+n).join(" · ")));
       publicInfo.append(k);
     }
     const review=state.exhaustive_review;
+    const settled=state.exhaustive_settlement;
     if(review?.triggered){
       const sec=el("section","match-exhaustive-review");
-      sec.append(el("h4","","流局查花猪 / 查大叫：待确认结算预览"));
+      sec.append(el("h4","",
+        settled?.posted?"流局查花猪 / 查大叫 · 方案A已正式入账":
+        "流局查花猪 / 查大叫 · 尚未正式入账"));
       sec.append(el("p","review-intro",
-        "本局牌墙耗尽，仍有"+review.participating_active_seats.length+
-        "位活跃玩家。仅按“活跃玩家之间付款”方案试算，"+
-        "已胡玩家是否参与尚未确认；以下金额没有进入实际账本。"));
+        "仅"+review.participating_active_seats.length+
+        "位未胡玩家参与流局收付款；已胡玩家不收也不付。"+
+        (settled?.posted?" 已由服务器逐笔结算并完成四家零和校验。":
+          " 当前是旧局试算或存在待核验牌形，不作实际扣款。")));
       const kinds={flower_pig:"花猪",listening:"合法听牌",
-        unready:"未听牌",unresolved_exposed_missing:"有缺门公开副露，待核验",
-        unresolved_nonstable_hand:"非稳定张数，待核验"};
+        unready:"未听牌",unresolved_exposed_missing:"缺门公开副露待核验",
+        unresolved_nonstable_hand:"非稳定手牌待核验"};
       for(const item of review.seats){
         sec.append(el("p","review-footnote",
           item.seat+"号："+(kinds[item.classification]||"待核验")+
           (item.max_effective_fan!==null?
             " · 最大可结"+item.max_effective_fan+"番":"")));
       }
-      for(const entry of review.proposed_transfers){
+      const transfers=settled?.posted?settled.entries:review.proposed_transfers;
+      for(const entry of transfers){
         sec.append(el("p","review-footnote",
-          (entry.stage==="flower_pig"?"花猪":"查大叫")+
-          "（仅试算）："+entry.payer+"号向"+entry.recipient+
-          "号付"+entry.amount));
+          (entry.stage==="flower_pig"?"查花猪":"查大叫")+
+          (settled?.posted?"（已入账）":"（仅预览）")+"："+
+          entry.payer+"号向"+entry.recipient+"号付"+entry.amount));
       }
-      // Compare TWO audited assumptions. Neither touches the authoritative
-      // HU ledger or makes a second terminal settlement.
-      const scope=review.scope_comparison;
-      if(scope?.available && Array.isArray(scope.scenarios)){
-        const options=el("details","match-transfers");
-        options.append(el("summary","",
-          "查看已胡玩家是否收取花猪赔付的两种假设（零和试算）"));
-        for(const scenario of scope.scenarios){
-          const label=scenario.policy==="active_only_preview"
-            ?"方案A：仅未胡玩家之间":"方案B：已胡玩家也收取花猪赔付";
-          options.append(el("p","review-footnote",label+" · 四家差额 "+
-            scenario.balances.map((n,i)=>i+"号"+signedScore(n)).join(" · ")+
-            " · 零和"+(scenario.zero_sum?"通过":"异常")));
-        }
-        options.append(el("p","match-unpriced",
-          "两种假设均未入账；已胡玩家在方案B仅参与花猪收款，不参与查大叫。"));
-        sec.append(options);
-      }else if(scope){
+      if(settled?.posted){
+        sec.append(el("p","match-net",
+          "四家流局净额："+settled.balances.map((n,i)=>
+            i+"号"+signedScore(n)).join(" · ")+
+          " · 零和"+(settled.zero_sum?"通过":"异常")));
+      }else{
         sec.append(el("p","match-unpriced",
-          "当前存在未核验缺门副露或手牌张数，暂不展示假设金额。"));
+          settled?.reason==="unresolved_terminal_hand"?
+            "存在异常公开缺门副露或非稳定手牌，正式赔付已暂缓；没有扣除任何流局积分。":
+            "此记录尚未进行正式流局入账。"));
       }
-      sec.append(el("p","match-unpriced",
-        "流局付款状态：未入账。赔付参与人及缺门副露归属确认后才能正式结算。"));
       publicInfo.append(sec);
     }
     const winners=state.winners;
