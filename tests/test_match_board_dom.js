@@ -32,7 +32,7 @@ const ids=[
   "match-coefficient","match-fan-cap","match-self-draw-mode","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status","match-request-status",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
-  "match-focus-toggle","match-large-tiles-toggle","match-skin-toggle",
+  "match-focus-toggle","match-skin-toggle","match-decision",
   "match-back-color","match-self-missing-flag",
   "match-confirm-discard",
   "match-board",
@@ -251,11 +251,6 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-focus-toggle"].attributes["aria-pressed"],"true");
   dom["match-focus-toggle"].handlers.click();
   assert.equal(dom["match-stage"].classList.contains("is-immersive"),false);
-  dom["match-large-tiles-toggle"].handlers.click();
-  assert.equal(dom["match-board"].classList.contains("is-large-tiles"),true);
-  assert.equal(dom["match-large-tiles-toggle"].attributes["aria-pressed"],"true");
-  dom["match-large-tiles-toggle"].handlers.click();
-  assert.equal(dom["match-board"].classList.contains("is-large-tiles"),false);
   dom["match-skin-toggle"].handlers.click();
   assert.equal(dom["match-board"].classList.contains("is-midnight-felt"),true);
   assert.equal(dom["match-skin-toggle"].attributes["aria-pressed"],"true");
@@ -816,8 +811,10 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   replyMatch={...next};
   dom["match-new"].handlers.click();
   await settle();
-  const reaction=dom["match-controls"].children.find(x=>
+  const reaction=dom["match-decision"].children.find(x=>
     x.className==="match-reaction-actions");
+  assert.equal(dom["match-decision"].hidden,false,
+    "claim must be selectable from table center");
   assert.ok(reaction);
   assert.deepEqual(reaction.children.map(x=>x.textContent),[
     "胡 · 优先响应","明杠","碰","过 · 放弃本次响应"
@@ -835,7 +832,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     pending_rob_kong:{seat:2,tile:"s2"}};
   dom["match-new"].handlers.click();
   await settle();
-  const rob=dom["match-controls"].children.find(x=>
+  const rob=dom["match-decision"].children.find(x=>
     x.className==="match-reaction-actions");
   assert.deepEqual(rob.children.map(x=>x.textContent),
     ["胡 · 优先响应","过 · 放弃本次响应"]);
@@ -904,6 +901,57 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-controls"].children.some(x=>
     x.className==="match-self-win-preview"),false,
     "a nonwinning/old round must not retain the prior quote");
+
+  // M3.44: each owner-oriented side river retains chronological source
+  // order, grouped in 8-tile VERTICAL lanes for desktop. CSS makes the left
+  // lanes top-to-bottom and right lanes bottom-to-top, without reversing
+  // source history, hidden hands, claimed removals or latest highlighting.
+  const lateral=[];
+  for(let i=0;i<17;i++){
+    lateral.push({seat:3,tile:"m"+(i%9+1),
+      discard_kind:i%2?"tedashi":"tsumogiri"});
+    lateral.push({seat:1,tile:"s"+(i%9+1)});
+  }
+  startMatch={...base,discards:lateral};
+  dom["match-new"].handlers.click();
+  await settle();
+  for(const seat of [3,1]){
+    const root=dom["match-river-"+seat];
+    const riverTiles=root.children.find(x=>x.className==="match-river-tiles");
+    assert.deepEqual(riverTiles.children.map(x=>x.className),
+      ["match-river-lane","match-river-lane","match-river-lane"]);
+    assert.deepEqual(riverTiles.children.map(x=>x.children.length),[8,8,1]);
+    const indexed=riverTiles.children.flatMap(lane=>
+      lane.children.map(cell=>Number(cell.attributes["data-discard-order"])));
+    assert.deepEqual(indexed,lateral.map((e,i)=>e.seat===seat?i:null)
+      .filter(x=>x!==null));
+    assert.equal(riverTiles.children[2].children[0].classList.contains(
+      "is-latest"),seat===1);
+  }
+  assert.equal(dom["match-decision"].hidden,true,
+    "normal discard phase must not block the table with a reaction panel");
+  assert.equal(dom["match-controls"].children.some(x=>
+    x.className==="match-reaction-actions"),false);
+  startMatch={...base,phase:"await_discard",
+    kong_options:[{type:"an_gang",tile:"m9"}]};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-decision"].hidden,false,
+    "own legally offered kong should be centered, never below the table");
+  const kongGroup=dom["match-decision"].children.find(x=>
+    x.className==="match-reaction-actions");
+  assert.equal(kongGroup.children.length,1);
+  assert.ok(kongGroup.children[0].textContent.includes("暗杠"));
+  assert.equal(dom["match-controls"].children.some(x=>
+    x.textContent.includes("暗杠")),false);
+  const kongBefore=requests.length;
+  kongGroup.children[0].handlers.click();
+  await settle();
+  assert.equal(requests.length,kongBefore+1);
+  assert.equal(requests.at(-1).action,"match_kong");
+  assert.equal(requests.at(-1).kind,"an_gang");
+  assert.equal(requests.at(-1).tile,"m9");
+  console.log("M3.44 left-down/right-up river lanes and centered peng/kong: PASS");
 
   // M3.42: all four concealed-kong backs remain if an old board had no
   // explicit public marker. A newly-declared kong flips only the last tile.
