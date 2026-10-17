@@ -1785,3 +1785,14 @@
 .match-voice-controls :is(select,button):focus-visible{
   outline:3px solid #c49b40;outline-offset:2px}
 .match-voice-controls :is(select,button):disabled{opacity:.5;cursor:not-allowed}
+
+/* M3.38: readable, accessible per-round self-draw rules selector. */
+.table-demo-toolbar select#match-self-draw-mode{
+  min-height:40px;min-width:165px;border:1px solid #c6dace;
+  border-radius:8px;padding:9px 11px;background:#fff;color:#30533b;font:inherit
+}
+.table-demo-toolbar select#match-self-draw-mode:focus-visible{
+  outline:3px solid #c49b40;outline-offset:2px
+}
+.match-self-draw-help{font-size:12px;color:#557260;line-height:1.65;
+  flex-basis:100%;padding:3px 2px}

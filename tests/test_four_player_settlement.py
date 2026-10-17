@@ -215,6 +215,56 @@ class M32SettlementTests(unittest.TestCase):
             self.assertEqual(item["raw_fan"],5)
             self.assertEqual(item["effective_fan"],3)
 
+    def test_self_draw_modes_two_fan_three_payers_and_normal_ron(self):
+        score={"legal":True,"raw_fan":2,"effective_fan":2,
+               "multiplier":4,"main_pattern":"pure_suit",
+               "combinations":{},"bonuses":{}}
+        for mode,unit in (("add_base",500),("add_fan",800)):
+            with self.subTest(mode=mode):
+                ledger=WinLedger(100,3,mode)
+                posted=ledger.pay_win(
+                    winner=0,payers=[1,2,3],score=score,
+                    source=0,kind="self_draw",tile="m1")
+                self.assertEqual(posted["multiplier"],4)
+                self.assertEqual(posted["self_draw_mode"],mode)
+                self.assertEqual(posted["amount_per_payer"],unit)
+                self.assertEqual(posted["total_received"],unit*3)
+                self.assertEqual(ledger.public_state()["balances"],
+                                 [unit*3,-unit,-unit,-unit])
+                self.assertEqual(len(ledger.public_state()["entries"]),3)
+                self.assertTrue(ledger.public_state()["zero_sum"])
+                # The selected self-draw mode must not uplift a discard win.
+                ron=WinLedger(100,3,mode)
+                ticket=ron.pay_win(
+                    winner=0,payers=[1],source=1,kind="ron",
+                    score=score,tile="m1")
+                self.assertEqual(ticket["amount_per_payer"],400)
+                rob=WinLedger(100,3,mode)
+                result=rob.pay_win(winner=0,payers=[2],source=2,
+                                  kind="rob_kong",score=score,tile="m1")
+                self.assertEqual(result["amount_per_payer"],400)
+        # Internal legacy default retains prior historical/AI fixture scores.
+        self.assertEqual(WinLedger().public_state()["self_draw_mode"],"legacy")
+        for invalid in ("add_two",True,None,0,{},[], "AddFan"):
+            with self.subTest(invalid=invalid),self.assertRaises(ValueError):
+                WinLedger(100,3,invalid)
+
+    def test_real_dealer_self_draw_mode_changes_verified_winner_balance(self):
+        dealer=FourPlayerOpening(42).dealer
+        hand=["m1"]*3+["m4"]*3+["s1"]*3+["s4"]*3+["s9"]*2
+        for mode,unit in (("add_base",900),("add_fan",1600)):
+            with self.subTest(mode=mode):
+                g=staged_game({dealer:hand.copy()},{dealer:"p"})
+                g.ledger=WinLedger(100,3,mode)
+                g.declare_self_win(dealer)
+                wins=g.public_state()["win_ledger"]["wins"]
+                self.assertEqual(wins[0]["effective_fan"],3)
+                self.assertEqual(wins[0]["amount_per_payer"],unit)
+                self.assertEqual(wins[0]["total_received"],unit*3)
+                self.assertEqual(sum(g.public_state()["settled_balances"]),0)
+                self.assertEqual(g.public_state()["winners"][0]["score"]
+                                 ["total_received"],unit*3)
+
     def test_ledger_rejects_invalid_amounts_and_requires_zero_sum(self):
         game=WinLedger(200,3)
         valid={"legal":True,"raw_fan":4,"effective_fan":3,"multiplier":8,

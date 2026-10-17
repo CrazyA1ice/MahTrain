@@ -999,6 +999,8 @@
       score.append(el("p","review-footnote",
         "房间系数"+ledger.room_coefficient+
         " · 最终番数封顶"+ledger.fan_cap+
+        " · 自摸方式"+({add_base:"加底",add_fan:"加番",
+          legacy:"旧版标准"}[ledger.self_draw_mode]||"未知")+
         " · 零和校验："+(ledger.zero_sum?"通过":"异常")));
       const balances=el("div","match-balances");
       ledger.balances.forEach((v,i)=>{
@@ -1018,7 +1020,11 @@
             " · "+win.main_pattern));
           row.append(el("span","",
             "原始"+win.raw_fan+"番 → 封顶"+
-            win.effective_fan+"番 / ×"+win.multiplier));
+            win.effective_fan+"番 / 牌型×"+win.multiplier+
+            (win.kind==="self_draw"?
+              " / 自摸"+({add_base:"加底",add_fan:"加番",
+                legacy:"旧版"}[ledger.self_draw_mode]||"")+
+              " / 每家×"+(win.amount_per_payer/ledger.room_coefficient):"")));
           row.append(el("span","",
             "付款："+win.payers.map(x=>x+"号").join("、")+
             "各付"+win.amount_per_payer+"；赢家共得"+win.total_received));
@@ -1152,6 +1158,7 @@
     const options={
       room_coefficient:Number($("match-coefficient").value),
       fan_cap:Number($("match-fan-cap").value),
+      self_draw_mode:$("match-self-draw-mode").value,
       ai_levels:[1,2,3].map(n=>$("match-ai-"+n).value),
       kong_base:$("match-enable-kong").checked
         ?Number($("match-kong-base").value):null,
