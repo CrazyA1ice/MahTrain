@@ -49,6 +49,19 @@ _MATCH_AGENTS: dict[str, dict[int, MahjongAgent]] = {}
 _MATCH_HISTORY: dict[str, list[dict]] = {}
 _MATCH_OPENING: dict[str, dict] = {}
 _MATCH_ARCHIVE_IDS: dict[str, str] = {}
+# Never reuse an automatically generated match seed during this server process.
+# Experimental fixed seeds remain opt-in for reproducible rule tests.
+_MATCH_USED_SEEDS: set[int] = set()
+
+
+def _automatic_match_seed() -> int:
+    if len(_MATCH_USED_SEEDS) >= 2**32:
+        raise RuntimeError("no unused match seeds remain")
+    seed = secrets.randbelow(2**32)
+    while seed in _MATCH_USED_SEEDS:
+        seed = secrets.randbelow(2**32)
+    return seed
+
 _AI_REPLAY_JOBS: dict[str, dict] = {}
 _MAX_REPLAY_JOBS = 4
 _MAX_ACTIVE_REPLAY_JOBS = 1
@@ -462,9 +475,12 @@ def _process(action: str, payload: dict) -> dict:
                 "notes":"其他家暗手、未来牌墙、私有合法响应选项及逐家向听不公开",
             }}
         if action == "match_new":
-            seed=payload.get("seed",42)
+            # Ordinary matches are generated server-side; explicit numeric
+            # seeds are reserved for the separate lab/reproducibility mode.
+            manual_seed="seed" in payload
+            seed=payload["seed"] if manual_seed else _automatic_match_seed()
             if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
-                raise ValueError("M3.1 四人试验局种子须为0至2^32-1")
+                raise ValueError("实验室四人对局种子须为0至2^32-1")
             levels=payload.get("ai_levels",["basic","advanced","challenge"])
             if (type(levels) is not list or len(levels)!=3 or
                 any(type(level) is not str or level not in AI_LEVELS
@@ -481,6 +497,7 @@ def _process(action: str, payload: dict) -> dict:
                 for seat in (1,2,3)
             }
             token=secrets.token_urlsafe(24)
+            _MATCH_USED_SEEDS.add(seed)
             if len(_MATCH_SESSIONS)>=32:
                 stale=next(iter(_MATCH_SESSIONS))
                 _MATCH_SESSIONS.pop(stale)
