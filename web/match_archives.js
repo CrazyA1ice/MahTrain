@@ -268,7 +268,10 @@
         "档案 "+archiveId+" · "+details.created_at;
       $("match-archives-detail-summary").textContent=
         (report.phase==="finished"?"三家胡牌结束":"牌山耗尽")+
-        " · 庄家"+report.dealer+"号 · "+report.steps.length+
+        " · 庄家"+report.dealer+"号 · 自摸"+
+        ({add_base:"加底",add_fan:"加番",legacy:"旧版"}[
+          report.match_config?.self_draw_mode||"legacy"]||"未知")+
+        " · "+report.steps.length+
         "个已保存动作快照 · "+report.win_ledger.wins.length+
         "笔胡牌"+(report.exhaustive_settlement?.posted?
           " · "+report.exhaustive_settlement.entries.length+
