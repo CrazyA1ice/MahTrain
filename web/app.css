@@ -1144,3 +1144,66 @@
   .match-review-preview-seats{grid-template-columns:1fr}
   .match-review-filters label{flex-wrap:wrap}
 }
+
+/* M3.22: persisted public Mahjong archives remain read-only. */
+.match-archives-panel{display:grid;gap:10px}
+.match-archives-panel .panel-title{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.match-archives-summary{font-size:13px;font-weight:700;color:#325846}
+.match-archives-list{display:grid;gap:7px;max-height:360px;overflow:auto}
+.match-archive-entry{
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+  border:1px solid #ceddce;border-radius:9px;background:#f7fcf8;
+  padding:9px 11px;
+}
+.match-archive-entry span{flex:1 1 280px;font-size:12px;color:#3e624c}
+.match-archive-button,.match-archives-compare-tools button{
+  border:1px solid #b3cbb9;background:#eef8f0;
+  color:#29563b;border-radius:7px;padding:6px 10px;cursor:pointer;
+  font-weight:700;font-size:12px;
+}
+.match-archive-button.is-selected{background:#cfebd2;border-color:#598c66}
+.match-archives-compare-tools{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.match-archives-compare-tools span{font-size:11px;color:#5b7560}
+.match-archives-compare-tools button:disabled{opacity:.5;cursor:not-allowed}
+.match-archives-comparison{
+  padding:9px;background:#e9f4eb;border-radius:8px;
+  color:#335c42;font-size:12px;
+}
+.match-archives-comparison:empty{display:none}
+.match-archives-comparison p{margin:5px 0}
+.match-archives-detail{
+  display:grid;gap:12px;padding:13px;
+  border:1px solid #aacfb5;border-radius:10px;background:#f0f8f1;
+}
+.match-archives-detail[hidden]{display:none}
+.match-archives-detail-head{
+  display:flex;justify-content:space-between;gap:12px;
+  align-items:center;flex-wrap:wrap
+}
+.match-archives-detail-head a{font-size:12px;color:#216044}
+.match-archives-detail-summary{font-size:12px}
+.match-archives-balances{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;
+}
+.match-archive-balance{font-size:12px;background:#fff;padding:8px;border-radius:8px}
+.match-archives-wins{font-size:12px;color:#3e604b}
+.match-archives-wins p{margin:4px 0}
+.match-archives-review-controls{display:flex;gap:12px;flex-wrap:wrap}
+.match-archives-review-controls label{
+  display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;
+}
+.match-archives-review-controls select{
+  padding:6px;border:1px solid #c5d6cb;border-radius:6px;
+}
+.match-archives-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:6px;max-height:225px;overflow:auto}
+.match-archives-board{display:grid;gap:8px;background:#e8f3eb;padding:10px;border-radius:8px}
+.match-archive-four-seats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.match-archive-public-seat{background:#fff;border:1px solid #cfddcf;padding:9px;border-radius:8px;min-width:0}
+.match-archive-public-seat strong{font-size:12px;color:#2b543a}
+.match-archive-public-seat p{font-size:11px;margin:5px 0;overflow-wrap:anywhere}
+.match-archive-back-count{display:flex;gap:2px;margin:6px 0;flex-wrap:wrap}
+.match-archive-back{width:10px;height:16px;background:#335f52;border:1px solid #b0b66a;border-radius:2px}
+#match-archives-message{font-size:12px;color:#a4422e}
+@media(max-width:640px){
+  .match-archive-four-seats,.match-archives-balances{grid-template-columns:1fr}
+}
