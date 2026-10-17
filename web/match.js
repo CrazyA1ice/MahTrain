@@ -105,14 +105,10 @@
           $("match-playback").hidden=true;
           $("match-motion").hidden=true;
         }
-      }else if(!announcedByPlayback && voice){
-        // Playback disabled/empty: still announce NEW publicly revealed
-        // events, never the complete historical event log or private draw.
-        const events=(data.match.events||[]).slice(previousEvents);
-        await voice.announceEventsWait(
-          window.MahTrainPlayback.normalize(events,96).frames);
-        syncVoiceControls();
       }
+      // On playback-off games, show the confirmed river / scoreboard first.
+      // Speech starts only AFTER the public tile is actually in the DOM;
+      // waiting here would produce invisible spoken discards.
       liveBoard=null;
       if(name==="match_new"){
         reviewHistory=[];reviewDropped=0;reviewSelected=null;
@@ -153,6 +149,12 @@
           seat:win.winner,amount:win.total_received,
           payers:win.payers,amount_per_payer:win.amount_per_payer,
         })));
+      }
+      if(name!=="match_new" && !announcedByPlayback && voice){
+        const events=(data.match.events||[]).slice(previousEvents);
+        await voice.announceEventsWait(
+          window.MahTrainPlayback.normalize(events,96).frames);
+        syncVoiceControls();
       }
     }catch(err){
       liveBoard=null;
