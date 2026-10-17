@@ -117,7 +117,7 @@ class OfficialFivePolicyTests(unittest.TestCase):
         cases=[]
         g=copy.deepcopy(original);g.pop();cases.append(g)
         g=copy.deepcopy(original);g.append(copy.deepcopy(g[0]));cases.append(g)
-        g=copy.deepcopy(original);g[0]["assignment"][0]="baseline";cases.append(g)
+        g=copy.deepcopy(original);g[0]["assignment"][0]="challenge";cases.append(g)
         g=copy.deepcopy(original);g[0]["scoring_rules"]["fan_cap"]=4;cases.append(g)
         g=copy.deepcopy(original);g[0]["scoring_rules"]["kong_base"]=100;cases.append(g)
         g=copy.deepcopy(original);g[0]["official_settled_balances"][0]+=1;cases.append(g)
