@@ -189,6 +189,74 @@ def sanitize_win_ledger(ledger: dict) -> dict:
     return {"balances": balances, "wins": cleaned, "zero_sum": True}
 
 
+def sanitize_exhaustive_settlement(raw, final_board: dict) -> dict | None:
+    """Strict archive allowlist for the official active-only terminal ledger."""
+    if raw is None:  # Old archives / synthetic historical tests.
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("invalid exhaustive settlement")
+    if raw.get("policy") != "active_only_final" or type(raw.get("posted")) is not bool:
+        raise ValueError("invalid exhaustive policy or posted flag")
+    balances = _balances(raw.get("balances"), "exhaustive balances")
+    entries = raw.get("entries")
+    coefficient = raw.get("room_coefficient")
+    cap = raw.get("fan_cap")
+    if (type(entries) is not list or type(coefficient) is not int or
+            coefficient <= 0 or type(cap) is not int or not 0 <= cap <= 12 or
+            raw.get("zero_sum") is not True):
+        raise ValueError("invalid exhaustive ledger header")
+    posted = raw["posted"]
+    reason = raw.get("reason")
+    if (posted and reason != "settled") or (not posted and reason != "unresolved_terminal_hand"):
+        raise ValueError("invalid exhaustive ledger status")
+    if not posted and (entries or balances != [0, 0, 0, 0]):
+        raise ValueError("unsettled exhaustive ledger cannot contain payments")
+    expected = [0, 0, 0, 0]
+    cleaned, seen = [], set()
+    for index, item in enumerate(entries, start=1):
+        if not isinstance(item, dict):
+            raise ValueError("invalid exhaustive transfer")
+        stage, payer, recipient, amount = (
+            item.get("stage"), item.get("payer"), item.get("recipient"),
+            item.get("amount"),
+        )
+        if (stage not in ("flower_pig", "da_jiao") or
+                type(payer) is not int or type(recipient) is not int or
+                payer not in range(4) or recipient not in range(4) or
+                payer == recipient or final_board["won"][payer] or
+                final_board["won"][recipient] or
+                type(amount) is not int or amount <= 0 or
+                type(item.get("index")) is not int or item["index"] != index):
+            raise ValueError("invalid exhaustive payment or participating seats")
+        identifier = (stage, payer, recipient)
+        if identifier in seen:
+            raise ValueError("duplicate exhaustive payout")
+        seen.add(identifier)
+        entry = {"index": index, "stage": stage, "payer": payer,
+                 "recipient": recipient, "amount": amount}
+        if stage == "flower_pig":
+            if amount != 8 * coefficient:
+                raise ValueError("incorrect flower pig payment")
+        else:
+            fan = item.get("effective_fan")
+            if (type(fan) is not int or not 0 <= fan <= cap or
+                    amount != coefficient * 2**fan):
+                raise ValueError("incorrect da-jiao payment")
+            entry["effective_fan"] = fan
+        expected[payer] -= amount
+        expected[recipient] += amount
+        cleaned.append(entry)
+    if balances != expected:
+        raise ValueError("exhaustive balance/payout mismatch")
+    if posted and final_board["phase"] != "wall_exhausted":
+        raise ValueError("cannot post exhaustive payments outside exhausted wall")
+    return {
+        "policy": "active_only_final", "posted": posted, "reason": reason,
+        "balances": balances, "entries": cleaned, "zero_sum": True,
+        "room_coefficient": coefficient, "fan_cap": cap,
+    }
+
+
 class MatchArchive:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -230,6 +298,9 @@ class MatchArchive:
         } for step in history[-_MAX_ARCHIVE_STEPS:]]
         safe_board = sanitize_board(public)
         ledger = sanitize_win_ledger(public["win_ledger"])
+        exhaustive = sanitize_exhaustive_settlement(
+            public.get("exhaustive_settlement"), safe_board,
+        )
         kong = public.get("kong_ledger")
         if not isinstance(kong, dict):
             raise ValueError("invalid kong ledger")
@@ -245,9 +316,19 @@ class MatchArchive:
             "steps": safe_steps, "truncated": max(0, len(history)-len(safe_steps)),
             "final_board": safe_board,
             "win_ledger": ledger,
+            "exhaustive_settlement": exhaustive,
+            "settled_balances": [
+                ledger["balances"][i] + (
+                    exhaustive["balances"][i] if exhaustive else 0
+                ) for i in range(4)
+            ],
             "kong_balances": kong_balances,
             "kong_priced": kong.get("base") is not None,
-            "note": "胡牌余额已入账；杠钱仅为可选试验积分；流局赔付未正式入账。",
+            "note": (
+                "胡牌及已核验方案A流局赔付已分别入账；杠钱仍属可选试验积分。"
+                if exhaustive and exhaustive["posted"] else
+                "胡牌余额已入账；流局待核验或未触发赔付；杠钱仅为可选试验积分。"
+            ),
         }
         archive_id = secrets.token_urlsafe(18)
         stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
