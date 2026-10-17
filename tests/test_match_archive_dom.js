@@ -57,11 +57,12 @@ const fetch=async url=>{
   const data=url.includes("archive_id=")?result:{
     matches:[
       {archive_id:"savedA",created_at:"2026-10-17T00:00:00Z",
-       phase:"finished",win_b0:-16,win_count:1},
+       phase:"finished",win_b0:-16,settled_b0:-8,win_count:1},
       {archive_id:"savedB",created_at:"2026-10-16T00:00:00Z",
-       phase:"wall_exhausted",win_b0:8,win_count:0},
+       phase:"wall_exhausted",win_b0:8,settled_b0:18,win_count:0},
     ],
-    summary:{games:2,average_player0_win_balance:-4,paid_wins:1},
+    summary:{games:2,average_player0_win_balance:-4,
+      average_player0_settled_balance:5,paid_wins:1},
   };
   return {ok:true,json:async()=>data};
 };
@@ -81,12 +82,20 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(dom["match-archives-list"].children.length,2);
   assert.ok(dom["match-archives-summary"].textContent.includes("已保存 2 局"));
+  assert.ok(dom["match-archives-summary"].textContent.includes("平均正式净额 5.0"));
+  assert.ok(dom["match-archives-list"].children[0].children[1].textContent.includes("-8"));
   let rows=dom["match-archives-list"].children;
   rows[0].children[0].checked=true;rows[0].children[0].handlers.change();
   rows[1].children[0].checked=true;rows[1].children[0].handlers.change();
   assert.equal(dom["match-archives-compare"].disabled,false);
   assert.ok(dom["match-archives-comparison"].children
     .some(x=>x.textContent.includes("差额")));
+  assert.ok(dom["match-archives-comparison"].children
+    .some(x=>x.textContent.includes("-26")),
+    "formal settled delta must include published exhaustive payments");
+  assert.ok(dom["match-archives-comparison"].children
+    .some(x=>x.textContent.includes("-24")),
+    "original HU-only comparison remains separately visible");
   rows[0].children[2].handlers.click();
   await settle();
   assert.equal(dom["match-archives-detail"].hidden,false);
