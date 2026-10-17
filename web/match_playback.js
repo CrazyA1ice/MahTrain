@@ -111,6 +111,17 @@
       ].includes(type));
       const isPeng=actionTypes.includes("peng");
       const isWin=events.some(f=>f.isWin);
+      // Win payments are public ONLY once posted by the authoritative
+      // rule engine. Keep multiple ron winners in one completed transition.
+      const settlements=(Array.isArray(step.events)?step.events:[])
+        .filter(e=>e?.type==="win_settlement" &&
+          Number.isInteger(e.seat)&&e.seat>=0&&e.seat<4 &&
+          Number.isInteger(e.amount)&&e.amount>=0 &&
+          Number.isInteger(e.effective_fan)&&e.effective_fan>=0)
+        .map(e=>({
+          seat:e.seat,amount:e.amount,fan:e.effective_fan,
+          kind:["self_draw","ron","rob_kong"].includes(e.kind)?e.kind:"win",
+        }));
       const tailDraw=actionTypes.includes("kong_supplement");
       const changes=previous?{
         wall:board.wall_count-previous.wall_count,
@@ -123,8 +134,9 @@
         chain:events.map(f=>f.label),
         actionTypes,
         publicTile:exposed?.publicTile||null,
-        isWin,winSeats:winner?.winSeats||last.winSeats,
-        isKong,isPeng,tailDraw,
+        isWin,winSeats:[...new Set([...(winner?.winSeats||last.winSeats||[]),
+          ...settlements.map(x=>x.seat)])],
+        settlements,isKong,isPeng,tailDraw,
         important:isKong||isPeng||isWin,
         holdScale:isWin?2.2:(isKong?1.7:(isPeng?1.4:1)),
         changes,board,

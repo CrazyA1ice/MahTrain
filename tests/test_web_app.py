@@ -758,6 +758,25 @@ class WebUI(unittest.TestCase):
         _match_public_step(game,len(game._events),steps)
         self.assertEqual(len(steps),empty)
 
+    def test_m320_round_end_report_and_all_win_details(self):
+        page,_=self.get("/")
+        script,_=self.get("/match.js")
+        playback,_=self.get("/match_playback.js")
+        css,_=self.get("/app.css")
+        for name in ("match-motion-settlements","match-table-history",
+                     "match-round-report","match-round-report-title",
+                     "match-round-report-status","match-round-report-seats",
+                     "match-round-report-wins","match-round-report-events",
+                     "match-round-report-note"):
+            self.assertEqual(page.count(('id="%s"' % name).encode()),1)
+        self.assertIn(b"renderRoundReport",script)
+        self.assertIn(b"appendWinRecord",script)
+        self.assertIn(b"win_settlement",playback)
+        self.assertIn(b"settlements.map",playback)
+        self.assertIn(b".match-motion-payment",css)
+        self.assertIn(b".match-round-report",css)
+        self.assertIn(b".match-win-history",css)
+
     def test_m319_table_meld_racks_and_settlement_landmarks(self):
         page,_=self.get("/")
         js,_=self.get("/match.js")

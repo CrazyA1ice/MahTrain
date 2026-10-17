@@ -32,7 +32,12 @@ const ids=[
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
   "match-own-score","match-table-settlement","match-table-settlement-title",
   "match-table-round-phase","match-table-scores","match-table-wins",
-  "match-table-score-note",
+  "match-table-score-note","match-table-history",
+  "match-round-report","match-round-report-title",
+  "match-round-report-status","match-round-report-seats",
+  "match-round-report-wins","match-round-report-timeline",
+  "match-round-report-events","match-round-report-note",
+  "match-motion-settlements",
   "match-self-melds","match-self-status","match-ready-hint","match-win-alert",
   "match-playback","match-playback-progress","match-playback-status",
   "match-playback-speed","match-playback-pause","match-playback-step",
@@ -453,6 +458,83 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-playback-skip"].handlers.click();
   await settle();
   assert.equal(dom["match-table-settlement"].hidden,false);
+  // M3.20: a multiple-ron rule transition posts two independent
+  // authoritative payments, but is still ONE real public board frame.
+  const postEvents=[
+    {type:"win_settlement",seat:1,source:0,kind:"ron",
+      amount:16,effective_fan:1},
+    {type:"win_settlement",seat:3,source:0,kind:"ron",
+      amount:8,effective_fan:1},
+    {type:"multi_ron",source:0,seats:[1,3],tile:"m1"},
+  ];
+  const record=(winner,total,source=0)=>({
+    winner,kind:"ron",main_pattern:"平胡",raw_fan:1,
+    effective_fan:1,multiplier:2,amount_per_payer:total,
+    total_received:total,payers:[source],bonuses:{}
+  });
+  const completeLedger={
+    balances:[-24,16,0,8],
+    wins:[record(1,16),record(3,8)]
+  };
+  dom["match-playback-speed"].value="450";
+  startMatch={...base,events:[],
+    win_ledger:{balances:[0,0,0,0],wins:[]}};
+  replyMatch={...next,
+    phase:"finished",won:[false,true,false,true],
+    win_ledger:completeLedger,
+    kong_ledger:{base:null,balances:[0,0,0,0],events:[],entries:[]},
+    events:postEvents,
+    public_steps:[{events:postEvents,board:{
+      phase:"finished",turn:0,wall_count:53,
+      hand_counts:[13,13,10,13],
+      melds:base.melds,
+      discards:base.discards,
+      won:[false,true,false,true],
+    }}],
+  };
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-round-report"].hidden,true);
+  dom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.equal(dom["match-playback"].hidden,false);
+  assert.equal(dom["match-round-report"].hidden,true,
+    "future final report must not show during replay");
+  const payments=dom["match-motion-settlements"];
+  assert.equal(payments.hidden,false);
+  assert.equal(payments.children.length,2);
+  assert.ok(payments.children[0].textContent.includes("1号胡牌"));
+  assert.ok(payments.children[0].textContent.includes("+16"));
+  assert.ok(payments.children[1].textContent.includes("3号胡牌"));
+  assert.ok(payments.children[1].textContent.includes("+8"));
+  assert.equal(dom["match-table-settlement"].hidden,true);
+  dom["match-playback-skip"].handlers.click();
+  await settle();
+  assert.equal(dom["match-round-report"].hidden,false);
+  assert.equal(dom["match-table-settlement"].hidden,false);
+  assert.equal(dom["match-round-report-seats"].children.length,4);
+  assert.equal(descendants(dom["match-round-report-wins"],
+    x=>x.className==="match-win-record").length,2);
+  assert.equal(descendants(dom["match-table-history"],
+    x=>x.className==="match-win-record").length,2);
+  assert.ok(dom["match-round-report-status"].textContent.includes("2笔胡牌"));
+  assert.ok(dom["match-round-report-note"].textContent.includes("未入账"));
+  assert.equal(descendants(dom["match-round-report-events"],
+    x=>x.textContent.includes("胡牌入账")).length,2);
+
+  // End-of-wall WITHOUT paid wins must still yield a report, with no
+  // fabricated transfer, no fake whole-room settlement.
+  startMatch={...base,phase:"wall_exhausted",wall_count:0,
+    win_ledger:{balances:[0,0,0,0],wins:[]},
+    kong_ledger:{base:null,balances:[0,0,0,0],events:[],entries:[]}};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-round-report"].hidden,false);
+  assert.equal(dom["match-table-settlement"].hidden,true);
+  assert.ok(dom["match-round-report-note"].textContent.includes("查花猪"));
+  assert.ok(descendants(dom["match-round-report-wins"],
+    x=>x.textContent.includes("没有已入账胡牌")).length>0);
+  console.log("M3.20 grouped settlement animation and round report DOM smoke: PASS");
   console.log("M3.19 in-table settlement and directional meld DOM smoke: PASS");
   console.log("M3.18 focused kong/win and manual-step live DOM smoke: PASS");
   console.log("M3.17 real wall/back/river incremental DOM smoke: PASS");

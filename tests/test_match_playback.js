@@ -221,6 +221,44 @@ function fakeClock(){
   assert.equal(committed,2);
   assert.equal(timer.count(),0);
 }
+{
+  const playback=require("../web/match_playback.js");
+  const board={
+    phase:"await_draw",turn:2,wall_count:40,
+    hand_counts:[13,13,13,13],
+    melds:[[],[],[],[]],discards:[],
+    won:[false,true,false,true],
+  };
+  const frame=playback.normalizeSteps([{
+    events:[
+      {type:"win_settlement",seat:1,source:0,
+        kind:"ron",effective_fan:2,amount:800,
+        private_hand:["m1"]},
+      {type:"win_settlement",seat:3,source:0,
+        kind:"ron",effective_fan:1,amount:400,
+        future_wall:["p9"]},
+      {type:"multi_ron",source:0,seats:[1,3],tile:"p5"},
+    ],
+    board,
+  }]).frames[0];
+  assert.equal(frame.isWin,true);
+  assert.equal(frame.type,"multi_ron");
+  assert.deepEqual(frame.winSeats,[1,3]);
+  assert.equal(frame.settlements.length,2);
+  assert.deepEqual(frame.settlements.map(x=>x.amount),[800,400]);
+  assert.deepEqual(frame.settlements.map(x=>x.seat),[1,3]);
+  assert.ok(!JSON.stringify(frame).includes("private_hand"));
+  assert.ok(!JSON.stringify(frame).includes("future_wall"));
+  const invalid=playback.normalizeSteps([{
+    events:[
+      {type:"win_settlement",seat:5,amount:100,effective_fan:1},
+      {type:"win_settlement",seat:1,amount:-5,effective_fan:1},
+      {type:"self_draw_win",seat:1},
+    ],board,
+  }]).frames[0];
+  assert.deepEqual(invalid.settlements,[]);
+}
+console.log("M3.20 multi-ron settlement grouping and payment privacy: PASS");
 console.log("M3.18 kong/tail-draw chain, critical-frame focus and paused step: PASS");
 console.log("M3.17 recorded public board steps and privacy: PASS");
 console.log("M3.16 public replay privacy and pause/skip/speed: PASS");
