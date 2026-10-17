@@ -309,5 +309,6 @@ window.MahTrainQuiz?.init();
 window.MahTrainQuizHistory?.init();
 window.MahTrainTableDemo?.init();
 window.MahTrainMatch?.init();
+window.MahTrainMatchArchives?.init();
 window.MahTrainAIReplay?.init();
 window.MahTrainAIBaseline?.init();
