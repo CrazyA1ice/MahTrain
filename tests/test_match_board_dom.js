@@ -252,8 +252,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(requests.length,priorCount);
   assert.ok(dom["match-hud-tip"].textContent.includes("已选"));
-  assert.ok(dom["match-hand"].children.some(x=>
-    x.classList.contains("match-pending-discard")));
+  assert.equal(dom["match-hand"].children.filter(x=>
+    x.classList.contains("match-pending-discard")).length,1,
+    "a duplicate of the same tile must not be raised together");
   const confirmCut=dom["match-controls"].children.find(x=>
     x.textContent.includes("确认打出"));
   assert.ok(confirmCut);
