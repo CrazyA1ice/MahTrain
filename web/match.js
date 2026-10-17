@@ -80,9 +80,25 @@
             :window.MahTrainPlayback.normalize(newEvents.slice(before));
           const fullCount=result.frames.length;
           const focusOnly=$("match-playback-focus").checked===true;
-          const frames=focusOnly
+          let frames=focusOnly
             ?window.MahTrainPlayback.highlightFrames(result.frames)
             :result.frames;
+          // An interactive AI continuation may include multiple real quiet
+          // transitions before ONE announced move. Keep every server board
+          // in reviewHistory, but do not make users watch separate 450ms
+          // placeholders for hidden draws and non-announced PASS responses.
+          let omittedQuiet=0;
+          if(name==="match_continue" && frames.length>1){
+            const audible=new Set([
+              "discard","peng","ming_gang","an_gang","bu_gang_declared",
+              "bu_gang","ron","multi_ron","rob_kong","self_draw_win",
+            ]);
+            const meaningful=frames.filter(frame=>
+              frame.actionTypes?.some(type=>audible.has(type)));
+            const reduced=meaningful.length?meaningful:[frames.at(-1)];
+            omittedQuiet=frames.length-reduced.length;
+            frames=reduced;
+          }
           if(frames.length){
             announcedByPlayback=true;
             $("match-playback").hidden=false;
@@ -92,7 +108,9 @@
                 :"按公开事件顺序播放；完整牌桌在播放结束时同步。")+
               (result.omitted?" 事件较多，已略过前"+result.omitted+"项。":"")+
               (focusOnly?" 精简模式：本次"+fullCount+
-                "个动作快照中播放"+frames.length+"个重点/最终画面。":"");
+                "个动作快照中播放"+frames.length+"个重点/最终画面。":"")+
+              (omittedQuiet?" 已合并"+omittedQuiet+
+                "个无声中间画面，完整公开快照仍在回顾记录中。":"");
             await new Promise(resolve=>playback.start(frames,resolve));
           }
         }
