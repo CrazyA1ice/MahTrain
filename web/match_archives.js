@@ -71,7 +71,7 @@
         match.created_at+" · "+(match.phase==="finished"?"三家已胡":"牌山耗尽")+
         " · "+match.win_count+"笔胡牌 · 0号正式净额 "+
         sign(match.settled_b0??match.win_b0)+
-        "（胡牌 "+sign(match.win_b0)+"）")));
+        "（胡牌 "+sign(match.win_b0)+"）"));
       row.append(makeButton("查看公开复盘",()=>openMatch(match.archive_id)));
       root.append(row);
     }
