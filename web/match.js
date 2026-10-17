@@ -688,15 +688,28 @@
   }
   function renderTableSettlement(){
     const panel=$("match-table-settlement");
-    const visible=settlementAvailable();
-    panel.hidden=!visible;
-    if(!visible)return;
     const ledger=state.win_ledger;
     const terminal=state.phase==="finished"||state.phase==="wall_exhausted";
-    $("match-table-settlement-title").textContent=
+    // A terminal round deserves a readable score sheet even with zero HUs.
+    // In an unresolved wall draw that is NOT a finalized zero balance.
+    const hasLedger=Array.isArray(ledger?.balances)&&
+      ledger.balances.length===4&&ledger.balances.every(Number.isSafeInteger);
+    const visible=settlementAvailable()||(terminal&&hasLedger);
+    panel.hidden=!visible;
+    if(!visible)return;
+    const wallPending=state.phase==="wall_exhausted"&&
+      state.exhaustive_settlement?.posted!==true;
+    $("match-table-settlement-title").textContent=wallPending?
+      "流局待核验 · 当前仅显示胡牌已入账金额":
       state.exhaustive_settlement?.posted?
-      "本局胡牌 + 流局结算 · 已入账":"本局胡牌结算 · 已入账";
+        "本局胡牌 + 流局结算 · 已入账":"本局胡牌结算 · 已入账";
     $("match-table-round-phase").textContent=terminal?"摸切已结束":"对局进行中";
+    const myPosted=state.settled_balances?.[0]??ledger.balances[0];
+    $("match-table-self-summary").textContent=
+      "我的已入账积分 "+signedScore(myPosted)+" · "+
+      (wallPending?"牌山耗尽但流局赔付尚未核验，不代表最终净积分":
+        state.exhaustive_settlement?.posted?
+          "包含方案A已确认的流局赔付":"仅含已确认胡牌积分");
     const scores=$("match-table-scores");
     scores.replaceChildren();
     for(const seat of seats){
@@ -737,7 +750,8 @@
         "以上仅为胡牌已入账积分")+
       (kongEnabled?"；独立杠钱试验积分另列，不计入此栏":
         "；不含独立杠钱")+
-      (state.exhaustive_settlement?.posted?"。":"；无正式流局结算。");
+      (wallPending?"；本局流局赔付待核验，当前合计不能视为最终净积分。":
+        state.exhaustive_settlement?.posted?"。":"；无正式流局结算。");
   }
   function renderWall(){
     const remaining=publicBoard().wall_count;
