@@ -1313,3 +1313,24 @@
  .match-scorecard-trend{overflow-x:auto}
  .match-scorecard-trend-row{min-width:510px}
 }
+
+/* M3.29: read-only grouped scorecards; warn when sample size is small. */
+.match-history-groups{display:grid;gap:10px;padding:14px;border:1px solid #c4d9cb;
+  background:#f5faf6;border-radius:11px}
+.match-history-groups-head{display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px}
+.match-history-groups-head h4{margin:0;font-size:15px;color:#2c5841}
+.match-history-groups-head label{display:flex;align-items:center;gap:7px;
+  font-size:12px;color:#3c624a}
+.match-history-groups-head select{background:#fff;border:1px solid #bdd4c5;
+  color:#30563f;padding:7px;border-radius:7px;font-size:12px}
+.match-history-groups-rows{display:grid;grid-template-columns:
+  repeat(auto-fit,minmax(min(100%,275px),1fr));gap:9px}
+.match-history-group-item{display:grid;gap:7px;padding:12px;
+  background:#fff;border:1px solid #d4e1d7;border-radius:9px}
+.match-history-group-item strong{font-size:13px;color:#2c5740}
+.match-history-group-item span{font-size:12px;color:#4f6a57}
+.match-history-group-total{font-weight:700}
+.match-history-group-item small{font-size:11px;color:#637d67;line-height:1.5}
+.match-history-group-item .match-history-group-warning{color:#9e6236}
+.match-history-groups>.review-footnote{margin:0;color:#607e66;font-size:11px;line-height:1.6}
