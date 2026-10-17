@@ -13,6 +13,7 @@ sys.path.insert(0,str(ROOT/"src"))
 
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.match_archive import MatchArchive, sanitize_board, sanitize_events
+from mahtrain_core.settlement import WinLedger
 
 
 class MatchArchiveTests(unittest.TestCase):
@@ -95,6 +96,94 @@ class MatchArchiveTests(unittest.TestCase):
         self.assertNotIn("s4",json.dumps(clean))
         self.assertNotIn("private",json.dumps(clean))
         self.assertEqual(clean[-1]["amount"],30)
+
+    def test_real_win_ledger_is_archived_without_private_nested_fields(self):
+        opening, finished = self.fixture()
+        ledger = WinLedger(room_coefficient=100, fan_cap=3)
+        score = {
+            "legal": True, "main_pattern": "pure_seven_pairs",
+            "raw_fan": 4, "effective_fan": 3, "multiplier": 8,
+            "combinations": {"tian_ting": 2}, "bonuses": {"roots": 1},
+        }
+        ledger.pay_win(
+            winner=0, payers=[1, 2, 3], source=0,
+            kind="self_draw", tile="m1", score=score,
+        )
+        private = ledger.public_state()
+        private["wins"][0]["combinations"]["private_future_tile"] = "SECRET-COMBINATION"
+        private["wins"][0]["secret_private"] = {"wall": "SECRET-WALL"}
+        private["wins"][0]["bonuses"] = {"roots": 1}
+        private["other_private"] = {"wall": "SECRET-LEDGER"}
+        completed = {**finished, "win_ledger": private}
+        archive_id = self.store.save_completed(
+            completed, [], opening, ["basic", "advanced", "challenge"]
+        )
+        report = self.store.detail(archive_id)["report"]
+        self.assertEqual(report["win_ledger"]["balances"], [2400, -800, -800, -800])
+        self.assertEqual(report["win_ledger"]["wins"][0]["payers"], [1, 2, 3])
+        self.assertEqual(report["win_ledger"]["wins"][0]["bonuses"], {"roots": 1})
+        serialized = json.dumps(report)
+        for secret in ("SECRET-COMBINATION", "SECRET-WALL", "SECRET-LEDGER"):
+            self.assertNotIn(secret, serialized)
+            self.assertNotIn(secret.encode(), self.db.read_bytes())
+
+    def test_reject_malformed_nested_payouts_before_writing_archive(self):
+        opening, finished = self.fixture()
+        ledger = WinLedger(room_coefficient=100, fan_cap=3)
+        ledger.pay_win(
+            winner=0, payers=[1, 2, 3], source=0, kind="self_draw",
+            tile="m1",
+            score={"legal": True, "main_pattern": "pure_seven_pairs",
+                   "raw_fan": 4, "effective_fan": 3, "multiplier": 8,
+                   "combinations": {}, "bonuses": {}},
+        )
+        good = ledger.public_state()
+        import copy
+        scenarios = []
+        bad = copy.deepcopy(good)
+        bad["wins"][0]["payers"][0] = {"private_tile": "SECRET-NESTED"}
+        scenarios.append(bad)
+        bad = copy.deepcopy(good)
+        bad["wins"][0]["bonuses"] = {"roots": ["SECRET-ROOT"]}
+        scenarios.append(bad)
+        bad = copy.deepcopy(good)
+        bad["wins"][0]["main_pattern"] = "SECRET-PATTERN"
+        scenarios.append(bad)
+        bad = copy.deepcopy(good)
+        bad["wins"][0]["total_received"] += 1
+        scenarios.append(bad)
+        bad = copy.deepcopy(good)
+        bad["balances"][0] += 1
+        scenarios.append(bad)
+        bad = copy.deepcopy(good)
+        bad["wins"][0]["payers"] = [1, 1, 3]
+        scenarios.append(bad)
+        bad = copy.deepcopy(good)
+        bad["zero_sum"] = False
+        scenarios.append(bad)
+        for candidate in scenarios:
+            with self.subTest(candidate=candidate):
+                with self.assertRaises(ValueError):
+                    self.store.save_completed(
+                        {**finished, "win_ledger": candidate},
+                        [], opening, ["basic", "advanced", "challenge"]
+                    )
+        for kong in (
+            {"balances": [1, 0, 0, 0], "base": 100},
+            {"balances": [True, 0, 0, 0], "base": None},
+            {"balances": [0, 0, 0, 0], "base": True},
+            {"balances": [0, 0, 0, 0], "base": -1},
+        ):
+            with self.subTest(kong=kong):
+                with self.assertRaises(ValueError):
+                    self.store.save_completed(
+                        {**finished, "kong_ledger": kong},
+                        [], opening, ["basic", "advanced", "challenge"]
+                    )
+        self.assertEqual(self.store.list_completed()["summary"]["games"], 0)
+        assert_bytes = self.db.read_bytes()
+        for private in (b"SECRET-NESTED", b"SECRET-ROOT", b"SECRET-PATTERN"):
+            self.assertNotIn(private, assert_bytes)
 
     def test_does_not_change_legacy_history_schema_version(self):
         from mahtrain_core.history import HistoryStore
