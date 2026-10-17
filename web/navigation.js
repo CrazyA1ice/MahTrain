@@ -7,14 +7,16 @@
   if(root)root.MahTrainNavigation=api;
 })(typeof window!=="undefined"?window:null,function(){
   const GROUPS=Object.freeze({
-    solo:["solo-intro","game","history-panel"],
+    solo:["solo-intro","game"],
+    history:["history-panel"],
     quiz:["quiz-center"],
     match:["match-panel"],
     records:["match-archives-panel"],
     lab:["ai-replay-panel","ai-baseline-panel","four-player-demo"],
   });
   const LABELS=Object.freeze({
-    solo:"连续摸切训练",quiz:"单题专项训练",match:"四人人机对战",
+    solo:"连续摸切训练",history:"训练历史与错题本",
+    quiz:"单题专项训练",match:"四人人机对战",
     records:"历史战绩与统计图",lab:"策略与规则实验室",
   });
   function init(doc,host){
@@ -28,8 +30,12 @@
     if(panels.some(x=>!x))throw Error("missing MahTrain module panel");
     const recognized=s=>Object.prototype.hasOwnProperty.call(GROUPS,s)?s:"home";
     const hashModule=()=>recognized(String(w.location?.hash||"").slice(1));
+    let lastSelected=null;
     function select(name,updateHash=true){
       const selected=recognized(name);
+      const firstVisit=lastSelected===null;
+      const changed=lastSelected!==selected;
+      lastSelected=selected;
       const isHome=selected==="home";
       home.hidden=!isHome;
       home.classList.toggle("module-inactive",!isHome);
@@ -50,8 +56,22 @@
         const hash=isHome?"#home":"#"+selected;
         if(w.location.hash!==hash)w.location.hash=hash;
       }
-      // Returning home and switching views never posts any game mutation.
-      if(typeof w.scrollTo==="function")w.scrollTo(0,0);
+      // The scorecard is a snapshot. Refresh it whenever the player RETURNS
+      // to historical records, especially after completing a match.
+      // Initial refresh is already performed by each archive module.init().
+      // Do not refresh twice when our own hash update emits hashchange.
+      if(changed&&!firstVisit){
+        if(selected==="records")w.MahTrainMatchArchives?.refresh?.();
+        else if(selected==="history")w.MahTrainHistory?.refresh?.();
+      }
+      if(isHome){
+        const tag=byId("home-match-state");
+        const stage=byId("match-stage");
+        if(tag&&stage)tag.textContent=!stage.hidden?
+          "已有对局界面，点击继续查看":"";
+      }
+      // No game mutation, even if background AI playback is in progress.
+      if(changed&&typeof w.scrollTo==="function")w.scrollTo(0,0);
       return selected;
     }
     for(const group of Object.keys(GROUPS)){

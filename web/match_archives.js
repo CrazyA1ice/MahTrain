@@ -4,7 +4,7 @@
   const $=id=>document.getElementById(id);
   const playback=()=>window.MahTrainPlayback;
   let listed=[],opened=null,selected=new Set(),frames=[],active=null;
-  let lastGrouping=null;
+  let lastGrouping=null,refreshVersion=0;
   const el=(tag,kind,txt)=>{
     const n=document.createElement(tag);
     if(kind)n.className=kind;
@@ -173,9 +173,12 @@
     comparison();
   }
   async function refresh(){
+    const version=++refreshVersion;
     try{
       $("match-archives-message").textContent="";
       const response=await api("/api/match_archives?limit=50");
+      // Slow earlier replies must never overwrite a newer visit's chart.
+      if(version!==refreshVersion)return;
       listed=response.matches||[];
       selected=new Set([...selected].filter(id=>
         listed.some(x=>x.archive_id===id)));
@@ -191,7 +194,7 @@
       window.MahTrainMatchStats?.render(response.scorecard,document);
       lastGrouping=response.scorecard?.groupings||null;
       renderGroupings();
-    }catch(err){fail(err)}
+    }catch(err){if(version===refreshVersion)fail(err)}
   }
   function renderArchiveBoard(frame){
     const root=$("match-archives-board");

@@ -2286,4 +2286,7 @@
   .match-stats-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
   .match-stats-outcome-row{grid-template-columns:43px minmax(0,1fr) 88px;gap:5px}
 }
+.home-match-state{display:block;margin-top:8px;padding:5px 8px;border-radius:7px;
+  background:#d9eadc;color:#20573e;font-weight:750;font-size:11px}
+.home-match-state:empty{display:none}
 @media(prefers-reduced-motion:reduce){.home-module-card{transition:none}}

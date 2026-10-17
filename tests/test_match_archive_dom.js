@@ -58,8 +58,10 @@ const result={
   },
 };
 const requests=[];
+let overrideList=null;
 const fetch=async url=>{
   requests.push(url);
+  if(overrideList&&!url.includes("archive_id="))return overrideList(url);
   const data=url.includes("archive_id=")?result:{
     matches:[
       {archive_id:"savedA",created_at:"2026-10-17T00:00:00Z",
@@ -195,6 +197,29 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-archives-board"].children[0].textContent.includes("牌山53张"));
   assert.ok(!JSON.stringify(dom).includes("never-show"));
   assert.ok(requests.every(url=>url.startsWith("/api/match_archives")));
+  // M3.47: simulate two rapid visits to history. The SLOW response
+  // from the first request cannot replace the new SQLite scorecard.
+  const baselineResponse=await fetch("/api/match_archives?limit=50");
+  const baseline=await baselineResponse.json();
+  const pending=[];
+  overrideList=()=>new Promise(resolve=>pending.push(resolve));
+  const slow=win.MahTrainMatchArchives.refresh();
+  const fast=win.MahTrainMatchArchives.refresh();
+  assert.equal(pending.length,2);
+  const newest=JSON.parse(JSON.stringify(baseline));
+  newest.summary.games=3;
+  newest.scorecard.valid_games=3;
+  pending[1]({ok:true,json:async()=>newest});
+  await fast;
+  assert.ok(dom["match-archives-summary"].textContent.includes("已保存 3 局"));
+  assert.ok(dom["match-scorecard-status"].textContent.includes("已核验 3 局"));
+  pending[0]({ok:true,json:async()=>baseline});
+  await slow;
+  assert.ok(dom["match-archives-summary"].textContent.includes("已保存 3 局"),
+    "older delayed archive reply must not revert freshly loaded stats");
+  assert.ok(dom["match-scorecard-status"].textContent.includes("已核验 3 局"));
+  overrideList=null;
+  console.log("M3.47 stale history chart response is ignored: PASS");
   console.log("M3.28 audited four-seat official scoreboard and recent net trend DOM: PASS");
   console.log("M3.22 SQLite archive browser, two-game comparison, reopen and privacy: PASS");
 })().catch(error=>{console.error(error);process.exitCode=1});
