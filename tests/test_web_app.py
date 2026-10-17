@@ -1112,6 +1112,32 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"raw_fan",js)
         self.assertIn("javascript",mime)
 
+    def test_m338_self_draw_mode_is_validated_and_published(self):
+        page, _ = self.get("/")
+        client, _ = self.get("/match.js")
+        self.assertEqual(page.count(b'id="match-self-draw-mode"'),1)
+        self.assertIn("自摸加底".encode(),page)
+        self.assertIn("自摸加番".encode(),page)
+        self.assertIn(b"self_draw_mode",client)
+        for mode in ("add_base","add_fan"):
+            with self.subTest(mode=mode):
+                result=self.post({"action":"match_new","seed":81,
+                                  "room_coefficient":100,
+                                  "self_draw_mode":mode})
+                state=result["match"]
+                self.assertEqual(state["win_ledger"]["self_draw_mode"],mode)
+                self.assertEqual(state["win_ledger"]["balances"],[0]*4)
+                self.assertNotIn("_wall",state)
+                self.assertNotIn("_hands",state)
+        # Old API consumers retain old pricing until they opt in.
+        legacy=self.post({"action":"match_new","seed":81})
+        self.assertEqual(legacy["match"]["win_ledger"]["self_draw_mode"],
+                         "legacy")
+        for invalid in ("boost",None,[],True,0,{"private":"x"}):
+            with self.subTest(invalid=invalid),self.assertRaises(HTTPError):
+                self.post({"action":"match_new","seed":81,
+                           "self_draw_mode":invalid})
+
     def test_m32_rejects_invalid_room_parameters(self):
         for settings in (
             {"room_coefficient":0},
