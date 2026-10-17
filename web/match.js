@@ -42,7 +42,8 @@
     $("match-error").textContent="";
     const previousEvents=state?.events?.length||0;
     const previousWinCount=state?.win_ledger?.wins?.length||0;
-    let announcedByPlayback=false;
+    let announcedByPlayback=false,needsContinue=false;
+    const requestToken=token;
     try{
       const response=await fetch("/api/action",{
         method:"POST",
@@ -101,7 +102,8 @@
         // Playback disabled/empty: still announce NEW publicly revealed
         // events, never the complete historical event log or private draw.
         const events=(data.match.events||[]).slice(previousEvents);
-        voice.announceEvents(window.MahTrainPlayback.normalize(events,96).frames);
+        await voice.announceEventsWait(
+          window.MahTrainPlayback.normalize(events,96).frames);
         syncVoiceControls();
       }
       liveBoard=null;
@@ -112,6 +114,7 @@
         $("match-review-type-filter").value="all";
       }
       token=data.match_token;state=data.match;choice.clear();
+      needsContinue=data.match.needs_continue===true;
       pendingDiscard=null;
       if(name==="match_new"){
         const opening=window.MahTrainPlayback.openingFrame(state);
@@ -145,7 +148,14 @@
       liveBoard=null;
       if(state)renderBoard();
       $("match-error").textContent=err.message||String(err);
-    }finally{busy=false;}
+    }finally{
+      busy=false;
+      // One AI transition per request: never submit the next transition
+      // before visual playback and speech have both reached their ends.
+      if(needsContinue && token && (name==="match_new"||requestToken===token)){
+        setTimeout(()=>{if(!busy)action("match_continue");},0);
+      }
+    }
   }
   // Preserve the user's scroll focus across redraws (including touch
   // confirm/cancel) without changing the order or identity of the tiles.
@@ -249,8 +259,6 @@
     }
   }
   function showPublicMotion(frame,step,total){
-    voice?.announceFrame(frame);
-    syncVoiceControls();
     if(frame.board){
       liveBoard=frame.board;
       renderBoard();
@@ -317,6 +325,11 @@
         "is-replay-acting",seat.id===frame.seat||
           frame.winSeats.includes(seat.id));
     }
+    // Start speaking only after the physical tile is on the visible table.
+    // Playback may move forward only after both visual hold and speech end.
+    const finished=voice?.announceFrameWait(frame);
+    syncVoiceControls();
+    return finished;
   }
   function onPlaybackStatus(status){
     $("match-playback-progress").textContent=
