@@ -133,6 +133,12 @@
         ...last,label:events.map(f=>f.label).join(" → "),
         chain:events.map(f=>f.label),
         actionTypes,
+        // Preserve only already allowlisted PUBLIC action names and tiles.
+        // A rule-call frame can contain several sequential public actions.
+        announcements:events.map(e=>({
+          type:e.type,seat:e.seat,winSeats:e.winSeats,
+          publicTile:e.publicTile,
+        })),
         publicTile:exposed?.publicTile||null,
         isWin,winSeats:[...new Set([...(winner?.winSeats||last.winSeats||[]),
           ...settlements.map(x=>x.seat)])],
