@@ -1151,8 +1151,13 @@ class WebUI(unittest.TestCase):
         # the concealed draw can run immediately into an audible discard.
         from test_four_player_claims import staged_game
         from mahtrain_core.ai import MahjongAgent
-        game=staged_game({}, seed=19)
-        ai_seat=next(seat for seat in (1,2,3) if seat!=game.dealer)
+        dealer=web_server.FourPlayerOpening(19).dealer
+        ai_seat=next(seat for seat in (1,2,3) if seat!=dealer)
+        # A deliberate missing-suit tile prevents a self-win, and unique
+        # kinds prevent any optional kong from interrupting the discard.
+        ai_hand=["p1"]+["m"+str(n) for n in range(1,10)]+[
+            "s1","s2","s3"]
+        game=staged_game({ai_seat:ai_hand},{ai_seat:"p"},seed=19)
         game.phase="await_draw"
         game.turn=ai_seat
         token="m341-private-fixture"
