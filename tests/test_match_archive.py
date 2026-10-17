@@ -252,6 +252,103 @@ class MatchArchiveTests(unittest.TestCase):
                 {**completed,"won":[False,True,False,False]},
                 [],before,["basic"]*3)
 
+    def test_four_seat_archive_scorecard_win_draw_totals_and_trend(self):
+        before, finished = self.fixture()
+        from mahtrain_core.match_archive import _archived_score_components
+        ledger = WinLedger(room_coefficient=100, fan_cap=3)
+        ledger.pay_win(
+            winner=0, payers=[1], source=1, kind="ron", tile="m1",
+            score={"legal":True,"main_pattern":"pinghu",
+                   "raw_fan":0,"effective_fan":0,"multiplier":1,
+                   "combinations":{},"bonuses":{}}
+        )
+        first=self.store.save_completed(
+            {**finished,"win_ledger":ledger.public_state()},
+            [],before,["basic","advanced","challenge"])
+        # second completed match has a HU payment and a separate official
+        # flower-pig settlement between seats 0 and 1.
+        other=WinLedger(room_coefficient=100, fan_cap=3)
+        other.pay_win(
+            winner=2,payers=[3],source=3,kind="ron",tile="p2",
+            score={"legal":True,"main_pattern":"pinghu",
+                   "raw_fan":1,"effective_fan":1,"multiplier":2,
+                   "combinations":{},"bonuses":{}}
+        )
+        draw={
+            "policy":"active_only_final","posted":True,"reason":"settled",
+            "balances":[-800,800,0,0],"zero_sum":True,
+            "room_coefficient":100,"fan_cap":3,
+            "entries":[{"index":1,"stage":"flower_pig","payer":0,
+                        "recipient":1,"amount":800,
+                        "future_secret":"NEVER_INCLUDE_IN_TREND"}],
+        }
+        second=self.store.save_completed(
+            {**finished,"win_ledger":other.public_state(),
+             "exhaustive_settlement":draw},
+            [],before,["challenge","basic","advanced"])
+        # Establish a deterministic order across same-second timestamps.
+        with sqlite3.connect(self.db) as db:
+            db.execute(
+                "UPDATE completed_matches SET created_at=? WHERE archive_id=?",
+                ("2026-10-17T10:00:00+00:00",first))
+            db.execute(
+                "UPDATE completed_matches SET created_at=? WHERE archive_id=?",
+                ("2026-10-17T11:00:00+00:00",second))
+            # A malformed / incomplete old row cannot silently count as 0.
+            db.execute("""INSERT INTO completed_matches(
+                archive_id,created_at,phase,dealer,win_count,steps_count,
+                win_b0,record_json) VALUES(?,?,?,?,?,?,?,?)""",
+                ("legacy-corrupt","2026-10-17T09:00:00+00:00",
+                 "finished",0,0,0,0,'{}'))
+        result=self.store.list_completed(limit=1)
+        self.assertEqual(len(result["matches"]),1,
+                         "list pagination must not affect ALL-history totals")
+        card=result["scorecard"]
+        self.assertEqual(card["valid_games"],2)
+        self.assertEqual(card["excluded_games"],1)
+        self.assertTrue(card["zero_sum"])
+        self.assertEqual([x["hu_total"] for x in card["seats"]],
+                         [100,-100,200,-200])
+        self.assertEqual([x["draw_total"] for x in card["seats"]],
+                         [-800,800,0,0])
+        self.assertEqual([x["settled_total"] for x in card["seats"]],
+                         [-700,700,200,-200])
+        self.assertEqual([(x["positive_games"],x["negative_games"],
+                           x["zero_games"]) for x in card["seats"]],
+                         [(1,1,0),(1,1,0),(1,0,1),(0,1,1)])
+        self.assertEqual([x["score"] for x in card["trend"]],[100,-800])
+        self.assertEqual([x["cumulative"] for x in card["trend"]],[100,-700])
+        self.assertEqual(
+            self.store.four_seat_scorecard(trend_limit=1)["trend"],
+            [card["trend"][-1]])
+        self.assertNotIn("NEVER_INCLUDE_IN_TREND",str(card))
+        self.assertEqual(_archived_score_components(
+            self.store.detail(second)["report"]),
+            ([0,0,200,-200],[-800,800,0,0]))
+        # Tampered private JSON cannot invent an inconsistent formal total.
+        with sqlite3.connect(self.db) as db:
+            record=json.loads(db.execute(
+                "SELECT record_json FROM completed_matches WHERE archive_id=?",
+                (first,)).fetchone()[0])
+            record["settled_balances"]=[101,-101,0,0]
+            db.execute(
+                "UPDATE completed_matches SET record_json=? WHERE archive_id=?",
+                (json.dumps(record),first))
+        after=self.store.four_seat_scorecard()
+        self.assertEqual(after["valid_games"],1)
+        self.assertEqual(after["excluded_games"],2)
+        for limit in (0,101,True,1.0):
+            with self.subTest(limit=limit),self.assertRaises(ValueError):
+                self.store.four_seat_scorecard(trend_limit=limit)
+
+    def test_four_seat_empty_scorecard_uses_zeros_and_no_fake_trend(self):
+        card=self.store.four_seat_scorecard()
+        self.assertEqual(card["valid_games"],0)
+        self.assertEqual(card["excluded_games"],0)
+        self.assertEqual(card["trend"],[])
+        self.assertTrue(card["zero_sum"])
+        self.assertEqual([x["settled_total"] for x in card["seats"]],[0]*4)
+
     def test_legacy_schema_migrates_additive_settled_index_and_falls_back(self):
         old_db=Path(self.temp.name)/"old_matches.sqlite3"
         with sqlite3.connect(old_db) as db:

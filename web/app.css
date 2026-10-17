@@ -1257,3 +1257,59 @@
   .match-board{min-width:1250px}
   .match-board-scroll::after{content:"牌面已放大，左右滑动查看完整四家牌桌"}
 }
+
+
+/* M3.28: archival four-seat scoreboard and true zero-axis net-score trend. */
+.match-scorecard{
+  display:grid;gap:10px;
+  border:1px solid #b9d4c0;border-radius:11px;
+  background:linear-gradient(135deg,#f1f9f1,#eaf3ee);
+  padding:14px;
+}
+.match-scorecard h4{margin:0;color:#28533b;font-size:15px}
+#match-scorecard-status{margin:0;color:#52765d;font-size:12px}
+.match-scorecard-seats{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;
+}
+.match-scorecard-seat{
+  display:grid;align-content:start;gap:5px;background:#fff;
+  border:1px solid #d0e1d3;border-radius:9px;padding:11px;
+}
+.match-scorecard-seat strong{font-size:12px;color:#315c42}
+.match-scorecard-seat b{font-size:21px;font-variant-numeric:tabular-nums}
+.match-scorecard-seat b.is-credit{color:#207447}
+.match-scorecard-seat b.is-debit{color:#ab4b3f}
+.match-scorecard-seat span{font-size:11px;color:#5a705f;line-height:1.5}
+.match-scorecard-trend-head{
+  display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;
+  align-items:center;margin-top:5px;
+}
+.match-scorecard-trend-head strong{font-size:13px;color:#2a533b}
+.match-scorecard-trend-head span{font-size:11px;color:#66806b}
+.match-scorecard-trend{
+  display:grid;gap:4px;max-height:330px;overflow-y:auto;
+  border-radius:8px;background:#fff;padding:10px 8px;
+  border:1px solid #d2e3d7;
+}
+.match-scorecard-trend-row{
+  display:grid;grid-template-columns:82px minmax(0,1fr) minmax(0,1fr) 66px 95px;
+  align-items:center;gap:2px;min-height:18px;
+  font-variant-numeric:tabular-nums;font-size:11px;
+}
+.match-scorecard-date{color:#66806a;white-space:nowrap}
+.match-scorecard-half{height:12px;display:flex;align-items:center}
+.match-scorecard-half.negative{justify-content:flex-end;border-right:1px solid #6c8071}
+.match-scorecard-half.positive{justify-content:flex-start}
+.match-scorecard-bar{display:block;height:10px;max-width:100%;border-radius:2px}
+.match-scorecard-half.negative .match-scorecard-bar{background:#cf8978}
+.match-scorecard-half.positive .match-scorecard-bar{background:#58a87a}
+.match-scorecard-round{text-align:right;color:#315341;font-weight:700}
+.match-scorecard-cumulative{text-align:right;color:#4e725a}
+.match-scorecard>.review-footnote{margin:0;font-size:11px;color:#607966}
+@media(max-width:860px){
+ .match-scorecard-seats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:570px){
+ .match-scorecard-trend{overflow-x:auto}
+ .match-scorecard-trend-row{min-width:510px}
+}

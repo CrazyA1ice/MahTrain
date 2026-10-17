@@ -352,13 +352,25 @@
           <h3>四人血战 · 本地已完成对局档案</h3>
           <button id="match-archives-refresh" type="button" class="review-control">刷新对局档案</button>
         </div>
-        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。保存的是已入账的胡牌金额与真实公开动作快照；杠钱只属试验积分，流局赔付未正式入账。</p>
+        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。胡牌及符合方案 A 的流局赔付分别正式入账；杠钱仍为单独的试验积分，不参与正式战绩。</p>
         <p id="match-archives-message" aria-live="polite"></p>
         <div id="match-archives-summary" class="match-archives-summary"></div>
+        <section class="match-scorecard" aria-labelledby="match-scorecard-title">
+          <h4 id="match-scorecard-title">多局正式积分总览 · 四家座位统计</h4>
+          <p id="match-scorecard-status" class="review-footnote"></p>
+          <div id="match-scorecard-seats" class="match-scorecard-seats"></div>
+          <div class="match-scorecard-trend-head">
+            <strong>0号玩家 · 近30局正式净额走势</strong>
+            <span>每行显示单局净额及截至该局的累计正式积分</span>
+          </div>
+          <div id="match-scorecard-trend" class="match-scorecard-trend"
+            aria-label="最近三十局的正式净额和累计得分"></div>
+          <p class="review-footnote">统计范围为本机所有可核验的已完成档案；历史缺失账本的记录会单独计数排除。1—3号仅代表座位，不代表固定的同一名 AI；正式积分不含试验杠钱。</p>
+        </section>
         <div id="match-archives-list" class="match-archives-list"></div>
         <div class="match-archives-compare-tools">
           <button id="match-archives-compare" type="button" disabled>对比所选两局</button>
-          <span>在档案条目中勾选两局进行已入账胡牌余额对比。</span>
+          <span>在档案条目中勾选两局，比较胡牌与方案A流局组成的正式积分。</span>
         </div>
         <div id="match-archives-comparison" class="match-archives-comparison"></div>
         <section id="match-archives-detail" class="match-archives-detail" hidden>

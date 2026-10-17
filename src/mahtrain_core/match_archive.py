@@ -257,6 +257,40 @@ def sanitize_exhaustive_settlement(raw, final_board: dict) -> dict | None:
     }
 
 
+def _archived_score_components(report: dict) -> tuple[list[int], list[int]]:
+    """Return trustworthy four-seat HU/official-draw scores from OLD or NEW JSON.
+
+    The archive is a server-written, sanitized public snapshot. Unreadable or
+    inconsistent legacy snapshots cannot silently contaminate a leaderboard.
+    No concealed tiles, events or opponent hand information are materialized.
+    """
+    if (type(report) is not dict or
+            report.get("privacy") != "public_board_only" or
+            report.get("phase") not in _TERMINAL):
+        raise ValueError("not a completed public archive")
+    ledger = report.get("win_ledger")
+    if not isinstance(ledger, dict):
+        raise ValueError("missing archived HU ledger")
+    hu = _balances(ledger.get("balances"), "archived HU balances")
+    terminal = report.get("exhaustive_settlement")
+    if terminal is None:
+        draw = [0] * 4
+    else:
+        board = report.get("final_board")
+        if type(board) is not dict:
+            raise ValueError("missing verified terminal board")
+        clean = sanitize_exhaustive_settlement(terminal, board)
+        draw = clean["balances"]
+    expected = [a + b for a, b in zip(hu, draw)]
+    # Pre-M3.26 JSON can have no explicit 'settled_balances'; for old
+    # matches that means HU was the only officially posted payment.
+    if "settled_balances" in report:
+        declared = _balances(report["settled_balances"], "archived settled balances")
+        if declared != expected:
+            raise ValueError("archived official totals disagree with ledgers")
+    return hu, draw
+
+
 class MatchArchive:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -380,7 +414,85 @@ class MatchArchive:
                            "average_player0_win_balance":total["average_b0"],
                            "average_player0_settled_balance":
                                total["average_settled_b0"],
-                           "paid_wins":total["paid_wins"]}}
+                           "paid_wins":total["paid_wins"]},
+                "scorecard":self.four_seat_scorecard()}
+
+    def four_seat_scorecard(self, *, trend_limit: int = 30) -> dict:
+        """Aggregate ALL completed public archive scores for fixed seats.
+
+        Seats 1-3 are positions, NOT persistent AI identities: difficulty
+        assignments may change between games. Exclude malformed legacy
+        archives visibly instead of fabricating missing settled scores.
+        """
+        if type(trend_limit) is not int or not 1 <= trend_limit <= 100:
+            raise ValueError("trend limit must be from 1 to 100")
+        totals = [[0] * 4 for _ in range(3)]  # HU, draw, official
+        pos = [0] * 4
+        neg = [0] * 4
+        ties = [0] * 4
+        valid = 0
+        skipped = 0
+        trends = []
+        cumulative = 0
+        with self._connect() as db:
+            rows = db.execute("""
+                SELECT archive_id,created_at,record_json
+                FROM completed_matches
+                ORDER BY created_at ASC,archive_id ASC
+            """)
+            for row in rows:
+                try:
+                    hu, draw = _archived_score_components(
+                        json.loads(row["record_json"])
+                    )
+                except (ValueError, TypeError, KeyError, IndexError,
+                        json.JSONDecodeError):
+                    skipped += 1
+                    continue
+                official = [a + b for a, b in zip(hu, draw)]
+                for seat in range(4):
+                    totals[0][seat] += hu[seat]
+                    totals[1][seat] += draw[seat]
+                    totals[2][seat] += official[seat]
+                    if official[seat] > 0:
+                        pos[seat] += 1
+                    elif official[seat] < 0:
+                        neg[seat] += 1
+                    else:
+                        ties[seat] += 1
+                valid += 1
+                cumulative += official[0]
+                trends.append({
+                    "archive_id": row["archive_id"],
+                    "created_at": row["created_at"],
+                    "score": official[0],
+                    "cumulative": cumulative,
+                })
+                if len(trends) > trend_limit:
+                    trends.pop(0)
+        if any(sum(values) != 0 for values in totals):
+            raise ValueError("non-zero-sum archived history")
+        return {
+            "valid_games": valid,
+            "excluded_games": skipped,
+            "scope": "all_saved_completed_games",
+            "kong_included": False,
+            "seats": [{
+                "seat": seat,
+                "hu_total": totals[0][seat],
+                "draw_total": totals[1][seat],
+                "settled_total": totals[2][seat],
+                "average_settled": (
+                    round(totals[2][seat] / valid, 2) if valid else 0
+                ),
+                "positive_games": pos[seat],
+                "negative_games": neg[seat],
+                "zero_games": ties[seat],
+            } for seat in range(4)],
+            "zero_sum": True,
+            "trend": trends,
+            "trend_limit": trend_limit,
+        }
 
     def detail(self, archive_id: str) -> dict:
         with self._connect() as db:

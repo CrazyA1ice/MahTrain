@@ -47,6 +47,54 @@
       " · 胡牌部分差额："+sign(a.win_b0-b.win_b0)+
       "（第一局减第二局；正式积分=胡牌+已入账方案A流局赔付，不含模拟杠钱）"));
   }
+  function renderScorecard(board){
+    const status=$("match-scorecard-status");
+    const seats=$("match-scorecard-seats");
+    const trend=$("match-scorecard-trend");
+    seats.replaceChildren();
+    trend.replaceChildren();
+    if(!board || !Array.isArray(board.seats) || board.seats.length!==4){
+      status.textContent="暂无可核验的历史成绩。";
+      return;
+    }
+    status.textContent="已核验 "+board.valid_games+" 局"+
+      (board.excluded_games?" · 排除"+board.excluded_games+"局缺失或不一致的旧档案":"")+
+      " · 所有座位正式积分合计零和："+(board.zero_sum?"通过":"异常");
+    for(const seat of board.seats){
+      const card=el("div","match-scorecard-seat");
+      card.append(el("strong","",seat.seat===0?"0号 · 玩家":"座位"+seat.seat+" · AI"));
+      card.append(el("b",seat.settled_total>=0?"is-credit":"is-debit",
+        sign(seat.settled_total)));
+      card.append(el("span","",
+        "胡牌 "+sign(seat.hu_total)+" · 流局 "+sign(seat.draw_total)));
+      card.append(el("span","",
+        "场均 "+sign(seat.average_settled)+
+        " · 正/负/零局 "+seat.positive_games+"/"+
+        seat.negative_games+"/"+seat.zero_games));
+      seats.append(card);
+    }
+    const history=Array.isArray(board.trend)?board.trend:[];
+    if(!history.length){
+      trend.append(el("p","review-footnote","尚无可核验的已完成对局。"));
+      return;
+    }
+    const max=Math.max(1,...history.map(x=>Math.abs(x.score)));
+    for(const item of history){
+      const row=el("div","match-scorecard-trend-row");
+      row.append(el("span","match-scorecard-date",item.created_at.slice(0,10)));
+      const negative=el("div","match-scorecard-half negative");
+      const positive=el("div","match-scorecard-half positive");
+      if(item.score!==0){
+        const bar=el("span","match-scorecard-bar");
+        bar.style.width=(Math.abs(item.score)/max*100).toFixed(1)+"%";
+        (item.score<0?negative:positive).append(bar);
+      }
+      row.append(negative,positive);
+      row.append(el("span","match-scorecard-round",sign(item.score)));
+      row.append(el("span","match-scorecard-cumulative","累计 "+sign(item.cumulative)));
+      trend.append(row);
+    }
+  }
   function renderList(){
     const root=$("match-archives-list");
     root.replaceChildren();
@@ -92,6 +140,7 @@
           response.summary.average_player0_win_balance).toFixed(1)+"）"+
         " · 累计 "+response.summary.paid_wins+"笔胡牌";
       renderList();
+      renderScorecard(response.scorecard);
     }catch(err){fail(err)}
   }
   function renderArchiveBoard(frame){

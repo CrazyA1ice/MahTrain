@@ -8,11 +8,11 @@ class Node{
   constructor(tag="div"){
     this.tagName=tag;this.children=[];this.textContent="";
     this.className="";this.value="";this.checked=false;this.disabled=false;
-    this.hidden=false;this.handlers={};this.href="";this.download="";
+    this.hidden=false;this.handlers={};this.href="";this.download="";this.style={};
     this.classes=new Set();
     this.classList={add:name=>this.classes.add(name)};
   }
-  append(child){this.children.push(child)}
+  append(...children){this.children.push(...children)}
   replaceChildren(...children){this.children=[...children]}
   addEventListener(event,handler){this.handlers[event]=handler}
 }
@@ -24,6 +24,7 @@ const ids=[
   "match-archives-title","match-archives-detail-summary",
   "match-archives-balances","match-archives-wins",
   "match-archives-count","match-archives-actions",
+  "match-scorecard-status","match-scorecard-seats","match-scorecard-trend",
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
 dom["match-archives-seat"].value="all";
@@ -63,6 +64,26 @@ const fetch=async url=>{
     ],
     summary:{games:2,average_player0_win_balance:-4,
       average_player0_settled_balance:5,paid_wins:1},
+    scorecard:{
+      valid_games:2,excluded_games:1,zero_sum:true,
+      seats:[
+        {seat:0,hu_total:-8,draw_total:18,settled_total:10,
+         average_settled:5,positive_games:1,negative_games:1,zero_games:0},
+        {seat:1,hu_total:8,draw_total:-18,settled_total:-10,
+         average_settled:-5,positive_games:1,negative_games:1,zero_games:0},
+        {seat:2,hu_total:0,draw_total:0,settled_total:0,
+         average_settled:0,positive_games:0,negative_games:0,zero_games:2},
+        {seat:3,hu_total:0,draw_total:0,settled_total:0,
+         average_settled:0,positive_games:0,negative_games:0,zero_games:2},
+      ],
+      trend:[
+        {archive_id:"savedA",created_at:"2026-10-16T10:00:00Z",
+         score:-8,cumulative:-8},
+        {archive_id:"savedB",created_at:"2026-10-17T10:00:00Z",
+         score:18,cumulative:10},
+      ],
+      trend_limit:30,
+    },
   };
   return {ok:true,json:async()=>data};
 };
@@ -84,6 +105,17 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-archives-summary"].textContent.includes("已保存 2 局"));
   assert.ok(dom["match-archives-summary"].textContent.includes("平均正式净额 5.0"));
   assert.ok(dom["match-archives-list"].children[0].children[1].textContent.includes("-8"));
+  assert.equal(dom["match-scorecard-seats"].children.length,4);
+  assert.ok(dom["match-scorecard-status"].textContent.includes("已核验 2 局"));
+  assert.ok(dom["match-scorecard-status"].textContent.includes("排除1局"));
+  assert.ok(dom["match-scorecard-seats"].children[0].children[1].textContent.includes("+10"));
+  assert.ok(dom["match-scorecard-seats"].children[0].children[2].textContent.includes("胡牌 -8"));
+  assert.equal(dom["match-scorecard-trend"].children.length,2);
+  assert.equal(dom["match-scorecard-trend"].children[0].children[3].textContent,"-8");
+  assert.equal(dom["match-scorecard-trend"].children[1].children[4].textContent,"累计 +10");
+  assert.ok(dom["match-scorecard-trend"].children[0].children[1].children[0].style.width.endsWith("%"));
+  assert.equal(dom["match-scorecard-trend"].children[1].children[2].children.length,1);
+  assert.ok(!JSON.stringify(dom).includes("hidden-hand"));
   let rows=dom["match-archives-list"].children;
   rows[0].children[0].checked=true;rows[0].children[0].handlers.change();
   rows[1].children[0].checked=true;rows[1].children[0].handlers.change();
@@ -113,5 +145,6 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-archives-board"].children[0].textContent.includes("牌山53张"));
   assert.ok(!JSON.stringify(dom).includes("never-show"));
   assert.ok(requests.every(url=>url.startsWith("/api/match_archives")));
+  console.log("M3.28 audited four-seat official scoreboard and recent net trend DOM: PASS");
   console.log("M3.22 SQLite archive browser, two-game comparison, reopen and privacy: PASS");
 })().catch(error=>{console.error(error);process.exitCode=1});
