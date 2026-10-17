@@ -180,6 +180,19 @@ class MatchArchiveTests(unittest.TestCase):
                         {**finished, "kong_ledger": kong},
                         [], opening, ["basic", "advanced", "challenge"]
                     )
+        for assignment in (["basic", "advanced", {"private": "SECRET-AI"}],
+                           ["basic", True, "challenge"]):
+            with self.subTest(assignment=assignment):
+                with self.assertRaises(ValueError):
+                    self.store.save_completed(
+                        {**finished, "win_ledger": good},
+                        [], opening, assignment
+                    )
+        with self.assertRaises(ValueError):
+            self.store.save_completed(
+                {**finished, "win_ledger": good, "dealer": {"private": "SECRET-DEALER"}},
+                [], opening, ["basic", "advanced", "challenge"]
+            )
         self.assertEqual(self.store.list_completed()["summary"]["games"], 0)
         assert_bytes = self.db.read_bytes()
         for private in (b"SECRET-NESTED", b"SECRET-ROOT", b"SECRET-PATTERN"):
