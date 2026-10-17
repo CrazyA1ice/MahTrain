@@ -116,12 +116,27 @@
       const settlements=(Array.isArray(step.events)?step.events:[])
         .filter(e=>e?.type==="win_settlement" &&
           Number.isInteger(e.seat)&&e.seat>=0&&e.seat<4 &&
-          Number.isInteger(e.amount)&&e.amount>=0 &&
+          Number.isSafeInteger(e.amount)&&e.amount>=0 &&
           Number.isInteger(e.effective_fan)&&e.effective_fan>=0)
-        .map(e=>({
-          seat:e.seat,amount:e.amount,fan:e.effective_fan,
-          kind:["self_draw","ron","rob_kong"].includes(e.kind)?e.kind:"win",
-        }));
+        .map(e=>{
+          // Only public, already-booked payer identities/charges may be shown.
+          // Older match servers may omit the breakdown; then show winner
+          // credit ONLY, never fabricate a losing seat or amount.
+          const payers=Array.isArray(e.payers)?e.payers:null;
+          const unit=e.amount_per_payer;
+          const verified=payers&&payers.length>=1&&payers.length<=3&&
+            payers.every(p=>Number.isInteger(p)&&p>=0&&p<4&&p!==e.seat)&&
+            new Set(payers).size===payers.length&&
+            Number.isSafeInteger(unit)&&unit>0&&
+            Number.isSafeInteger(unit*payers.length)&&
+            unit*payers.length===e.amount;
+          return {
+            seat:e.seat,amount:e.amount,fan:e.effective_fan,
+            kind:["self_draw","ron","rob_kong"].includes(e.kind)?e.kind:"win",
+            payers:verified?[...payers]:[],
+            amount_per_payer:verified?unit:null,
+          };
+        });
       const tailDraw=actionTypes.includes("kong_supplement");
       const changes=previous?{
         wall:board.wall_count-previous.wall_count,
