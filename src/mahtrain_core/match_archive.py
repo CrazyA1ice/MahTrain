@@ -1,0 +1,223 @@
+"""Local read-only four-player public match archives, never a playable save.
+
+Archives are server-generated from public post-rule states only.  No active
+match token, PRNG seed, concealed tile identity or future wall is stored.
+This module does NOT alter legacy solo/quiz SQLite user_version.
+"""
+from __future__ import annotations
+
+import json
+import re
+import secrets
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+
+_TERMINAL = frozenset(("finished", "wall_exhausted"))
+_TILES = re.compile(r"^[msp][1-9]$")
+_MELDS = frozenset(("peng", "ming_gang", "an_gang", "bu_gang"))
+_PUBLIC_TILE_EVENTS = frozenset((
+    "discard", "peng", "ming_gang", "bu_gang",
+    "ron", "multi_ron", "rob_kong", "bu_gang_declared",
+))
+_MAX_ARCHIVE_STEPS = 2048
+
+
+def _tile(value):
+    return value if isinstance(value, str) and _TILES.fullmatch(value) else None
+
+
+def sanitize_board(raw: dict) -> dict:
+    """Reject missing or malformed structural state; discard all extra data."""
+    counts = raw.get("hand_counts")
+    groups = raw.get("melds")
+    won = raw.get("won")
+    if (not isinstance(counts, list) or len(counts) != 4
+            or not all(type(n) is int and 0 <= n <= 14 for n in counts)
+            or not isinstance(groups, list) or len(groups) != 4
+            or not all(isinstance(g, list) for g in groups)
+            or not isinstance(won, list) or len(won) != 4
+            or not all(type(x) is bool for x in won)
+            or type(raw.get("wall_count")) is not int
+            or raw["wall_count"] < 0
+            or type(raw.get("turn")) is not int
+            or raw["turn"] not in range(4)
+            or type(raw.get("phase")) is not str):
+        raise ValueError("invalid public board for match archive")
+    melds = []
+    for member in groups:
+        out = []
+        for meld in member:
+            if not isinstance(meld, dict) or meld.get("type") not in _MELDS:
+                raise ValueError("invalid public meld")
+            kind = meld["type"]
+            tile = None if kind == "an_gang" else _tile(meld.get("tile"))
+            if kind != "an_gang" and tile is None:
+                raise ValueError("invalid exposed meld tile")
+            out.append({"type": kind, "tile": tile})
+        melds.append(out)
+    discards = []
+    for item in raw.get("discards", []):
+        if not isinstance(item, dict) or type(item.get("seat")) is not int:
+            raise ValueError("invalid public discard")
+        seat = item["seat"]
+        tile = _tile(item.get("tile"))
+        if seat not in range(4) or tile is None:
+            raise ValueError("invalid public discard")
+        cleaned = {"seat": seat, "tile": tile}
+        if type(item.get("claimed_by")) is int and item["claimed_by"] in range(4):
+            cleaned["claimed_by"] = item["claimed_by"]
+        if item.get("discard_kind") in ("tsumogiri", "tedashi"):
+            cleaned["discard_kind"] = item["discard_kind"]
+        if isinstance(item.get("won_by"), list):
+            cleaned["won_by"] = [x for x in item["won_by"]
+                                  if type(x) is int and x in range(4)]
+        discards.append(cleaned)
+    return {
+        "phase": raw["phase"], "turn": raw["turn"],
+        "wall_count": raw["wall_count"], "hand_counts": list(counts),
+        "melds": melds, "discards": discards, "won": list(won),
+    }
+
+
+def sanitize_events(events: list) -> list[dict]:
+    clean = []
+    for entry in events:
+        if not isinstance(entry, dict) or type(entry.get("type")) is not str:
+            continue
+        event = {"type": entry["type"]}
+        for field in ("seat", "source"):
+            if type(entry.get(field)) is int and entry[field] in range(4):
+                event[field] = entry[field]
+        if entry["type"] in _PUBLIC_TILE_EVENTS:
+            tile = _tile(entry.get("tile"))
+            if tile:
+                event["tile"] = tile
+        if entry.get("discard_kind") in ("tsumogiri", "tedashi") and entry["type"]=="discard":
+            event["discard_kind"] = entry["discard_kind"]
+        if entry["type"] == "win_settlement":
+            for field in ("amount", "effective_fan"):
+                if type(entry.get(field)) is int and entry[field] >= 0:
+                    event[field] = entry[field]
+            if entry.get("kind") in ("ron", "rob_kong", "self_draw"):
+                event["kind"] = entry["kind"]
+        if entry["type"] in ("multi_ron", "rob_kong") and isinstance(entry.get("seats"), list):
+            event["seats"] = [n for n in entry["seats"]
+                              if type(n) is int and n in range(4)]
+        clean.append(event)
+    return clean
+
+
+def sanitize_win_ledger(ledger: dict) -> dict:
+    balances = ledger.get("balances", [])
+    if len(balances) != 4 or not all(type(x) is int for x in balances):
+        raise ValueError("invalid win ledger balances")
+    allowed = ("winner", "kind", "main_pattern", "raw_fan", "effective_fan",
+               "multiplier", "amount_per_payer", "total_received", "payers",
+               "bonuses")
+    return {
+        "balances": list(balances),
+        "wins": [{key: win[key] for key in allowed if key in win}
+                 for win in ledger.get("wins", [])],
+        "zero_sum": ledger.get("zero_sum") is True,
+    }
+
+
+class MatchArchive:
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as db:
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS completed_matches (
+                    archive_id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    phase TEXT NOT NULL,
+                    dealer INTEGER NOT NULL,
+                    win_count INTEGER NOT NULL,
+                    steps_count INTEGER NOT NULL,
+                    win_b0 INTEGER NOT NULL,
+                    record_json TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_matches_created
+                    ON completed_matches(created_at DESC,archive_id DESC);
+            """)
+
+    def _connect(self):
+        db = sqlite3.connect(str(self.path), timeout=10)
+        db.row_factory = sqlite3.Row
+        return db
+
+    def save_completed(self, public: dict, history: list[dict],
+                       initial_board: dict, ai_levels: list[str]) -> str:
+        if public.get("phase") not in _TERMINAL:
+            raise ValueError("only completed matches can be archived")
+        if not isinstance(ai_levels, list) or len(ai_levels) != 3:
+            raise ValueError("invalid AI assignment")
+        safe_steps = [{
+            "board": sanitize_board(step["board"]),
+            "events": sanitize_events(step.get("events", [])),
+        } for step in history[-_MAX_ARCHIVE_STEPS:]]
+        safe_board = sanitize_board(public)
+        ledger = sanitize_win_ledger(public["win_ledger"])
+        kong = public["kong_ledger"]
+        payload = {
+            "privacy": "public_board_only", "version": 1,
+            "phase": public["phase"], "dealer": public["dealer"],
+            "ai_levels": list(ai_levels),
+            "opening": sanitize_board(initial_board),
+            "steps": safe_steps, "truncated": max(0, len(history)-len(safe_steps)),
+            "final_board": safe_board,
+            "win_ledger": ledger,
+            "kong_balances": list(kong["balances"]),
+            "kong_priced": kong.get("base") is not None,
+            "note": "胡牌余额已入账；杠钱仅为可选试验积分；流局赔付未正式入账。",
+        }
+        archive_id = secrets.token_urlsafe(18)
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        with self._connect() as db:
+            db.execute("""
+                INSERT INTO completed_matches(
+                    archive_id,created_at,phase,dealer,win_count,
+                    steps_count,win_b0,record_json
+                ) VALUES(?,?,?,?,?,?,?,?)
+            """, (archive_id,stamp,public["phase"],public["dealer"],
+                  len(ledger["wins"]),len(safe_steps),
+                  ledger["balances"][0],
+                  json.dumps(payload,ensure_ascii=False,separators=(",",":"))))
+        return archive_id
+
+    @staticmethod
+    def _id(value: str):
+        if type(value) is not str or len(value) > 100 or not value:
+            raise ValueError("invalid match archive id")
+        return value
+
+    def list_completed(self, limit: int=30) -> dict:
+        if type(limit) is not int or not 1 <= limit <= 100:
+            raise ValueError("match archive limit must be between 1 and 100")
+        with self._connect() as db:
+            rows = db.execute("""
+                SELECT archive_id,created_at,phase,dealer,win_count,
+                       steps_count,win_b0 FROM completed_matches
+                ORDER BY created_at DESC,archive_id DESC LIMIT ?""",(limit,)).fetchall()
+            total = db.execute("""
+                SELECT COUNT(*) AS games,COALESCE(AVG(win_b0),0) AS average_b0,
+                COALESCE(SUM(win_count),0) AS paid_wins
+                FROM completed_matches""").fetchone()
+        return {"matches":[dict(x) for x in rows],
+                "summary":{"games":total["games"],
+                           "average_player0_win_balance":total["average_b0"],
+                           "paid_wins":total["paid_wins"]}}
+
+    def detail(self, archive_id: str) -> dict:
+        with self._connect() as db:
+            row = db.execute("""
+                SELECT archive_id,created_at,record_json
+                FROM completed_matches WHERE archive_id=?""",
+                (self._id(archive_id),)).fetchone()
+        if row is None:
+            raise ValueError("match archive not found")
+        return {"archive_id":row["archive_id"],
+                "created_at":row["created_at"],
+                "report":json.loads(row["record_json"])}

@@ -258,54 +258,6 @@ function fakeClock(){
   }]).frames[0];
   assert.deepEqual(invalid.settlements,[]);
 }
-{
-  const playback=require("../web/match_playback.js");
-  const start={
-    phase:"await_discard",turn:0,wall_count:54,
-    hand_counts:[14,13,10,13],
-    melds:[[],[],[{type:"an_gang",tile:"secret-kong"}],[]],
-    won:[false,false,false,false],discards:[],
-    hand:["hidden-self"],future_wall:["hidden-wall"],
-  };
-  const first={...start,wall_count:53,turn:1,
-    hand_counts:[13,14,10,13]};
-  const settled={...first,phase:"finished",
-    hand_counts:[13,13,10,13],won:[false,true,false,false],
-    discards:[{seat:1,tile:"p8",discard_kind:"tedashi",
-      private_tile:"never-forward"}]};
-  const opening=playback.openingFrame(start);
-  assert.equal(opening.board.melds[2][0].tile,null);
-  assert.equal(opening.board.wall_count,54);
-  const steps=playback.normalizeHistorySteps([
-    {events:[{type:"exchange_selected",seat:2,
-      tiles:["private"]}],board:first},
-    {events:[{type:"discard",seat:1,tile:"p8"}],board:settled},
-    {events:[{type:"win_settlement",seat:1,amount:24,
-      effective_fan:2,private_hand:["danger"]},
-      {type:"self_draw_win",seat:1}],board:settled},
-  ],start);
-  assert.equal(steps.length,3);
-  assert.equal(steps[0].type,"state",
-    "a real post-rule state with no playable event must be preserved");
-  assert.equal(steps[0].board.wall_count,53);
-  assert.equal(steps[1].publicTile,"p8");
-  assert.equal(steps[2].settlements[0].amount,24);
-  const all=[opening,...steps];
-  assert.equal(playback.filterReviewEntries(all,"all","all").length,4);
-  assert.equal(playback.filterReviewEntries(all,"1","win").length,1);
-  assert.equal(playback.filterReviewEntries(all,"1","discard").length,1);
-  assert.equal(playback.filterReviewEntries(all,"3","all").length,0);
-  assert.equal(playback.filterReviewEntries(all,"all","key").length,1);
-  assert.equal(playback.filterReviewEntries(all,"-1","all").length,0);
-  assert.equal(playback.filterReviewEntries(all,"all","malicious").length,0);
-  for(const forbidden of ["secret-kong","hidden-self","hidden-wall",
-      "private_tile","never-forward","private_hand","danger","exchange_selected"]){
-    assert.ok(!JSON.stringify(all).includes(forbidden),
-      forbidden+" must not survive public review normalization");
-  }
-  assert.equal(playback.openingFrame({hand_counts:[2]}),null);
-}
-console.log("M3.21 public history archive and seat/type filter privacy: PASS");
 console.log("M3.20 multi-ron settlement grouping and payment privacy: PASS");
 console.log("M3.18 kong/tail-draw chain, critical-frame focus and paused step: PASS");
 console.log("M3.17 recorded public board steps and privacy: PASS");

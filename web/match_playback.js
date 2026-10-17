@@ -146,56 +146,6 @@
     const omitted=Math.max(0,accepted.length-maxFrames);
     return {omitted,frames:accepted.slice(omitted)};
   }
-  // M3.21: retain ONLY authoritative public post-action snapshots.
-  // A transition may emit bookkeeping events outside the animation
-  // allowlist; it still has a real, safe public board we can inspect.
-  function openingFrame(board){
-    const safe=normalizeBoard(board);
-    return safe?{
-      type:"start",seat:null,winSeats:[],settlements:[],
-      actionTypes:[],isWin:false,isKong:false,isPeng:false,
-      important:false,publicTile:null,label:"开局公开状态",board:safe,
-    }:null;
-  }
-  function normalizeHistorySteps(steps,initialBoard){
-    const accepted=[];
-    let previous=normalizeBoard(initialBoard);
-    for(const step of Array.isArray(steps)?steps:[]){
-      const board=normalizeBoard(step?.board);
-      if(!board)continue;
-      // normalizeSteps applies the strict event and board allowlist. Do
-      // not copy any source event fields or private step fields here.
-      const normal=normalizeSteps([step],1,previous).frames[0];
-      accepted.push(normal||{
-        type:"state",seat:null,winSeats:[],settlements:[],
-        actionTypes:[],isWin:false,isKong:false,isPeng:false,
-        important:false,publicTile:null,label:"公开阶段状态更新",
-        board,
-      });
-      previous=board;
-    }
-    return accepted;
-  }
-  function filterReviewEntries(entries,seat="all",kind="all"){
-    const id=seat==="all"?"all":Number(seat);
-    if(seat!=="all"&&(!Number.isInteger(id)||id<0||id>3))
-      return [];
-    if(!["all","key","win","kong","peng","discard"].includes(kind))
-      return [];
-    return (Array.isArray(entries)?entries:[]).filter(entry=>{
-      if(!entry||!entry.board)return false;
-      if(id!=="all"&&entry.seat!==id&&
-          !entry.winSeats?.includes(id)&&
-          !entry.settlements?.some(x=>x.seat===id))return false;
-      const actions=entry.actionTypes||[];
-      return kind==="all"||
-        (kind==="key"&&!!entry.important)||
-        (kind==="win"&&!!entry.isWin)||
-        (kind==="kong"&&!!entry.isKong)||
-        (kind==="peng"&&!!entry.isPeng)||
-        (kind==="discard"&&actions.includes("discard"));
-    });
-  }
   function highlightFrames(frames){
     if(!Array.isArray(frames)||!frames.length)return [];
     // The final AUTHENTIC post-action snapshot must always be included,
@@ -263,6 +213,5 @@
       getState(){return {playing,paused,index,total:items.length,duration};},
     };
   }
-  return {normalize,normalizeBoard,normalizeSteps,normalizeHistorySteps,
-    openingFrame,filterReviewEntries,highlightFrames,createController};
+  return {normalize,normalizeSteps,highlightFrames,createController};
 });

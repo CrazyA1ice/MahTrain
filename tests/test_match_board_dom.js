@@ -38,11 +38,6 @@ const ids=[
   "match-round-report-wins","match-round-report-timeline",
   "match-round-report-events","match-round-report-note",
   "match-motion-settlements",
-  "match-review-seat-filter","match-review-type-filter",
-  "match-review-inspector","match-review-selected",
-  "match-review-board-status","match-review-preview-seats",
-  "match-review-prev","match-review-next",
-  "match-review-count",
   "match-self-melds","match-self-status","match-ready-hint","match-win-alert",
   "match-playback","match-playback-progress","match-playback-status",
   "match-playback-speed","match-playback-pause","match-playback-step",
@@ -103,10 +98,6 @@ window.MahTrainPlayback={
   normalize:playbackModule.normalize,
   normalizeSteps:playbackModule.normalizeSteps,
   highlightFrames:playbackModule.highlightFrames,
-  normalizeBoard:playbackModule.normalizeBoard,
-  normalizeHistorySteps:playbackModule.normalizeHistorySteps,
-  openingFrame:playbackModule.openingFrame,
-  filterReviewEntries:playbackModule.filterReviewEntries,
   createController:callbacks=>playbackModule.createController({
     ...callbacks,
     clock:(fn,delay)=>context.setTimeout(fn,delay),
@@ -528,11 +519,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     x=>x.className==="match-win-record").length,2);
   assert.ok(dom["match-round-report-status"].textContent.includes("2笔胡牌"));
   assert.ok(dom["match-round-report-note"].textContent.includes("未入账"));
-  assert.equal(dom["match-round-report-events"].children.length,2,
-    "opening snapshot and single authoritative multi-ron rule transition");
   assert.equal(descendants(dom["match-round-report-events"],
-    x=>x.textContent.includes("一炮多响")).length,1,
-    "two paid wins must share one authentic post-transition board");
+    x=>x.textContent.includes("胡牌入账")).length,2);
 
   // End-of-wall WITHOUT paid wins must still yield a report, with no
   // fabricated transfer, no fake whole-room settlement.
@@ -546,103 +534,6 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-round-report-note"].textContent.includes("查花猪"));
   assert.ok(descendants(dom["match-round-report-wins"],
     x=>x.textContent.includes("没有已入账胡牌")).length>0);
-  // M3.21: archive two successful API responses while animations are OFF.
-  // Old public boards remain accessible after the match ends without
-  // interfering with the real current board or making further requests.
-  dom["match-playback-speed"].value="0";
-  startMatch={...base,events:[],win_ledger:{
-    balances:[0,0,0,0],wins:[]}};
-  const firstBoard={phase:"claim_window",turn:0,wall_count:54,
-    hand_counts:[13,13,10,13],melds:base.melds,
-    discards:[...base.discards,{seat:0,tile:"m1"}],
-    won:[false,false,false,false]};
-  const secondBoard={...firstBoard,phase:"await_discard",turn:1,
-    wall_count:53,hand_counts:[13,14,10,13]};
-  replyMatch={...next,events:[{type:"discard",seat:0,tile:"m1"}],
-    public_steps:[
-      {events:[{type:"discard",seat:0,tile:"m1"}],board:firstBoard},
-      {events:[{type:"draw",seat:1,tile:"hidden-drawn"}],board:secondBoard},
-    ],
-    win_ledger:{balances:[0,0,0,0],wins:[]},
-  };
-  dom["match-new"].handlers.click();
-  await settle();
-  dom["match-hand"].children[0].handlers.click();
-  await settle();
-  assert.equal(dom["match-round-report"].hidden,true);
-  const matchWin={winner:1,kind:"ron",main_pattern:"平胡",
-    raw_fan:1,effective_fan:1,multiplier:2,
-    amount_per_payer:16,total_received:16,payers:[0],
-    bonuses:{}};
-  const finishedBoard={...secondBoard,phase:"finished",
-    wall_count:52,hand_counts:[13,13,10,13],
-    won:[false,true,false,false],
-    discards:[...secondBoard.discards,{seat:1,tile:"p8"}]};
-  replyMatch={...replyMatch,phase:"finished",
-    wall_count:52,hand_counts:finishedBoard.hand_counts,
-    discards:finishedBoard.discards,won:finishedBoard.won,
-    events:[{type:"discard",seat:0,tile:"m1"},
-      {type:"win_settlement",seat:1,amount:16,effective_fan:1},
-      {type:"ron",seat:1,source:0}],
-    win_ledger:{balances:[-16,16,0,0],wins:[matchWin]},
-    public_steps:[
-      {events:[{type:"discard",seat:1,tile:"p8"}],board:finishedBoard},
-      {events:[{type:"win_settlement",seat:1,amount:16,
-        effective_fan:1,private_hand:["must-never-show"]},
-        {type:"ron",seat:1,source:0}],board:finishedBoard},
-    ],
-  };
-  dom["match-hand"].children[0].handlers.click();
-  await settle();
-  assert.equal(dom["match-round-report"].hidden,false);
-  assert.equal(dom["match-wall-count"].textContent,"52");
-  assert.equal(dom["match-round-report-events"].children.length,5,
-    "opening + two frames each across TWO successful turns");
-  assert.equal(dom["match-review-preview-seats"].children.length,4);
-  assert.ok(dom["match-review-board-status"].textContent.includes("牌山剩余52"));
-  const callCount=requests.length;
-  dom["match-review-seat-filter"].value="1";
-  dom["match-review-seat-filter"].handlers.change();
-  assert.equal(descendants(dom["match-round-report-wins"],
-    x=>x.className==="match-win-record").length,1);
-  dom["match-review-type-filter"].value="win";
-  dom["match-review-type-filter"].handlers.change();
-  assert.equal(dom["match-round-report-events"].children.length,1);
-  assert.equal(dom["match-review-prev"].disabled,true);
-  dom["match-review-type-filter"].value="all";
-  dom["match-review-type-filter"].handlers.change();
-  assert.ok(dom["match-round-report-events"].children.length>=3);
-  dom["match-review-prev"].handlers.click();
-  assert.ok(dom["match-review-board-status"].textContent.includes("牌山剩余52"));
-  dom["match-review-prev"].handlers.click();
-  assert.ok(dom["match-review-board-status"].textContent.includes("牌山剩余53"));
-  assert.equal(dom["match-wall-count"].textContent,"52",
-    "historical preview must never mutate live authoritative table");
-  assert.equal(requests.length,callCount,
-    "review navigation must not submit any game action");
-  assert.equal(descendants(dom["match-review-preview-seats"],
-    x=>x.tile==="hidden-drawn"||x.tile==="must-never-show").length,0);
-  assert.equal(descendants(dom["match-review-preview-seats"],
-    x=>x.tile!==undefined && x.tile==="p8").length,0,
-    "older history must not display future discard");
-
-  // Filter by a seat not involved in the only paid win, then reset the
-  // match. Old history and old selections must not cross into a new game.
-  dom["match-review-seat-filter"].value="2";
-  dom["match-review-seat-filter"].handlers.change();
-  assert.equal(descendants(dom["match-round-report-wins"],
-    x=>x.className==="match-win-record").length,0);
-  startMatch={...base,phase:"wall_exhausted",wall_count:0,
-    win_ledger:{balances:[0,0,0,0],wins:[]},
-    kong_ledger:{base:null,balances:[0,0,0,0],events:[],entries:[]}};
-  dom["match-new"].handlers.click();
-  await settle();
-  assert.equal(dom["match-review-seat-filter"].value,"all");
-  assert.equal(dom["match-review-type-filter"].value,"all");
-  assert.equal(dom["match-round-report-events"].children.length,1);
-  assert.equal(dom["match-review-preview-seats"].children.length,4);
-  assert.equal(dom["match-wall-count"].textContent,"0");
-  console.log("M3.21 cross-turn public history, seat/filter navigation and reset DOM smoke: PASS");
   console.log("M3.20 grouped settlement animation and round report DOM smoke: PASS");
   console.log("M3.19 in-table settlement and directional meld DOM smoke: PASS");
   console.log("M3.18 focused kong/win and manual-step live DOM smoke: PASS");
