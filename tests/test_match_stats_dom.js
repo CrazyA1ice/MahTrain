@@ -64,6 +64,31 @@ assert.equal(nodes["match-stats-cumulative"].children[0].tagName,"p");
 assert.ok(nodes["match-stats-cumulative"].children[0].textContent.includes("暂无"));
 assert.equal(nodes["match-stats-outcomes"].children[0].tagName,"p");
 assert.equal(nodes["match-stats-metrics"].children[3].children[1].textContent,"0.0%");
+// 30+ archived results: only bounded server-delivered history is drawn.
+// The SVG geometry must stay finite even when cumulative net alternates.
+const thirty=Array.from({length:30},(_,i)=>({
+  created_at:"2026-10-"+String(i%28+1).padStart(2,"0")+"T12:00:00Z",
+  score:i%2?20:-20,cumulative:i%2?0:-20,
+}));
+stats.render({...board,valid_games:30,seats:[{
+  ...board.seats[0],positive_games:15,negative_games:15,zero_games:0,
+}],trend:thirty},doc);
+const manyPlot=nodes["match-stats-cumulative"].children[0];
+assert.equal(manyPlot.tagName,"svg");
+const thirtyDots=manyPlot.children.filter(x=>x.tagName==="circle");
+assert.equal(thirtyDots.length,30);
+assert.ok(manyPlot.children.find(x=>x.tagName==="polyline")
+  .attributes.points.split(" ").every(pair=>
+    pair.split(",").every(n=>Number.isFinite(Number(n)))));
+assert.equal(nodes["match-stats-outcomes"].children[0].children[2]
+  .textContent,"15 局 · 50.0%");
+stats.render({...board,valid_games:1,seats:[{
+  ...board.seats[0],positive_games:0,negative_games:1,zero_games:0,
+}],trend:[{created_at:"2026-10-17",score:-8,cumulative:-8}]},doc);
+assert.equal(nodes["match-stats-cumulative"].children[0]
+  .children.filter(x=>x.tagName==="circle").length,1);
+assert.equal(nodes["match-stats-outcomes"].children[1].children[2]
+  .textContent,"1 局 · 100.0%");
 const same=stats.makeLinePoints([{cumulative:100}]);
 assert.equal(same.points.length,1);
 assert.ok(Number.isFinite(same.zeroY));
