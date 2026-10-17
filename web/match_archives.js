@@ -74,6 +74,58 @@
         seat.negative_games+"/"+seat.zero_games));
       seats.append(card);
     }
+    // Visual summaries use only the server-verified scorecard. A positive
+    // net result is not automatically a mahjong "win"; label it correctly.
+    const dashboard=$("match-stats-dashboard");
+    dashboard.replaceChildren();
+    const human=board.seats.find(x=>x.seat===0);
+    if(human){
+      const n=(human.positive_games||0)+(human.negative_games||0)+
+        (human.zero_games||0);
+      const make=()=>el("section","match-stat-visual");
+      const outcome=make();
+      outcome.append(el("h5","","我的历史正式净额分布"));
+      const bars=el("div","match-stat-stacked");
+      const parts=[["positive","正净额",human.positive_games],
+        ["negative","负净额",human.negative_games],
+        ["even","零净额",human.zero_games]];
+      for(const [kind,name,count] of parts){
+        const segment=el("span","match-stat-segment "+kind);
+        segment.style.width=(n?100*count/n:0).toFixed(2)+"%";
+        segment.title=name+" "+count+"局";
+        bars.append(segment);
+      }
+      bars.setAttribute("role","img");
+      bars.setAttribute("aria-label",parts.map(x=>x[1]+x[2]+"局").join("、"));
+      outcome.append(bars);
+      outcome.append(el("p","match-stat-legend",
+        parts.map(x=>x[1]+" "+x[2]+"局").join(" · ")+
+        (n?" · 正净额占比 "+(human.positive_games/n*100).toFixed(1)+"%":" · 暂无数据"));
+      dashboard.append(outcome);
+      const totals=make();
+      totals.append(el("h5","","胡牌与流局 · 正式积分组成"));
+      const max=Math.max(1,...board.seats.map(x=>
+        Math.max(Math.abs(x.hu_total||0),Math.abs(x.draw_total||0))));
+      for(const seat of board.seats){
+        const row=el("div","match-stat-component-row");
+        row.append(el("span","",seat.seat===0?"自己":seat.seat+"号AI"));
+        for(const [type,value] of [["hu",seat.hu_total||0],
+                                    ["draw",seat.draw_total||0]]){
+          const track=el("div","match-stat-component-track");
+          const fill=el("span","match-stat-component-bar "+
+            (value>=0?"credit ":"debit ")+type);
+          fill.style.width=(Math.abs(value)/max*100).toFixed(1)+"%";
+          fill.title=(type==="hu"?"胡牌":"流局")+": "+sign(value);
+          track.append(fill);
+          row.append(track);
+        }
+        row.append(el("strong","",sign(seat.settled_total)));
+        totals.append(row);
+      }
+      totals.append(el("p","review-footnote",
+        "每行从左到右为胡牌积分、流局积分、正式净额。条形长度按全体座位的最大绝对组成值归一，不代表胜率。"));
+      dashboard.append(totals);
+    }
     const history=Array.isArray(board.trend)?board.trend:[];
     if(!history.length){
       trend.append(el("p","review-footnote","尚无可核验的已完成对局。"));
