@@ -20,6 +20,7 @@
   <script src="/ai_replay.js" defer></script>
   <script src="/ai_baseline.js" defer></script>
   <script src="/app.js" defer></script>
+  <script src="/app_home.js" defer></script>
 </head>
 <body>
   <div class="app">
@@ -28,7 +29,25 @@
       <div class="top-actions"><button id="sound-toggle" class="toolbar-button" type="button" aria-pressed="true">🔊 音效开启</button><span class="mode-label">单人摸切 · 14轮</span></div>
     </header>
     <main>
-      <section class="intro">
+      <nav id="module-navbar" class="module-navbar" aria-label="功能导航" hidden>
+        <button id="module-back-home" type="button" class="review-control">← 返回首页</button>
+        <strong id="module-current-name"></strong>
+      </nav>
+      <section id="module-home" class="module-home" aria-labelledby="module-home-title">
+        <p class="eyebrow">MAHTRAIN · FUNCTION HUB</p>
+        <h1 id="module-home-title">选择功能，开始麻将练习</h1>
+        <p class="module-home-lead">训练、真实人机对战、复盘和战绩统计分别进入，主页面不再堆叠所有功能。</p>
+        <div class="module-home-grid">
+          <button type="button" data-open-module="match" class="module-home-card module-home-featured"><span>01 · 对战</span><strong>四人血战 · 人机对战</strong><small>和三名策略 AI 正式对局，碰杠胡与积分结算</small><b>进入对战 →</b></button>
+          <button type="button" data-open-module="archives" class="module-home-card"><span>02 · 数据</span><strong>历史战绩与统计图</strong><small>累计积分、胜负局占比、四家对比、近期走势</small><b>查看战绩 →</b></button>
+          <button type="button" data-open-module="training" class="module-home-card"><span>03 · 训练</span><strong>连续摸切训练</strong><small>独立14轮切牌训练、逐轮报告与错题重练</small><b>进入训练 →</b></button>
+          <button type="button" data-open-module="quiz" class="module-home-card"><span>04 · 训练</span><strong>单题训练中心</strong><small>何切、听牌与清一色专项练习</small><b>开始练习 →</b></button>
+          <button type="button" data-open-module="history" class="module-home-card"><span>05 · 复盘</span><strong>训练历史与错题本</strong><small>查询单人训练存档，查看错题和进步记录</small><b>查看训练记录 →</b></button>
+          <button type="button" data-open-module="research" class="module-home-card"><span>06 · 研究</span><strong>AI 对局与策略研究</strong><small>多种 AI 对局回放和基准测试，独立于正式战绩</small><b>进入研究 →</b></button>
+          <button type="button" data-open-module="demo" class="module-home-card"><span>07 · 演示</span><strong>四人开局规则演示</strong><small>换三张、定缺等入门规则；不是正式战绩</small><b>查看演示 →</b></button>
+        </div>
+      </section>
+      <section class="intro" data-module-section="training">
         <div>
           <p class="eyebrow">STRUCTURED PRACTICE</p>
           <h1>每一张切牌，都有依据。</h1>
@@ -51,7 +70,7 @@
           <button id="begin-training" type="submit" class="primary" disabled>③ 确认定缺 · 开始训练 <span aria-hidden="true">↗</span></button>
         </form>
       </section>
-      <section id="quiz-center" class="panel quiz-center">
+      <section id="quiz-center" class="panel quiz-center" data-module-section="quiz">
         <div class="panel-title"><h3>单题训练中心</h3><small>四种模式 · 基础 / 进阶 / 挑战</small></div>
         <p class="review-intro">和连续14轮训练相互独立。服务端按已验证的顺子、搭子、七对等牌形出题，提交后才公布标准答案。</p>
         <div class="quiz-toolbar">
@@ -84,7 +103,7 @@
           <div id="quiz-history-detail" class="quiz-history-detail" aria-live="polite"></div>
         </section>
       </section>
-      <section id="game" class="game" hidden>
+      <section id="game" class="game" data-module-section="training" hidden>
         <div class="stats">
           <div><span>训练进度</span><strong id="progress">0 / 14</strong></div>
           <div><span>牌墙剩余</span><strong id="wall">95</strong></div>
@@ -110,7 +129,7 @@
         <section id="report-panel" class="panel report-panel" hidden><div class="panel-title"><h3 id="report-title">逐轮切牌复盘与牌效总结</h3><small id="report-subtitle">已完成的回合实时记录</small></div><div id="report" aria-live="polite"></div></section>
         <section id="retry-panel" class="panel retry-panel" hidden><div class="panel-title"><h3>错题重练 · 再做一次</h3><small>仅复习本局答错的回合，不影响原牌墙和成绩</small></div><div id="retry-board" aria-live="polite"></div></section>
       </section>
-      <section id="ai-replay-panel" class="panel ai-replay-panel">
+      <section id="ai-replay-panel" class="panel ai-replay-panel" data-module-section="research">
         <div class="panel-title"><h3>M3.8 · AI决策公开解释与种子对照统计</h3><small>三次座位轮换合并为一个种子 · 脱敏逐动作讲解</small></div>
         <p class="review-intro">运行三档AI的完整自动对局，完成后逐步查看出牌、碰杠胡、公开副露及每家的牌河。不同档位可比较胡牌事件、放铳责任、最低向听选择率与局部最优率；<strong>公开回放不会显示其他家的暗牌、未来牌墙或隐藏牌效。</strong> 新增 M3.30 可统计胡牌加方案A真实流局赔付的正式积分，但仅针对三档启发式 AI 的受控实验，不代表真人胜率。</p>
         <div class="ai-replay-toolbar">
@@ -162,7 +181,7 @@
           </div>
         </div>
       </section>
-      <section id="ai-baseline-panel" class="panel ai-replay-panel ai-baseline-panel">
+      <section id="ai-baseline-panel" class="panel ai-replay-panel ai-baseline-panel" data-module-section="research">
         <div class="panel-title"><h3>M3.9 · 独立规则基线与三档AI对照</h3>
           <small>不使用向听/有效进张的独立牌形对手 · 每种子四轮座位轮换</small>
         </div>
@@ -205,7 +224,7 @@
           </div>
         </div>
       </section>
-      <section id="match-panel" class="panel match-panel">
+      <section id="match-panel" class="panel match-panel" data-module-section="match">
         <div class="panel-title">
           <h3>四人血战 · 四边牌桌人机对战</h3>
           <small>一炮多响 / 碰 / 明暗补杠 / 抢杠胡 / 已胡退出</small>
@@ -432,7 +451,7 @@
           <div id="match-public" class="match-public"></div>
         </div>
       </section>
-      <section id="match-archives-panel" class="panel match-archives-panel">
+      <section id="match-archives-panel" class="panel match-archives-panel" data-module-section="archives">
         <div class="panel-title">
           <h3>四人血战 · 本地已完成对局档案</h3>
           <button id="match-archives-refresh" type="button" class="review-control">刷新对局档案</button>
@@ -444,6 +463,7 @@
           <h4 id="match-scorecard-title">多局正式积分总览 · 四家座位统计</h4>
           <p id="match-scorecard-status" class="review-footnote"></p>
           <div id="match-scorecard-seats" class="match-scorecard-seats"></div>
+          <div id="match-stats-dashboard" class="match-stats-dashboard" aria-label="真实对局战绩可视化"></div>
           <div class="match-scorecard-trend-head">
             <strong>0号玩家 · 近30局正式净额走势</strong>
             <span>每行显示单局净额及截至该局的累计正式积分</span>
@@ -503,7 +523,7 @@
           <p class="review-footnote">这里仅能查看公开局面，不会恢复对战或暴露任何历史暗手。浏览器刷新后可从 SQLite 重新打开已完成对局；本地档案没有账户登录或云同步。</p>
         </section>
       </section>
-      <section id="four-player-demo" class="panel table-demo">
+      <section id="four-player-demo" class="panel table-demo" data-module-section="demo">
         <div class="panel-title">
           <h3>四人血战 · 开局规则演示（M3预览）</h3>
           <small>先发牌换三张，再盖牌定缺；非完整人机对战</small>
@@ -522,7 +542,7 @@
           <div id="table-public" class="table-public"></div>
         </div>
       </section>
-      <section id="history-panel" class="panel history-panel">
+      <section id="history-panel" class="panel history-panel" data-module-section="history">
         <div class="panel-title"><h3>本地历史训练与错题本</h3><button id="history-refresh" type="button" class="review-control">刷新历史</button></div>
         <p class="review-footnote">已完成训练自动保存到本机 SQLite，重启服务后仍能查看旧成绩、逐轮复盘和错题重练。本地原型不含账号或云同步。</p>
         <div id="history-summary" class="history-summary"></div>
