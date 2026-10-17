@@ -1753,3 +1753,23 @@
 @media(prefers-reduced-motion:reduce){
   .match-controls .match-reaction-button{transition:none}
 }
+
+/* M3.36 second felt, purely local appearance; public tiles remain unchanged. */
+#match-board.is-midnight-felt{
+  background:radial-gradient(ellipse at center,#1d7181 0%,#135264 54%,#092f43 100%);
+  border-color:#715139;
+  box-shadow:inset 0 0 0 3px #bb8750,inset 0 0 48px #091f3080,
+    0 9px 26px #0a324437;
+}
+#match-board.is-midnight-felt .match-river{
+  background:#0b3f527a;border-color:#9ecad93d;
+}
+#match-board.is-midnight-felt .match-wall{
+  background:#103e52;border-color:#debd83;
+}
+#match-board.is-midnight-felt .match-seat.is-active{
+  background:#87b7c32e;border-color:#d6c58a;
+}
+#match-board.is-midnight-felt .match-table-settlement{
+  background:#102e43e8;border-color:#dec78b;
+}
