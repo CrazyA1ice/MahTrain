@@ -13,7 +13,6 @@
   <script src="/quiz.js" defer></script>
   <script src="/quiz_history.js" defer></script>
   <script src="/four_player.js" defer></script>
-  <script src="/match_playback.js" defer></script>
   <script src="/match.js" defer></script>
   <script src="/ai_replay.js" defer></script>
   <script src="/ai_baseline.js" defer></script>
@@ -199,26 +198,6 @@
         <div id="match-stage" hidden>
           <h4 id="match-title"></h4>
           <p id="match-status" class="review-footnote"></p>
-          <div id="match-playback" class="match-playback" hidden>
-            <div class="match-playback-info">
-              <strong>公开动作回放</strong>
-              <span id="match-playback-progress" aria-live="polite">0 / 0</span>
-              <span id="match-playback-status">准备播放</span>
-            </div>
-            <div class="match-playback-controls">
-              <label>AI 动作速度
-                <select id="match-playback-speed">
-                  <option value="180">快速</option>
-                  <option value="450" selected>标准</option>
-                  <option value="900">慢速</option>
-                  <option value="0">关闭播放</option>
-                </select>
-              </label>
-              <button id="match-playback-pause" type="button" class="review-control">暂停</button>
-              <button id="match-playback-skip" type="button" class="review-control">跳过动画</button>
-            </div>
-            <p id="match-playback-note" class="review-footnote"></p>
-          </div>
           <div id="match-win-alert" class="match-win-alert" role="status"
                aria-live="assertive" hidden></div>
 
@@ -227,10 +206,6 @@
               <section id="match-seat-2" class="match-seat match-seat--top" aria-label="2号对家"></section>
               <section id="match-seat-3" class="match-seat match-seat--left" aria-label="3号上家"></section>
               <div class="match-board-center">
-                <div id="match-motion" class="match-motion" aria-live="polite" hidden>
-                  <strong id="match-motion-text"></strong>
-                  <div id="match-motion-card"></div>
-                </div>
                 <div id="match-river-2" class="match-river match-river--top" aria-label="对家牌河"></div>
                 <div id="match-river-3" class="match-river match-river--left" aria-label="上家牌河"></div>
                 <div id="match-wall" class="match-wall">

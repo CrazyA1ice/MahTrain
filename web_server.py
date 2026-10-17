@@ -153,8 +153,47 @@ def _match_private_view(game: FourPlayerOpening,
     return view
 
 
+_MATCH_PUBLIC_BOARD_FIELDS = (
+    "phase", "turn", "wall_count", "hand_counts", "melds",
+    "discards", "won",
+)
+_MAX_MATCH_PUBLIC_STEPS = 96
+
+
+def _match_public_board(game: FourPlayerOpening) -> dict:
+    """Only public, stable board facts. No wall, concealed hands or draws."""
+    published = game.public_state()
+    return {key: published[key] for key in _MATCH_PUBLIC_BOARD_FIELDS}
+
+
+def _match_public_step(game: FourPlayerOpening, before_events: int,
+                       output: list[dict]) -> None:
+    """Record one completed rules transition, not fictitious event substeps."""
+    board = game.public_state()
+    events = board["events"][before_events:]
+    if not events:
+        return
+    # Each snapshot is captured after the actual rules action finished.
+    # One action can emit several bookkeeping/public events: keep those
+    # grouped instead of claiming a non-existent intermediate board.
+    output.append({
+        "events": events,
+        "board": {key: board[key] for key in _MATCH_PUBLIC_BOARD_FIELDS},
+    })
+    if len(output) > _MAX_MATCH_PUBLIC_STEPS:
+        del output[:len(output)-_MAX_MATCH_PUBLIC_STEPS]
+
+
+def _match_record(game: FourPlayerOpening, output: list[dict],
+                  action) -> None:
+    before = len(game._events)
+    action()
+    _match_public_step(game, before, output)
+
+
 def _match_script_until_human(
     game: FourPlayerOpening, agents: dict[int, MahjongAgent],
+    steps: list[dict] | None = None,
 ) -> None:
     """Run three fair-visibility heuristic opponents until seat zero can act.
 
@@ -162,6 +201,8 @@ def _match_script_until_human(
     each bot chooses from its OWN seat-authorized private view and public
     state, never hidden wall, other hands or opponents' secret W0.
     """
+    if steps is None:
+        steps = []
     for _ in range(512):
         phase = game.phase
         if phase in ("exchange_select", "missing_select",
@@ -184,9 +225,11 @@ def _match_script_until_human(
                            agents[seat].response(view,
                                rob=(phase=="rob_kong_window")))
                 if phase=="claim_window":
-                    game.respond_discard(seat,selection)
+                    _match_record(game,steps,lambda seat=seat,selection=selection:
+                                  game.respond_discard(seat,selection))
                 else:
-                    game.respond_rob_kong(seat,selection)
+                    _match_record(game,steps,lambda seat=seat,selection=selection:
+                                  game.respond_rob_kong(seat,selection))
                 if game.phase!=phase:
                     break
             else:
@@ -194,7 +237,7 @@ def _match_script_until_human(
                     raise RuntimeError("AI response arbitration did not settle")
             continue
         if phase=="await_draw":
-            game.draw(game.turn)
+            _match_record(game,steps,lambda: game.draw(game.turn))
             continue
         if phase in ("await_discard","dealer_discard"):
             if game.turn==0:
@@ -203,13 +246,15 @@ def _match_script_until_human(
             view=game.private_view(seat)
             agent=agents[seat]
             if view["can_self_draw_win"]:
-                game.declare_self_win(seat)
+                _match_record(game,steps,lambda: game.declare_self_win(seat))
                 continue
             chosen_kong=agent.kong(view)
             if chosen_kong is not None:
-                game.declare_kong(seat, chosen_kong["type"],chosen_kong["tile"])
+                _match_record(game,steps,lambda: game.declare_kong(
+                    seat,chosen_kong["type"],chosen_kong["tile"]))
                 continue
-            game.discard(seat,agent.discard(view))
+            choice = agent.discard(view)
+            _match_record(game,steps,lambda: game.discard(seat,choice))
             continue
         raise RuntimeError("unexpected AI match phase: "+str(phase))
     raise RuntimeError("AI script exceeded 512 transitions")
@@ -445,35 +490,45 @@ def _process(action: str, payload: dict) -> dict:
             agents=_MATCH_AGENTS.get(token)
             if agents is None:
                 raise ValueError("试验对局AI未初始化，请重新开局")
+            steps: list[dict] = []
             if action=="match_exchange":
-                game.select_exchange(0,payload.get("tiles"))
+                _match_record(game,steps,lambda: game.select_exchange(
+                    0,payload.get("tiles")))
                 for s in (1,2,3):
-                    game.select_exchange(
-                        s,agents[s].exchange(game.private_view(s)))
+                    choice=agents[s].exchange(game.private_view(s))
+                    _match_record(game,steps,lambda s=s,choice=choice:
+                                  game.select_exchange(s,choice))
             elif action=="match_missing":
-                game.select_missing(0,payload.get("suit"))
+                _match_record(game,steps,lambda: game.select_missing(
+                    0,payload.get("suit")))
                 for s in (1,2,3):
-                    game.select_missing(
-                        s,agents[s].missing(game.private_view(s)))
-                _match_script_until_human(game,agents)
+                    suit=agents[s].missing(game.private_view(s))
+                    _match_record(game,steps,lambda s=s,suit=suit:
+                                  game.select_missing(s,suit))
+                _match_script_until_human(game,agents,steps)
             elif action=="match_discard":
-                game.discard(0,payload.get("tile"),
-                             from_draw=payload.get("from_draw"))
-                _match_script_until_human(game,agents)
+                _match_record(game,steps,lambda: game.discard(
+                    0,payload.get("tile"),
+                    from_draw=payload.get("from_draw")))
+                _match_script_until_human(game,agents,steps)
             elif action=="match_claim":
-                game.respond_discard(0,payload.get("choice"))
-                _match_script_until_human(game,agents)
+                _match_record(game,steps,lambda: game.respond_discard(
+                    0,payload.get("choice")))
+                _match_script_until_human(game,agents,steps)
             elif action=="match_rob":
-                game.respond_rob_kong(0,payload.get("choice"))
-                _match_script_until_human(game,agents)
+                _match_record(game,steps,lambda: game.respond_rob_kong(
+                    0,payload.get("choice")))
+                _match_script_until_human(game,agents,steps)
             elif action=="match_kong":
-                game.declare_kong(0,payload.get("kind"),payload.get("tile"))
-                _match_script_until_human(game,agents)
+                _match_record(game,steps,lambda: game.declare_kong(
+                    0,payload.get("kind"),payload.get("tile")))
+                _match_script_until_human(game,agents,steps)
             elif action=="match_win":
-                game.declare_self_win(0)
-                _match_script_until_human(game,agents)
-            return {"match_token":token,
-                    "match":_match_private_view(game,agents)}
+                _match_record(game,steps,lambda: game.declare_self_win(0))
+                _match_script_until_human(game,agents,steps)
+            view=_match_private_view(game,agents)
+            view["public_steps"]=steps
+            return {"match_token":token,"match":view}
         if action == "table_new":
             seed = payload.get("seed", 42)
             if type(seed) is not int or not 0 <= seed <= 2**32-1:

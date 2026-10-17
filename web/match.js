@@ -8,7 +8,6 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
-  let playback=null;
   const tileName=t=>window.MahTrainUI.tileName(t);
   function el(tag,css,label){
     const v=document.createElement(tag);
@@ -39,30 +38,6 @@
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"对局操作失败");
-      // Replay only NEW public events from this response, never seek a wall
-      // or a concealed AI draw. The trusted final state is applied once at
-      // completion; intermediate historic hand/wall layouts are NOT forged.
-      if(name!=="match_new" && state && playback &&
-          Number($("match-playback-speed").value)!==0){
-        const before=state.events?.length||0;
-        const newEvents=data.match.events||[];
-        if(newEvents.length>=before){
-          const result=window.MahTrainPlayback.normalize(
-            newEvents.slice(before));
-          if(result.frames.length){
-            $("match-playback").hidden=false;
-            $("match-playback-note").textContent=
-              "按公开事件顺序播放；完整牌桌在播放结束时同步。"+
-              (result.omitted?" 事件较多，已略过前"+result.omitted+"项。":"");
-            await new Promise(resolve=>playback.start(result.frames,resolve));
-          }
-        }
-      }
-      if(name==="match_new" && playback){
-        playback.cancel();
-        $("match-playback").hidden=true;
-        $("match-motion").hidden=true;
-      }
       token=data.match_token;state=data.match;choice.clear();render();
     }catch(err){
       $("match-error").textContent=err.message||String(err);
@@ -89,41 +64,6 @@
     const back=el("span","match-tile-back");
     back.setAttribute("aria-hidden","true");
     return back;
-  }
-  function showPublicMotion(frame,step,total){
-    const root=$("match-motion"),target=$("match-motion-card");
-    root.hidden=false;
-    root.classList.toggle("is-winning-motion",frame.isWin);
-    $("match-motion-text").textContent=frame.label;
-    target.replaceChildren();
-    // Only publicly revealed physical tile kinds are depicted face-up.
-    if(frame.publicTile){
-      target.append(card(frame.publicTile,null,false));
-    }else if(frame.concealed){
-      target.append(tileBack());
-    }
-    for(const seat of seats){
-      $("match-seat-"+seat.id).classList.toggle(
-        "is-replay-acting",seat.id===frame.seat||
-          frame.winSeats.includes(seat.id));
-    }
-  }
-  function onPlaybackStatus(status){
-    $("match-playback-progress").textContent=
-      (status.playing?status.index+1:status.total)+
-      " / "+status.total;
-    $("match-playback-status").textContent=
-      !status.playing?"播放完毕":status.paused?"已暂停":"播放中";
-    const pause=$("match-playback-pause");
-    pause.textContent=status.paused?"继续播放":"暂停";
-    pause.disabled=!status.playing;
-    $("match-playback-skip").disabled=!status.playing;
-  }
-  function onPlaybackDone(){
-    $("match-motion").hidden=true;
-    $("match-playback").hidden=true;
-    for(const seat of seats)$("match-seat-"+seat.id)
-      .classList.toggle("is-replay-acting",false);
   }
   function renderMelds(root,groups,showOwn){
     root.replaceChildren();
@@ -535,23 +475,6 @@
     publicInfo.append(log);
   }
   function init(){
-    playback=window.MahTrainPlayback.createController({
-      onFrame:showPublicMotion,onStatus:onPlaybackStatus,
-      onDone:onPlaybackDone,
-    });
-    const speed=$("match-playback-speed");
-    playback.setSpeed(Number(speed.value)||450);
-    speed.addEventListener("change",()=>{
-      const milliseconds=Number(speed.value);
-      if(milliseconds===0){playback.skip();return;}
-      playback.setSpeed(milliseconds);
-    });
-    $("match-playback-pause").addEventListener("click",()=>{
-      const status=playback.getState();
-      if(status.paused)playback.resume();
-      else playback.pause();
-    });
-    $("match-playback-skip").addEventListener("click",()=>playback.skip());
     $("match-enable-kong").addEventListener("change",()=>{
       $("match-kong-base").disabled=!$("match-enable-kong").checked;
     });
