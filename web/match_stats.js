@@ -107,7 +107,6 @@
         dot.append(title);svg.append(dot);
       });
       for(const [i,anchor] of [[0,"start"],[history.length-1,"end"]]){
-        if(i!==0&&i===0)continue;
         const label=svgNode("text",{
           x:points[i].x,y:224,"text-anchor":anchor,
           class:"match-stats-axis-label",
