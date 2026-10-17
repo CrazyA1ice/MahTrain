@@ -1231,7 +1231,7 @@ class WebUI(unittest.TestCase):
                       "match-stats-dashboard","match-stats-metrics",
                       "match-stats-cumulative","match-stats-outcomes"):
             self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
-        for kind in ("solo","quiz","match","records","lab"):
+        for kind in ("solo","quiz","match","records","history","lab"):
             self.assertEqual(page.count(
                 ('id="home-open-%s"' % kind).encode()),1)
             self.assertEqual(page.count(
@@ -1248,6 +1248,12 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"match-stats-outcomes",chart)
         self.assertIn(b".home-module-grid",css)
         self.assertIn(b".match-stats-line",css)
+        self.assertIn(b"\"history\"",nav)
+        self.assertIn(b"MahTrainMatchArchives?.refresh?.()",nav)
+        self.assertIn(b"MahTrainHistory?.refresh?.()",nav)
+        self.assertIn(b"refreshVersion",archive)
+        self.assertIn(b"home-match-state",page)
+        self.assertIn(b".home-match-state",css)
 
     def test_m345_fluid_board_no_horizontal_pan_and_contextual_dialog(self):
         page,_=self.get("/")
