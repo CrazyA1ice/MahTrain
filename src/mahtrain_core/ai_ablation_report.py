@@ -176,6 +176,79 @@ def _pressure_panel(report: dict[str, Any]) -> str:
     )
 
 
+def _official_score_panel(report: dict[str, Any]) -> str:
+    """M3.33: public, allowlisted aggregate official A-only score comparison."""
+    analysis = report.get("official_score_analysis")
+    if not analysis:
+        return ""
+    if analysis.get("protocol") != "five_policy_incomplete_block_official_a_v1":
+        raise ValueError("unknown official-score experiment schema")
+    count = analysis["valid_seeds"]
+    omitted = analysis["excluded_seed_count"]
+    rows = []
+    for level in report["opponents"]:
+        item = analysis["levels"][level]
+        mean = item["official_mean_per_exposure"]
+        cut = item["min_shanten_fraction"]
+        ukeire = item["mean_effective_copies"]
+        dealin = item["deal_in_events_per_100_discards"]
+        cells = [
+            LABELS.get(level, level),
+            str(item["seat_exposures"]),
+            "—" if mean is None else f"{mean:+.2f}",
+            _pct(cut),
+            "—" if ukeire is None else f"{ukeire:.2f}",
+            "—" if dealin is None else f"{dealin:.2f}",
+            str(item["discards"]),
+        ]
+        rows.append('<tr><th scope="row">'+escape(cells[0])+'</th>'+
+                    ''.join('<td>'+escape(cell)+'</td>' for cell in cells[1:])+
+                    '</tr>')
+    comparisons = []
+    for key,label in CONTRAST_LABELS.items():
+        item=analysis["contrasts"][key]
+        value=item["official_mean_delta"]
+        span=analysis["intervals"]
+        bound=(span["official_mean_delta"][key] if span else None)
+        signs=item["score_sign_counts"]
+        comparisons.append(
+            '<tr><th scope="row">'+escape(label)+'</th>'
+            '<td>'+("—" if value is None else f"{value:+.3f}")+'</td>'
+            '<td>'+('—' if bound is None else
+                    f"{bound[0]:+.3f} 至 {bound[1]:+.3f}")+'</td>'
+            f'<td>{signs["positive"]} / {signs["negative"]} / {signs["tied"]}</td>'
+            f'<td>{item["quality_higher_score_lower_seeds"]} / '
+            f'{item["comparable_quality_seeds"]}</td></tr>'
+        )
+    return (
+        '<section class="panel"><h2>M3.33 · 方案A正式积分与切牌质量受控消融</h2>'
+        '<p class="hint">五策略每个种子五局轮换，每档坐遍四个座位。'
+        f'共有 {analysis["requested_seeds"]} 个种子；已核验 {count} 个，'
+        f'未核验流局整组排除 {omitted} 个。'
+        '所有正式积分均不含模拟杠钱。出牌效率来自同一个赛后自家牌效评估器。'
+        '“放铳/百次弃牌”是观察事件率，不是风险模型概率。</p>'
+        '<div class="table-scroll"><table><thead><tr>'
+        '<th scope="col">策略</th><th scope="col">合格出场</th>'
+        '<th scope="col">正式积分/出场</th>'
+        '<th scope="col">最低向听率</th>'
+        '<th scope="col">有效张均值</th>'
+        '<th scope="col">放铳事件/百次弃牌</th>'
+        '<th scope="col">切牌样本</th></tr></thead><tbody>'
+        + ''.join(rows) + '</tbody></table></div>'
+        '<h2 style="margin-top:24px">同种子配对 · 正式分差与方向背离</h2>'
+        '<p class="hint">差值单位：正式积分/座位出场。'
+        '方向计数按完整洗牌种子而非单局；“切牌更优但得分更低”只是观察到的指标背离，'
+        '不能说明某次切牌造成得失。区间只在至少5个有效独立种子时给出探索性簇重抽样。</p>'
+        '<div class="table-scroll"><table><thead><tr>'
+        '<th scope="col">实验对照</th><th scope="col">正式分差</th>'
+        '<th scope="col">探索性区间</th>'
+        '<th scope="col">种子分差 正/负/平</th>'
+        '<th scope="col">最低向听更好但得分更低/可比种子</th>'
+        '</tr></thead><tbody>'+''.join(comparisons)+
+        '</tbody></table></div></section>'
+    )
+
+
 def render_ablation_html(report: dict[str, Any]) -> str:
     """Render a self-contained dashboard from M3.11 aggregate JSON.
 
@@ -242,6 +315,7 @@ def render_ablation_html(report: dict[str, Any]) -> str:
         + _heatmap(report, "local_optimal_fraction", "逐种子 · 局部最优差值")
         + _stability(report)
         + _pressure_panel(report)
+        + _official_score_panel(report)
         + '<footer>仅使用汇总统计生成 · 不包含对手暗手、牌墙与密封响应 '
           '· 请勿将探索性区间解释为正式获胜概率。</footer>'
         '</main></body></html>\n'
