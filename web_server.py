@@ -13,6 +13,7 @@ import mimetypes
 import secrets
 import sys
 import threading
+from time import perf_counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -965,7 +966,12 @@ class Handler(BaseHTTPRequestHandler):
             if type(payload) is not dict:
                 raise ValueError("请求必须为JSON对象")
             action = payload.get("action")
-            self._json(200, _process(action, payload))
+            started=perf_counter()
+            result=_process(action,payload)
+            # Distinguish server compute time from client animation/speech.
+            # This does not expose RNG, hands or internal AI decisions.
+            result["server_elapsed_ms"]=round((perf_counter()-started)*1000,1)
+            self._json(200,result)
         except (ValueError, TypeError, UnicodeError) as exc:
             self._json(400, {"error": str(exc)})
 
