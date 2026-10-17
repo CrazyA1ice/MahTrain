@@ -152,7 +152,8 @@ class DecisionOfficialCohortTests(unittest.TestCase):
         self.assertEqual(report["levels"]["challenge"]["discards"],0)
         self.assertIsNone(report["levels"]["challenge"]["mean_shanten_regret"])
         self.assertIsNone(report["levels"]["baseline"]["min_shanten_fraction"])
-        self.assertEqual(report["levels"]["challenge"]["win_events"],4)
+        self.assertEqual(report["levels"]["advanced"]["win_events"],4)
+        self.assertEqual(report["levels"]["challenge"]["win_events"],0)
 
 
 if __name__=="__main__":
