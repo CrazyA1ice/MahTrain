@@ -1877,3 +1877,6 @@
 .match-missing-flag--s{background:#c6efd6;border-color:#7bd69d;color:#22573c}
 .match-missing-flag--p{background:#cfe5ff;border-color:#8abfff;color:#244d7e}
 .match-seat-identity{flex-wrap:wrap;gap:8px}
+
+.match-request-status{font-size:12px;color:#51755e;line-height:1.5;
+  min-height:18px;margin:3px 0 6px;font-variant-numeric:tabular-nums}
