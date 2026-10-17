@@ -157,7 +157,7 @@ def _match_private_view(game: FourPlayerOpening,
     # During AI-only transitions, skip expensive 27-tile wait scans;
     # they are rebuilt when seat zero actually gets its turn.
     if (game.turn == 0 and game.phase in
-            ("dealer_discard","await_discard","claim_window","rob_kong_window")
+            ("dealer_discard","await_discard")
             and missing in ("m", "s", "p") and not game._won[0]
             and not any(tile[0] == missing for tile in hand)):
         if effective == 13:
