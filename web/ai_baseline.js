@@ -100,6 +100,114 @@
     link.click();
     setTimeout(()=>URL.revokeObjectURL(url),1500);
   }
+  function renderDecisionScoreDiagnostics(report){
+    const diagnostic=report?.decision_score_diagnostics;
+    const panel=$("ai-baseline-decision-scores");
+    panel.hidden=!diagnostic;
+    if(!diagnostic)return;
+    const official=report.official_score_analysis;
+    $("ai-baseline-decision-caveat").textContent=
+      "与方案A正式积分完全相同的已核验种子："+diagnostic.valid_seeds+
+      "个（整簇排除"+diagnostic.excluded_seed_count+"个），"+
+      diagnostic.complete_games+"局。只有赛后聚合数据，无暗手和未公开摸牌信息。";
+    const table=$("ai-baseline-decision-table");
+    table.replaceChildren();
+    const columns=[
+      "AI策略","正式分/出场","最低向听率","局部最优率",
+      "选后有效张均值","放铳责任事件/百次切牌","切牌样本",
+    ];
+    const header=el("div","ai-decision-row ai-decision-heading");
+    header.setAttribute("role","row");
+    for(const name of columns){
+      const cell=el("strong","",name);
+      cell.setAttribute("role","columnheader");
+      header.append(cell);
+    }
+    table.append(header);
+    function showNumber(n,suffix="",decimals=2){
+      return typeof n==="number" && Number.isFinite(n)
+        ?(n>=0?"+":"")+n.toFixed(decimals)+suffix:"无可用样本";
+    }
+    function showRatio(n){
+      return typeof n==="number" && Number.isFinite(n)
+        ?(n*100).toFixed(1)+"%":"无可用样本";
+    }
+    for(const level of report.opponents){
+      const data=diagnostic.levels[level];
+      const points=official.levels[level].official_mean_per_exposure;
+      const row=el("div","ai-decision-row");
+      row.setAttribute("role","row");
+      const values=[
+        names[level],
+        showNumber(points,"",2),
+        showRatio(data.min_shanten_fraction),
+        showRatio(data.local_optimal_fraction),
+        typeof data.mean_effective_copies==="number"
+          ?data.mean_effective_copies.toFixed(2):"无可用样本",
+        typeof data.deal_in_events_per_100_discards==="number"
+          ?data.deal_in_events_per_100_discards.toFixed(2):"无可用样本",
+        String(data.discards),
+      ];
+      for(let i=0;i<values.length;i++){
+        const cell=el("span",i===1?"ai-decision-official":"",values[i]);
+        cell.setAttribute("role",i===0?"rowheader":"cell");
+        if((i===2||i===3)&&typeof (
+          i===2?data.min_shanten_fraction:data.local_optimal_fraction
+        )==="number"){
+          const rail=el("span","ai-decision-rail");
+          const bar=el("span","ai-decision-bar");
+          bar.style.width=(Math.max(0,Math.min(1,
+            i===2?data.min_shanten_fraction:data.local_optimal_fraction))*100)+
+            "%";
+          rail.append(bar);
+          cell.append(rail);
+        }
+        row.append(cell);
+      }
+      table.append(row);
+    }
+    const context=$("ai-baseline-decision-disagreements");
+    context.replaceChildren();
+    for(const level of ["basic","advanced","challenge"]){
+      const counts=diagnostic.direction_disagreements_vs_baseline[level];
+      context.append(el("p","review-footnote",
+        names[level]+" 对基线：可比较种子"+counts.comparable_seeds+
+        "个；最低向听率更高但正式积分更低 "+
+        counts.higher_min_shanten_but_lower_score_seeds+"个；"+
+        "最低向听率更低但正式积分更高 "+
+        counts.lower_min_shanten_but_higher_score_seeds+
+        "个。这是同期指标方向不同的计数，不说明因果。"));
+    }
+  }
+  function exportDecisionScoreCSV(){
+    const diagnostic=result?.decision_score_diagnostics;
+    const official=result?.official_score_analysis;
+    if(!diagnostic||!official)return;
+    const rows=[
+      "policy,valid_seeds,seat_exposures,official_mean_per_exposure,discards,"+
+      "min_shanten_fraction,local_optimal_fraction,mean_effective_copies,"+
+      "mean_shanten_regret,deal_in_events,deal_in_events_per_100_discards",
+    ];
+    for(const level of result.opponents){
+      const x=diagnostic.levels[level];
+      const y=official.levels[level];
+      rows.push([
+        level,diagnostic.valid_seeds,x.seat_exposures,
+        y.official_mean_per_exposure,x.discards,
+        x.min_shanten_fraction,x.local_optimal_fraction,
+        x.mean_effective_copies,x.mean_shanten_regret,
+        x.deal_in_events,x.deal_in_events_per_100_discards,
+      ].map(value=>value===null?"":value).join(","));
+    }
+    const csv=String.fromCharCode(0xFEFF)+rows.join("\r\n")+"\r\n";
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download="mahtrain-four-policy-decision-official-comparison.csv";
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
   function render(report){
     result=report;
     const summary=$("ai-baseline-summary");
@@ -145,6 +253,7 @@
       delta.append(section);
     }
     renderOfficialScores(report);
+    renderDecisionScoreDiagnostics(report);
     $("ai-baseline-results").hidden=false;
   }
   async function check(expected){
@@ -213,6 +322,7 @@
     $("ai-baseline-start").addEventListener("click",start);
     $("ai-baseline-export").addEventListener("click",exportCSV);
     $("ai-baseline-official-export").addEventListener("click",exportOfficialScores);
+    $("ai-baseline-decision-export").addEventListener("click",exportDecisionScoreCSV);
   }
   window.MahTrainAIBaseline={init};
 })();

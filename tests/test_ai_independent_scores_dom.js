@@ -8,12 +8,13 @@ const vm=require("node:vm");
 class Element{
   constructor(tag="div"){
     this.tag=tag;this.children=[];this.textContent="";this.value="";
-    this.hidden=false;this.disabled=false;this.handlers={};this.style={};
+    this.hidden=false;this.disabled=false;this.handlers={};this.style={};this.attributes={};
   }
   append(...children){this.children.push(...children)}
   replaceChildren(...children){this.children=[...children]}
   addEventListener(event,handler){this.handlers[event]=handler}
   click(){this.clicked=true}
+  setAttribute(k,v){this.attributes[k]=v}
 }
 const ids=[
   "ai-baseline-start","ai-baseline-results","ai-baseline-error",
@@ -22,6 +23,9 @@ const ids=[
   "ai-baseline-export","ai-baseline-official",
   "ai-baseline-official-export","ai-baseline-official-caveat",
   "ai-baseline-official-levels","ai-baseline-official-differences",
+  "ai-baseline-decision-scores","ai-baseline-decision-caveat",
+  "ai-baseline-decision-table","ai-baseline-decision-disagreements",
+  "ai-baseline-decision-export",
 ];
 const nodes=Object.fromEntries(ids.map(id=>[id,new Element()]));
 nodes["ai-baseline-seed"].value="11";
@@ -48,10 +52,28 @@ const official={
   paired_differences_vs_baseline:{basic:20,advanced:40,challenge:60},
   intervals:null,
 };
+const decision={
+  protocol:"decision_quality_vs_rule_a_official_points_v1",
+  valid_seeds:1,excluded_seed_count:0,complete_games:4,
+  levels:Object.fromEntries(opponents.map((level,index)=>[level,{
+    seat_exposures:4,discards:8,min_shanten_cuts:index*2,
+    local_optimal_cuts:index*2,effective_copies_total:(3+index)*8,
+    min_shanten_fraction:index/4,local_optimal_fraction:index/4,
+    mean_effective_copies:3+index,mean_shanten_regret:3-index,
+    deal_in_events:index,deal_in_events_per_100_discards:index*12.5,
+  }])),
+  direction_disagreements_vs_baseline:Object.fromEntries(
+    opponents.slice(1).map(level=>[level,{
+      comparable_seeds:1,higher_min_shanten_but_lower_score_seeds:1,
+      lower_min_shanten_but_higher_score_seeds:0,
+    }]),
+  ),
+};
 const report={
   opponents,levels,independent_shuffle_seeds:1,intervals:null,
   paired_differences_vs_baseline:comparison,
   per_seed:[{seed:11,levels}],official_score_analysis:official,
+  decision_score_diagnostics:decision,
 };
 const requests=[];
 const fetch=async(_url,options)=>{
@@ -103,8 +125,21 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     .children[2].children[1].textContent.includes("+30"));
   assert.ok(nodes["ai-baseline-official-differences"].children[2]
     .textContent.includes("+60"));
-  nodes["ai-baseline-official-export"].handlers.click();
+  assert.equal(nodes["ai-baseline-decision-scores"].hidden,false);
+  assert.equal(nodes["ai-baseline-decision-table"].children.length,5);
+  assert.equal(nodes["ai-baseline-decision-table"].children[0].children.length,7);
+  assert.equal(nodes["ai-baseline-decision-disagreements"].children.length,3);
+  assert.ok(nodes["ai-baseline-decision-table"].children[4].children[4]
+    .textContent.includes("6.00"));
+  assert.ok(nodes["ai-baseline-decision-table"].children[4].children[2]
+    .textContent.includes("75.0%"));
+  assert.ok(nodes["ai-baseline-decision-caveat"].textContent.includes("核验种子：1"));
+  nodes["ai-baseline-decision-export"].handlers.click();
   assert.equal(exportClicks,1);
+  assert.ok(csv.includes("challenge,1,4,30,8,0.75,0.75,6"));
+  assert.ok(!csv.includes("opponent_hands")&&!csv.includes("private_tile"));
+  nodes["ai-baseline-official-export"].handlers.click();
+  assert.equal(exportClicks,2);
   assert.ok(csv.includes("11,baseline,4,-120,-30"));
   assert.ok(csv.includes("11,challenge,4,120,30"));
   assert.ok(!csv.includes("future_wall"));
@@ -119,15 +154,38 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     }])),
     paired_differences_vs_baseline:{basic:null,advanced:null,challenge:null},
   };
+  report.decision_score_diagnostics={
+    ...decision,valid_seeds:0,excluded_seed_count:1,complete_games:0,
+    levels:Object.fromEntries(opponents.map(level=>[level,{
+      seat_exposures:0,discards:0,min_shanten_cuts:0,local_optimal_cuts:0,
+      effective_copies_total:0,mean_effective_copies:null,
+      min_shanten_fraction:null,local_optimal_fraction:null,
+      mean_shanten_regret:null,deal_in_events:0,
+      deal_in_events_per_100_discards:null,
+    }])),
+    direction_disagreements_vs_baseline:Object.fromEntries(
+      opponents.slice(1).map(level=>[level,{
+        comparable_seeds:0,higher_min_shanten_but_lower_score_seeds:0,
+        lower_min_shanten_but_higher_score_seeds:0,
+      }]),
+    ),
+  };
   nodes["ai-baseline-start"].handlers.click();
   for(let i=0;i<6;i++)await settle();
   assert.equal(nodes["ai-baseline-official-levels"].children.length,4);
+  assert.ok(nodes["ai-baseline-decision-table"].children[1].children[2]
+    .textContent.includes("无可用样本"));
+  nodes["ai-baseline-decision-export"].handlers.click();
+  assert.equal(exportClicks,3);
+  assert.ok(csv.includes("challenge,0,0,,0"));
+  assert.ok(!csv.includes("NaN"));
   assert.ok(nodes["ai-baseline-official-caveat"].textContent.includes("排除1个"));
   assert.ok(nodes["ai-baseline-official-levels"].children[0].children[1]
     .children[2].children[1].textContent.includes("无已核验局"));
   nodes["ai-baseline-official-export"].handlers.click();
-  assert.equal(exportClicks,2);
+  assert.equal(exportClicks,4);
   assert.equal(csv.trim().split("\r\n").length,1,
     "unverified seed must not enter official-point CSV");
+  console.log("M3.32 joint decision metrics vs verified score, missing data and aggregate CSV: PASS");
   console.log("M3.31 4-policy official-score cards, exclusion, paired difference, CSV privacy: PASS");
 })().catch(error=>{console.error(error);process.exitCode=1});

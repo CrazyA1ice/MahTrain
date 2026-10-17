@@ -22,8 +22,9 @@ def fake_match(seed: int, rotation: int, lineup: list[str]) -> dict:
     wins=[{"seat":lineup.index("challenge"),"source":lineup.index("baseline"),
            "kind":"ron"}] if seed%2==0 else []
     trace=[
-        {"action":"discard","seat":i,
+        {"action":"discard","seat":i,"level":level,
          "shanten_regret":int(level=="baseline" and seed%2==1),
+         "effective_copies":(4 if level!="baseline" else 2),
          "locally_optimal":level!="baseline"}
         for i,level in enumerate(lineup)
     ]
@@ -128,6 +129,17 @@ class IndependentBaselineTests(unittest.TestCase):
         self.assertEqual(result["levels"]["challenge"]["local_optimal_fraction"],1)
         self.assertEqual(result["levels"]["baseline"]["local_optimal_fraction"],0)
         self.assertEqual(result["intervals"]["replications"],200)
+        diagnostics=result["decision_score_diagnostics"]
+        self.assertEqual(diagnostics["valid_seeds"],5)
+        self.assertEqual(diagnostics["complete_games"],20)
+        self.assertEqual(diagnostics["levels"]["baseline"]["discards"],20)
+        self.assertEqual(diagnostics["levels"]["challenge"]["discards"],20)
+        self.assertEqual(diagnostics["levels"]["challenge"]["mean_effective_copies"],4)
+        self.assertEqual(diagnostics["levels"]["baseline"]["mean_effective_copies"],2)
+        self.assertEqual(diagnostics["levels"]["challenge"]["local_optimal_fraction"],1)
+        self.assertEqual(diagnostics["levels"]["baseline"]["local_optimal_fraction"],0)
+        self.assertEqual(
+            diagnostics["direction_disagreements_vs_baseline"]["challenge"]["comparable_seeds"],5)
         official=result["official_score_analysis"]
         self.assertEqual(official["valid_seeds"],5)
         self.assertEqual(official["excluded_seed_count"],0)
@@ -156,6 +168,7 @@ class IndependentBaselineTests(unittest.TestCase):
             self.assertEqual(called,[(1,4),(2,4),(3,4),(4,4)])
             self.assertIsNone(compact["intervals"])
             self.assertIsNone(compact["official_score_analysis"]["intervals"])
+            self.assertEqual(compact["decision_score_diagnostics"]["valid_seeds"],1)
             self.assertEqual(compact["official_score_analysis"]["valid_seeds"],1)
             self.assertNotIn("trace",compact["matches"][0])
             self.assertNotIn("public_replay",compact["matches"][0])

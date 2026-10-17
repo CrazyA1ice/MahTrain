@@ -1306,6 +1306,19 @@ class WebUI(unittest.TestCase):
             "interval_status":"insufficient_independent_seeds_need_5",
             "intervals":None,
             "per_seed":[{"seed":11,"rotations":4,"levels":lv}],
+            "decision_score_diagnostics":{
+                "protocol":"decision_quality_vs_rule_a_official_points_v1",
+                "valid_seeds":0,"excluded_seed_count":1,
+                "complete_games":0,
+                "levels":{level:{
+                    "seat_exposures":0,"discards":0,
+                    "min_shanten_fraction":None,
+                    "local_optimal_fraction":None,
+                    "mean_effective_copies":None,
+                    "deal_in_events_per_100_discards":None,
+                } for level in ("baseline","basic","advanced","challenge")},
+                "direction_disagreements_vs_baseline":{},
+            },
             "official_score_analysis":{
                 "protocol":"paired_initial_shuffle_4_rotation_official_a_v1",
                 "room_coefficient":100,"fan_cap":3,
@@ -1353,6 +1366,10 @@ class WebUI(unittest.TestCase):
         self.assertEqual(official["valid_seeds"],0)
         self.assertEqual(official["excluded_seed_ids"],[11])
         self.assertEqual(official["levels"]["baseline"]["official_total"],0)
+        diagnostic=overview["decision_score_diagnostics"]
+        self.assertEqual(diagnostic["valid_seeds"],0)
+        self.assertIsNone(diagnostic["levels"]["baseline"]["min_shanten_fraction"])
+        self.assertNotIn("trace",str(diagnostic))
         for private in ("secret","opponent_hand","future_wall","trace",
                         "public_replay","matches"):
             self.assertNotIn(private,str(overview))
@@ -1377,6 +1394,14 @@ class WebUI(unittest.TestCase):
                       "ai-baseline-official-differences"):
             self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
         self.assertIn(b"renderOfficialScores",js)
+        self.assertIn(b"renderDecisionScoreDiagnostics",js)
+        for ident in ("ai-baseline-decision-scores",
+                      "ai-baseline-decision-caveat",
+                      "ai-baseline-decision-table",
+                      "ai-baseline-decision-disagreements",
+                      "ai-baseline-decision-export"):
+            self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
+        self.assertIn(b".ai-decision-row",css)
         self.assertIn(b"exportOfficialScores",js)
         self.assertIn("javascript",mime)
 

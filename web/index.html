@@ -189,6 +189,17 @@
             <div id="ai-baseline-official-differences" class="ai-replay-cluster-differences"></div>
             <p class="review-footnote">每种子四轮座位轮换只算一个相关样本；规则固定，策略不同会改变后续牌局轨迹。独立牌形基线不是外部训练模型，积分并非真人胜率。</p>
           </section>
+          <section id="ai-baseline-decision-scores" class="ai-controlled-scores" hidden>
+            <div class="ai-replay-cluster-heading">
+              <h4>M3.32 · 切牌质量与实际结算积分联合诊断</h4>
+              <button id="ai-baseline-decision-export" type="button" class="review-control">导出四策略联合指标 CSV</button>
+            </div>
+            <p id="ai-baseline-decision-caveat" class="review-footnote"></p>
+            <div id="ai-baseline-decision-table" class="ai-decision-table"
+              role="table" aria-label="相同有效洗牌种子下四策略的决策与积分对照"></div>
+            <div id="ai-baseline-decision-disagreements" class="ai-replay-cluster-differences"></div>
+            <p class="review-footnote">最低向听、有效张数取自本项目的自家手牌评估器，只用于赛后聚合；放铳频率指已发生的点炮责任事件/100次弃牌，并不是预测风险概率。不同策略的行动会改变后续局面，指标相关不等于因果。</p>
+          </section>
           <div class="ai-replay-picker">
             <button id="ai-baseline-export" type="button" class="review-control">导出独立种子分组 CSV</button>
           </div>
@@ -199,7 +210,7 @@
           <h3>四人血战 · 四边牌桌人机对战</h3>
           <small>一炮多响 / 碰 / 明暗补杠 / 抢杠胡 / 已胡退出</small>
         </div>
-        <p class="review-intro">你操作0号座位，另外三家使用入门、进阶、挑战三档<strong>可复现的启发式策略AI</strong>（非训练模型）。AI只使用自己的暗手与公开牌，不偷看别家的手牌或牌墙；胡牌账本与可选杠钱模拟保留，流局仍只预览不入账。<strong>目前不是正式完整的血战结算</strong>。</p>
+        <p class="review-intro">你操作0号座位，另外三家使用入门、进阶、挑战三档<strong>可复现的启发式策略AI</strong>（非训练模型）。AI只使用自己的暗手与公开牌，不偷看别家的手牌或牌墙；胡牌与符合方案A的流局查花猪/查大叫均已正式记账；可选杠钱仍是单独模拟分。<strong>其他尚未确认的血战细则仍未实现</strong>。</p>
         <div class="table-demo-toolbar">
           <label>房间系数 <input id="match-coefficient" type="number" min="1" max="1000000" value="100"/></label>
           <label>番数封顶 <input id="match-fan-cap" type="number" min="0" max="12" value="3"/></label>
