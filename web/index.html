@@ -253,6 +253,7 @@
             <div class="match-hud-actions" role="group" aria-label="牌桌显示与操作偏好">
               <button id="match-focus-toggle" type="button" class="review-control" aria-pressed="false">沉浸牌桌</button>
               <button id="match-large-tiles-toggle" type="button" class="review-control" aria-pressed="false">放大手牌</button>
+              <button id="match-skin-toggle" type="button" class="review-control" aria-pressed="false">深蓝桌布</button>
               <label class="match-confirm-option"><input id="match-confirm-discard" type="checkbox"> 出牌二次确认</label>
             </div>
           </div>
@@ -322,7 +323,14 @@
               <section id="match-seat-0" class="match-seat match-seat--bottom" aria-label="0号自己">
                 <div class="match-self-header"><span class="match-seat-avatar match-seat-avatar--self" aria-hidden="true">我</span><strong>0号 · 自己</strong></div>
                 <div id="match-self-status" class="match-seat-status"></div>
-                <div id="match-hand" class="retry-hand"></div>
+                <div class="match-hand-navigation" aria-label="手机手牌导航">
+                  <button id="match-hand-prev" type="button" class="review-control" aria-label="查看左侧手牌">◀ 左侧</button>
+                  <span id="match-hand-position" role="status" aria-live="polite">等待发牌</span>
+                  <button id="match-hand-draw" type="button" class="review-control" aria-label="查看最右侧摸牌">看摸牌 ›</button>
+                  <button id="match-hand-next" type="button" class="review-control" aria-label="查看右侧手牌">右侧 ▶</button>
+                </div>
+                <div id="match-hand" class="retry-hand" tabindex="0" role="group"
+                  aria-label="我的手牌；可以左右滑动，选牌后按需要确认出牌"></div>
                 <div id="match-ready-hint" class="match-ready-hint" aria-live="polite"></div>
                 <div id="match-self-melds" class="match-seat-melds"></div>
                 <div id="match-own-score" class="match-seat-score" hidden></div>
@@ -332,6 +340,8 @@
                   <strong id="match-table-settlement-title">胡牌结算</strong>
                   <span id="match-table-round-phase"></span>
                 </div>
+                <div id="match-table-self-summary" class="match-table-self-summary" role="status"
+                  aria-live="polite"></div>
                 <div id="match-table-scores" class="match-table-scores"></div>
                 <div id="match-table-wins" class="match-table-wins"></div>
                 <div id="match-table-history" class="match-table-history"></div>

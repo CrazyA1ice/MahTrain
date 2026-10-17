@@ -8,7 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
-  let pendingDiscard=null,immersive=false,largeTiles=false;
+  let pendingDiscard=null,immersive=false,largeTiles=false,midnightFelt=false;
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   let reviewHistory=[],reviewDropped=0,reviewSelected=null;
@@ -100,6 +100,7 @@
       liveBoard=null;
       if(name==="match_new"){
         reviewHistory=[];reviewDropped=0;reviewSelected=null;
+        $("match-hand").scrollLeft=0;
         $("match-review-seat-filter").value="all";
         $("match-review-type-filter").value="all";
       }
@@ -138,6 +139,37 @@
       if(state)renderBoard();
       $("match-error").textContent=err.message||String(err);
     }finally{busy=false;}
+  }
+  // Preserve the user's scroll focus across redraws (including touch
+  // confirm/cancel) without changing the order or identity of the tiles.
+  function updateHandNavigation(){
+    const hand=$("match-hand"), total=hand.children.length;
+    const left=Number(hand.scrollLeft)||0;
+    const viewport=Number(hand.clientWidth)||0;
+    const width=Number(hand.scrollWidth)||0;
+    const max=Math.max(0,width-viewport);
+    const drawn=total>0&&hand.children[total-1].classList.contains(
+      "match-new-draw");
+    $("match-hand-position").textContent=total?
+      total+"张手牌 · "+(drawn?"最右侧是刚摸的牌":"左右滑动查看"):
+      "暂无手牌";
+    $("match-hand-prev").disabled=!total||left<=1;
+    $("match-hand-next").disabled=!total||(max>0&&left>=max-1);
+    $("match-hand-draw").disabled=!drawn;
+  }
+  function navigateHand(destination){
+    const hand=$("match-hand");
+    const viewport=Number(hand.clientWidth)||270;
+    const max=Math.max(0,(Number(hand.scrollWidth)||0)-
+      (Number(hand.clientWidth)||0));
+    const current=Number(hand.scrollLeft)||0;
+    const step=Math.max(120,Math.round(viewport*.75));
+    const next=destination==="draw"?max:
+      Math.max(0,Math.min(max,current+(destination==="left"?-step:step)));
+    // Set the exact position for immediate button state and keyboard users.
+    // No server call, hand mutation or inferred private tile is involved.
+    hand.scrollLeft=next;
+    updateHandNavigation();
   }
   function chooseDiscard(tile,fromDraw,index=null){
     if(busy||!state||state.turn!==0||
@@ -656,15 +688,28 @@
   }
   function renderTableSettlement(){
     const panel=$("match-table-settlement");
-    const visible=settlementAvailable();
-    panel.hidden=!visible;
-    if(!visible)return;
     const ledger=state.win_ledger;
     const terminal=state.phase==="finished"||state.phase==="wall_exhausted";
-    $("match-table-settlement-title").textContent=
+    // A terminal round deserves a readable score sheet even with zero HUs.
+    // In an unresolved wall draw that is NOT a finalized zero balance.
+    const hasLedger=Array.isArray(ledger?.balances)&&
+      ledger.balances.length===4&&ledger.balances.every(Number.isSafeInteger);
+    const visible=settlementAvailable()||(terminal&&hasLedger);
+    panel.hidden=!visible;
+    if(!visible)return;
+    const wallPending=state.phase==="wall_exhausted"&&
+      state.exhaustive_settlement?.posted!==true;
+    $("match-table-settlement-title").textContent=wallPending?
+      "流局待核验 · 当前仅显示胡牌已入账金额":
       state.exhaustive_settlement?.posted?
-      "本局胡牌 + 流局结算 · 已入账":"本局胡牌结算 · 已入账";
+        "本局胡牌 + 流局结算 · 已入账":"本局胡牌结算 · 已入账";
     $("match-table-round-phase").textContent=terminal?"摸切已结束":"对局进行中";
+    const myPosted=state.settled_balances?.[0]??ledger.balances[0];
+    $("match-table-self-summary").textContent=
+      "我的已入账积分 "+signedScore(myPosted)+" · "+
+      (wallPending?"牌山耗尽 · 流局赔付待核验，不代表最终净积分":
+        state.exhaustive_settlement?.posted?
+          "包含方案A已确认的流局赔付":"仅含已确认胡牌积分");
     const scores=$("match-table-scores");
     scores.replaceChildren();
     for(const seat of seats){
@@ -705,7 +750,8 @@
         "以上仅为胡牌已入账积分")+
       (kongEnabled?"；独立杠钱试验积分另列，不计入此栏":
         "；不含独立杠钱")+
-      (state.exhaustive_settlement?.posted?"。":"；无正式流局结算。");
+      (wallPending?"；本局流局赔付待核验，当前合计不能视为最终净积分。":
+        state.exhaustive_settlement?.posted?"。":"；无正式流局结算。");
   }
   function renderWall(){
     const remaining=publicBoard().wall_count;
@@ -753,6 +799,9 @@
     const stage=$("match-stage");
     stage.classList.toggle("is-immersive",immersive);
     $("match-board").classList.toggle("is-large-tiles",largeTiles);
+    $("match-board").classList.toggle("is-midnight-felt",midnightFelt);
+    $("match-skin-toggle").setAttribute("aria-pressed",String(midnightFelt));
+    $("match-skin-toggle").textContent=midnightFelt?"绿色桌布":"深蓝桌布";
     $("match-focus-toggle").setAttribute("aria-pressed",String(immersive));
     $("match-large-tiles-toggle").setAttribute("aria-pressed",String(largeTiles));
     $("match-focus-toggle").textContent=immersive?"显示详细信息":"沉浸牌桌";
@@ -786,7 +835,9 @@
     $("match-status").textContent=
       "你是0号位 · 庄家"+state.dealer+"号 · "+directions[state.exchange_direction]+
       "换牌 · 剩余"+state.wall_count+"张 · 当前行动："+(state.turn??"—");
-    const hand=$("match-hand");hand.replaceChildren();
+    const hand=$("match-hand");
+    const previousHandScroll=Number(hand.scrollLeft)||0;
+    hand.replaceChildren();
     // Exactly one equal-valued copy is the newly drawn physical tile.
     // Other equal copies remain selectable as an explicit HAND-cut.
     const drawn=(state.turn===0 &&
@@ -816,6 +867,8 @@
       last.setAttribute("aria-label","刚摸到"+tileName(drawn)+"，点击摸切");
       hand.append(last);
     }
+    hand.scrollLeft=previousHandScroll;
+    updateHandNavigation();
     renderBoard();
     renderReadyHint();
     renderWinAlert();
@@ -844,15 +897,30 @@
       controls.append(el("p","review-intro",
         "当前目标："+(target?tileName(target.tile):"—")+
         "。必须确认响应，胡牌优先于杠、碰；系统会等待所有活跃玩家提交。"));
-      for(const option of options){
-        controls.append(button(actionNames[option]||option,
-          option==="hu"?"primary":"review-control",
+      const reactions=el("div","match-reaction-actions");
+      reactions.setAttribute("role","group");
+      reactions.setAttribute("aria-label","本次碰杠胡响应");
+      const priority=["hu","ming_gang","peng","pass"];
+      for(const option of [...options].sort((a,b)=>
+        priority.indexOf(a)-priority.indexOf(b))){
+        const label=option==="pass"?"过 · 放弃本次响应":
+          option==="hu"?"胡 · 优先响应":
+            actionNames[option]||option;
+        const btn=button(label,
+          "match-reaction-button match-reaction--"+option+
+          (option==="hu"?" primary":" review-control"),
           ()=>action(phase==="claim_window"?"match_claim":"match_rob",
-            {choice:option})));
+            {choice:option}));
+        btn.setAttribute("aria-label",
+          (actionNames[option]||option)+
+          (option==="pass"?"，跳过本次机会":"，提交本次响应"));
+        reactions.append(btn);
       }
+      controls.append(reactions);
     }else if(phase==="dealer_discard"||phase==="await_discard"){
       if(state.can_self_draw_win){
-        controls.append(button("确认自摸胡牌","primary",
+        controls.append(button("胡！确认自摸入账",
+          "primary match-self-win-action",
           ()=>action("match_win")));
       }
       for(const kong of state.kong_options||[]){
@@ -1107,6 +1175,15 @@
     });
     $("match-focus-toggle").addEventListener("click",()=>{
       immersive=!immersive;
+      if(state)renderHUD();
+    });
+    $("match-hand-prev").addEventListener("click",()=>navigateHand("left"));
+    $("match-hand-next").addEventListener("click",()=>navigateHand("right"));
+    $("match-hand-draw").addEventListener("click",()=>navigateHand("draw"));
+    $("match-hand").addEventListener("scroll",updateHandNavigation);
+    updateHandNavigation();
+    $("match-skin-toggle").addEventListener("click",()=>{
+      midnightFelt=!midnightFelt;
       if(state)renderHUD();
     });
     $("match-large-tiles-toggle").addEventListener("click",()=>{
