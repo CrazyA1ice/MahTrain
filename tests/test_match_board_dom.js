@@ -922,21 +922,21 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-playback-speed"].value="450";
   dom["match-playback-speed"].handlers.change();
   dom["match-playback-focus"].checked=false;
-  const firstBoard={phase:"await_discard",turn:1,wall_count:52,
+  const m341DrawBoard={phase:"await_discard",turn:1,wall_count:52,
     hand_counts:[14,14,10,13],won:base.won,
     melds:base.melds,discards:next.discards};
-  const lastBoard={...firstBoard,phase:"claim_window",
+  const m341DiscardBoard={...m341DrawBoard,phase:"claim_window",
     hand_counts:[14,13,10,13],
     discards:[...next.discards,
       {seat:1,tile:"s5",discard_kind:"tedashi"}]};
   replyMatch={...next,wall_count:52,phase:"claim_window",
-    turn:1,hand_counts:lastBoard.hand_counts,discards:lastBoard.discards,
+    turn:1,hand_counts:m341DiscardBoard.hand_counts,discards:m341DiscardBoard.discards,
     events:[{type:"draw",seat:1},
       {type:"discard",seat:1,tile:"s5",discard_kind:"tedashi"}],
     public_steps:[
-      {events:[{type:"draw",seat:1}],board:firstBoard},
+      {events:[{type:"draw",seat:1}],board:m341DrawBoard},
       {events:[{type:"discard",seat:1,tile:"s5",
-        discard_kind:"tedashi"}],board:lastBoard},
+        discard_kind:"tedashi"}],board:m341DiscardBoard},
     ],needs_continue:false};
   pendingTimers.delete(scheduledContinuation[0]);
   scheduledContinuation[1].fn();
