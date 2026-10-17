@@ -19,15 +19,18 @@ sys.path.insert(0, str(ROOT))
 import web_server  # noqa: E402
 from mahtrain_core.efficiency import analyze_discards  # noqa: E402
 from mahtrain_core.history import HistoryStore  # noqa: E402
+from mahtrain_core.match_archive import MatchArchive  # noqa: E402
 
 
 class WebUI(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._old_store = web_server._HISTORY
+        cls._old_match_archive = web_server._MATCH_ARCHIVE
         cls._temp = tempfile.TemporaryDirectory()
         cls._history_path = Path(cls._temp.name) / "http-archive.sqlite3"
         web_server._HISTORY = HistoryStore(cls._history_path)
+        web_server._MATCH_ARCHIVE = MatchArchive(cls._history_path)
         cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), web_server.Handler)
         cls.base = "http://127.0.0.1:" + str(cls.httpd.server_address[1])
         cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
@@ -39,6 +42,7 @@ class WebUI(unittest.TestCase):
         cls.httpd.server_close()
         cls.thread.join(timeout=5)
         web_server._HISTORY = cls._old_store
+        web_server._MATCH_ARCHIVE = cls._old_match_archive
         cls._temp.cleanup()
 
     @classmethod
@@ -757,6 +761,49 @@ class WebUI(unittest.TestCase):
         empty=len(steps)
         _match_public_step(game,len(game._events),steps)
         self.assertEqual(len(steps),empty)
+
+    def test_m322_completed_match_archive_api_and_static_ui(self):
+        page,_=self.get("/")
+        js,mime=self.get("/match_archives.js")
+        css,_=self.get("/app.css")
+        app,_=self.get("/app.js")
+        self.assertIn("javascript",mime)
+        self.assertIn(b"MahTrainMatchArchives",js)
+        self.assertIn(b"MahTrainMatchArchives?.init",app)
+        for item in ("match-archives-refresh","match-archives-list",
+                     "match-archives-detail","match-archives-compare",
+                     "match-archives-export","match-archives-board",
+                     "match-archives-seat","match-archives-action"):
+            self.assertEqual(page.count(('id="%s"' % item).encode()),1)
+        self.assertIn(b".match-archive-four-seats",css)
+        self.assertLess(page.index(b'/match_archives.js'),
+                        page.index(b'/app.js'))
+        before,_=self.get("/api/match_archives")
+        count=json.loads(before)["summary"]["games"]
+        game=web_server.FourPlayerOpening(47)
+        actual=game.public_state()
+        terminal={**actual,"phase":"wall_exhausted"}
+        archive=web_server._MATCH_ARCHIVE.save_completed(
+            terminal,[{"board":actual,
+                       "events":[{"type":"draw","seat":1,
+                                  "tile":"PRIVATE-MUST-NOT-SAVE"}]}],
+            actual,["basic","advanced","challenge"])
+        summary,_=self.get("/api/match_archives?limit=10")
+        parsed=json.loads(summary)
+        self.assertEqual(parsed["summary"]["games"],count+1)
+        self.assertIn(archive,[r["archive_id"] for r in parsed["matches"]])
+        detail,_=self.get("/api/match_archives?archive_id="+archive)
+        data=json.loads(detail)["report"]
+        self.assertEqual(data["privacy"],"public_board_only")
+        self.assertEqual(data["steps"][0]["events"],[
+            {"type":"draw","seat":1}])
+        self.assertNotIn("seed",json.dumps(data))
+        with self.assertRaises(HTTPError) as exc:
+            self.get("/api/match_archives?archive_id=not-found")
+        self.assertEqual(exc.exception.code,400)
+        with self.assertRaises(HTTPError) as exc:
+            self.get("/api/match_archives?limit=500")
+        self.assertEqual(exc.exception.code,400)
 
     def test_m321_filterable_replay_uses_public_historical_frames(self):
         page,_=self.get("/")
