@@ -1805,3 +1805,75 @@
 .match-self-win-preview strong{font-size:15px}
 .match-self-win-preview span{font-size:13px;font-variant-numeric:tabular-nums}
 .match-self-win-preview small{font-size:12px;color:#647d69}
+
+/* M3.40: each discard faces the seat that played it. Side rivers use
+   landscape footprints around physically rotated upright tile artwork. */
+@media(min-width:901px){
+  .match-board-center{
+    grid-template-columns:minmax(208px,1fr) minmax(154px,1.1fr) minmax(208px,1fr);
+  }
+  .match-river--left .match-river-cell,
+  .match-river--right .match-river-cell{
+    min-width:64px;min-height:49px;
+  }
+  .match-river--left .match-river-tiles,
+  .match-river--right .match-river-tiles{
+    grid-template-columns:repeat(3,64px);column-gap:5px;
+  }
+  .match-seat--top .match-tile-back{
+    flex:0 0 26px;width:26px;height:35px;
+  }
+  .match-seat--left .match-tile-back,
+  .match-seat--right .match-tile-back{
+    flex:0 0 25px;width:27px;min-width:27px;height:25px;
+    border-radius:4px;border-width:2px;
+  }
+  .match-seat--left .match-seat-backs,
+  .match-seat--right .match-seat-backs{
+    max-height:none;overflow:visible;
+  }
+}
+/* Rotations are purely visual: discard sequence, labels and hitboxes stay
+   in server-published seat order and physical claimed tiles remain absent. */
+.match-river--top .match-river-cell .tile{transform:rotate(180deg)}
+.match-river--left .match-river-cell .tile{transform:rotate(90deg)}
+.match-river--right .match-river-cell .tile{transform:rotate(-90deg)}
+.match-river--bottom .match-river-cell .tile{transform:none}
+.match-river-tiles{
+  max-height:none;overflow:visible;
+  scrollbar-width:none;overscroll-behavior:auto;
+}
+.match-river-tiles::-webkit-scrollbar{display:none;width:0;height:0}
+.match-river{overflow:visible;min-height:0}
+/* CSS variables apply to all backs and hidden kong tiles inside the table;
+   no downloadable card-back images and no hidden hand contents. */
+.match-board{--back-hi:#529d83;--back-lo:#31765d;--back-in:#27624b}
+.match-board[data-back-color="indigo"]{
+  --back-hi:#617db9;--back-lo:#263f82;--back-in:#1f326e
+}
+.match-board[data-back-color="red"]{
+  --back-hi:#c87475;--back-lo:#832e43;--back-in:#6a263c
+}
+.match-board[data-back-color="gold"]{
+  --back-hi:#c8a15f;--back-lo:#8c5b25;--back-in:#705020
+}
+.match-board .match-tile-back{
+  background:repeating-linear-gradient(45deg,
+    var(--back-hi) 0 4px,var(--back-lo) 4px 8px);
+  box-shadow:inset 0 0 0 2px var(--back-in),0 2px 0 #0e372b;
+}
+.match-back-picker{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.match-back-picker select{min-height:36px}
+.match-missing-flag{
+  display:inline-flex;align-items:center;justify-content:center;
+  border:2px solid #ffda7e;border-radius:9px;
+  background:#f8e7b0;color:#543d14;
+  box-shadow:0 2px 9px #0c251d65;
+  font-size:18px;line-height:1;letter-spacing:1px;
+  padding:6px 12px;font-weight:900;white-space:nowrap;
+}
+.match-missing-flag[hidden]{display:none}
+.match-missing-flag--m{background:#ffe4ac;border-color:#ffcd6c}
+.match-missing-flag--s{background:#c6efd6;border-color:#7bd69d;color:#22573c}
+.match-missing-flag--p{background:#cfe5ff;border-color:#8abfff;color:#244d7e}
+.match-seat-identity{flex-wrap:wrap;gap:8px}
