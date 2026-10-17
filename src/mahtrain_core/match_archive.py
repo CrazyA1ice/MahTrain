@@ -218,8 +218,12 @@ class MatchArchive:
                        initial_board: dict, ai_levels: list[str]) -> str:
         if public.get("phase") not in _TERMINAL:
             raise ValueError("only completed matches can be archived")
-        if not isinstance(ai_levels, list) or len(ai_levels) != 3:
+        if (type(ai_levels) is not list or len(ai_levels) != 3 or
+                any(type(level) is not str or level not in
+                    ("basic", "advanced", "challenge") for level in ai_levels)):
             raise ValueError("invalid AI assignment")
+        if type(public.get("dealer")) is not int or public["dealer"] not in range(4):
+            raise ValueError("invalid dealer in match archive")
         safe_steps = [{
             "board": sanitize_board(step["board"]),
             "events": sanitize_events(step.get("events", [])),
