@@ -15,6 +15,7 @@
   <script src="/four_player.js" defer></script>
   <script src="/match_playback.js" defer></script>
   <script src="/match.js" defer></script>
+  <script src="/match_archives.js" defer></script>
   <script src="/ai_replay.js" defer></script>
   <script src="/ai_baseline.js" defer></script>
   <script src="/app.js" defer></script>
@@ -297,6 +298,51 @@
           </section>
           <div id="match-public" class="match-public"></div>
         </div>
+      </section>
+      <section id="match-archives-panel" class="panel match-archives-panel">
+        <div class="panel-title">
+          <h3>四人血战 · 本地已完成对局档案</h3>
+          <button id="match-archives-refresh" type="button" class="review-control">刷新对局档案</button>
+        </div>
+        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。保存的是已入账的胡牌金额与真实公开动作快照；杠钱只属试验积分，流局赔付未正式入账。</p>
+        <p id="match-archives-message" aria-live="polite"></p>
+        <div id="match-archives-summary" class="match-archives-summary"></div>
+        <div id="match-archives-list" class="match-archives-list"></div>
+        <div class="match-archives-compare-tools">
+          <button id="match-archives-compare" type="button" disabled>对比所选两局</button>
+          <span>在档案条目中勾选两局进行已入账胡牌余额对比。</span>
+        </div>
+        <div id="match-archives-comparison" class="match-archives-comparison"></div>
+        <section id="match-archives-detail" class="match-archives-detail" hidden>
+          <div class="match-archives-detail-head">
+            <strong id="match-archives-title">已保存对局</strong>
+            <a id="match-archives-export" href="#" download="mahtrain_match.json">导出完整公开复盘 JSON</a>
+          </div>
+          <p id="match-archives-detail-summary"></p>
+          <div id="match-archives-balances" class="match-archives-balances"></div>
+          <div id="match-archives-wins" class="match-archives-wins"></div>
+          <div class="match-archives-review-controls">
+            <label>筛选玩家 <select id="match-archives-seat">
+              <option value="all">全部玩家</option>
+              <option value="0">0号 · 自己</option>
+              <option value="1">1号 · 下家</option>
+              <option value="2">2号 · 对家</option>
+              <option value="3">3号 · 上家</option>
+            </select></label>
+            <label>动作 <select id="match-archives-action">
+              <option value="all">全部公开动作</option>
+              <option value="key">关键动作</option>
+              <option value="win">胡牌</option>
+              <option value="kong">杠牌</option>
+              <option value="peng">碰牌</option>
+              <option value="discard">出牌</option>
+            </select></label>
+          </div>
+          <p id="match-archives-count"></p>
+          <div id="match-archives-actions" class="match-archives-actions"></div>
+          <div id="match-archives-board" class="match-archives-board"></div>
+          <p class="review-footnote">这里仅能查看公开局面，不会恢复对战或暴露任何历史暗手。浏览器刷新后可从 SQLite 重新打开已完成对局；本地档案没有账户登录或云同步。</p>
+        </section>
       </section>
       <section id="four-player-demo" class="panel table-demo">
         <div class="panel-title">
