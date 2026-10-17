@@ -272,7 +272,6 @@
             </div>
             <div class="match-hud-actions" role="group" aria-label="牌桌显示与操作偏好">
               <button id="match-focus-toggle" type="button" class="review-control" aria-pressed="false">沉浸牌桌</button>
-              <button id="match-large-tiles-toggle" type="button" class="review-control" aria-pressed="false">放大手牌</button>
               <button id="match-skin-toggle" type="button" class="review-control" aria-pressed="false">深蓝桌布</button>
               <label class="match-back-picker">牌背颜色
                 <select id="match-back-color" aria-label="其他玩家及牌墙牌背颜色">
@@ -321,6 +320,8 @@
               <section id="match-seat-2" class="match-seat match-seat--top" aria-label="2号对家"></section>
               <section id="match-seat-3" class="match-seat match-seat--left" aria-label="3号上家"></section>
               <div class="match-board-center">
+                <div id="match-decision" class="match-decision" role="group"
+                     aria-label="牌桌中央碰杠胡操作" hidden></div>
                 <div id="match-motion" class="match-motion" aria-live="polite" hidden>
                   <div id="match-motion-big-action" class="match-motion-big-action" aria-hidden="true"></div>
                   <strong id="match-motion-text"></strong>
