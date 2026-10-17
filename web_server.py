@@ -490,11 +490,18 @@ def _process(action: str, payload: dict) -> dict:
                 any(type(level) is not str or level not in AI_LEVELS
                     for level in levels)):
                 raise ValueError("三位AI必须分别选择入门、进阶或挑战难度")
+            # Existing API callers without a mode retain legacy scoring.
+            # Browser games explicitly select one of two house rules.
+            self_draw_mode=payload.get("self_draw_mode","legacy")
+            if (type(self_draw_mode) is not str or
+                    self_draw_mode not in ("legacy","add_base","add_fan")):
+                raise ValueError("自摸计分仅支持加底或加番模式")
             game=FourPlayerOpening(
                 seed,
                 room_coefficient=payload.get("room_coefficient",100),
                 fan_cap=payload.get("fan_cap",3),
                 kong_base=payload.get("kong_base"),
+                self_draw_mode=self_draw_mode,
             )
             agents={
                 seat: MahjongAgent(levels[seat-1],seed=seed,seat=seat)
