@@ -180,7 +180,14 @@
     }
     for(const meld of groups){
       const item=el("div","match-seat-meld");
-      item.append(el("small","",actionNames[meld.type]||meld.type));
+      const label=actionNames[meld.type]||"公开副露";
+      const kind=["peng","ming_gang","an_gang","bu_gang"].includes(meld.type)
+        ?meld.type:"other";
+      item.classList.add("match-seat-meld--"+kind);
+      item.setAttribute("aria-label",label+
+        (kind==="an_gang"&&!showOwn?"，牌种保密":"，"+
+          (kind==="peng"?"3":"4")+"张牌"));
+      item.append(el("small","",label));
       const tiles=el("div","match-meld-tiles");
       for(let n=0;n<(meld.type==="peng"?3:4);n++){
         // Public an-gang is intentionally redacted by public_state().
@@ -211,6 +218,9 @@
           "庄家"+state.dealer+"号 · 当前手牌"+state.hand.length+"张";
       renderMelds($("match-self-melds"),
         liveBoard?view.melds[0]:state.own_melds,!liveBoard);
+      const ownScore=$("match-own-score");
+      ownScore.hidden=!settlementAvailable();
+      if(!ownScore.hidden)ownScore.textContent=seatScoreText(0);
       return;
     }
     root.replaceChildren();
@@ -230,6 +240,9 @@
     const melds=el("div","match-seat-melds");
     renderMelds(melds,view.melds[seat],false);
     root.append(melds);
+    if(settlementAvailable()){
+      root.append(el("div","match-seat-score",seatScoreText(seat)));
+    }
   }
   function renderRiver(seat){
     const view=publicBoard();
@@ -308,6 +321,58 @@
       (w.kind==="ron"||w.kind==="rob_kong"?" · 来自"+w.source+"号":"")
     ).join(" ｜ ")));
   }
+  function settlementAvailable(){
+    return !liveBoard && Array.isArray(state?.win_ledger?.wins) &&
+      state.win_ledger.wins.length>0 &&
+      Array.isArray(state.win_ledger.balances);
+  }
+  function signedScore(value){
+    return (value>=0?"+":"")+value;
+  }
+  function seatScoreText(seat){
+    const amount=state.win_ledger.balances[seat];
+    return "胡牌积分 "+signedScore(amount);
+  }
+  function renderTableSettlement(){
+    const panel=$("match-table-settlement");
+    const visible=settlementAvailable();
+    panel.hidden=!visible;
+    if(!visible)return;
+    const ledger=state.win_ledger;
+    const terminal=state.phase==="finished"||state.phase==="wall_exhausted";
+    $("match-table-settlement-title").textContent="本局胡牌结算 · 已入账";
+    $("match-table-round-phase").textContent=terminal?"摸切已结束":"对局进行中";
+    const scores=$("match-table-scores");
+    scores.replaceChildren();
+    for(const seat of seats){
+      const amount=ledger.balances[seat.id];
+      const cell=el("div","match-table-score");
+      cell.classList.add(amount>0?"is-credit":amount<0?"is-debit":"is-zero");
+      cell.append(el("span","",seat.id+"号 · "+seat.label+
+        (state.won[seat.id]?" · 已胡":"")));
+      cell.append(el("strong","",signedScore(amount)));
+      scores.append(cell);
+    }
+    const wins=$("match-table-wins");
+    wins.replaceChildren();
+    for(const win of ledger.wins.slice(-2)){
+      const mode={self_draw:"自摸",ron:"点炮胡",rob_kong:"抢杠胡"}[win.kind]||
+        "胡牌";
+      const row=el("div","match-table-win-row");
+      row.append(el("strong","",win.winner+"号"+mode+
+        " · "+win.main_pattern));
+      row.append(el("span","",
+        "实收 "+signedScore(win.total_received)+
+        " · "+win.effective_fan+"番 · 付款 "+
+        win.payers.map(x=>x+"号").join("、")));
+      wins.append(row);
+    }
+    const kongEnabled=state.kong_ledger?.base!=null;
+    $("match-table-score-note").textContent=
+      "以上仅为胡牌已入账积分"+(kongEnabled?
+        "；独立杠钱另以试验积分记账，不计入此栏":"，不含独立杠钱")+
+      "；流局查花猪、查大叫仍未正式入账。";
+  }
   function renderWall(){
     const remaining=publicBoard().wall_count;
     $("match-wall-count").textContent=String(remaining);
@@ -319,6 +384,7 @@
       renderSeat(seat.id);
       renderRiver(seat.id);
     }
+    renderTableSettlement();
   }
 
   function render(){

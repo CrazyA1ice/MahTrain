@@ -823,3 +823,132 @@
   .match-motion{max-width:205px;padding:8px}
   .match-motion-chain{max-width:190px}
 }
+
+
+/* M3.19: compact four-seat rails, seat-oriented public meld racks, and
+   in-table SETTLED win ledger (kong and exhausted-draw charges excluded). */
+.match-board{
+  grid-template-areas:". top ." "left center right" "bottom bottom bottom"
+    "summary summary summary";
+  grid-template-columns:140px minmax(0,1fr) 140px;
+  grid-template-rows:minmax(110px,auto) minmax(375px,auto)
+    minmax(145px,auto) auto;
+  gap:8px;
+}
+.match-seat--left,.match-seat--right{
+  min-height:0;
+  overflow:hidden;
+  align-items:center;
+  justify-content:center;
+}
+.match-seat--left .match-seat-backs,
+.match-seat--right .match-seat-backs{
+  max-height:247px;flex-shrink:0;
+}
+.match-seat--left .match-seat-melds,
+.match-seat--right .match-seat-melds{
+  display:flex;
+  flex-direction:column;
+  flex-wrap:nowrap;
+  align-items:center;
+  width:100%;
+  max-width:100%;
+  max-height:110px;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  gap:4px;
+  scrollbar-width:thin;
+}
+.match-seat--left .match-seat-meld,
+.match-seat--right .match-seat-meld{
+  width:max-content;
+  max-width:100%;
+  padding:3px 5px;
+}
+.match-seat--left .match-seat-meld .tile,
+.match-seat--right .match-seat-meld .tile{width:24px;height:32px}
+.match-seat--left .match-seat-meld .match-tile-back,
+.match-seat--right .match-seat-meld .match-tile-back{
+  width:20px;height:29px;flex-basis:20px;
+}
+.match-seat--top .match-seat-melds,
+.match-seat--bottom .match-seat-melds{
+  flex-direction:row;justify-content:center;flex-wrap:wrap;
+}
+.match-seat-meld--peng{border-color:#afd6be88}
+.match-seat-meld--ming_gang{border-color:#e4c276a8}
+.match-seat-meld--bu_gang{border-color:#e4b080a8}
+.match-seat-meld--an_gang{border-style:dashed;border-color:#c3d0db93}
+.match-board .match-seat{position:relative}
+.match-board .match-seat.is-won::before{
+  content:"已胡";position:absolute;top:3px;right:3px;
+  padding:1px 6px;
+  border-radius:9px;
+  background:#f8d580;color:#684117;
+  font-weight:800;font-size:10px;
+  z-index:3;
+}
+.match-seat-score{
+  font-size:11px;
+  padding:3px 7px;
+  font-weight:750;
+  color:#f7e2ab;
+  background:#052c24a8;
+  border:1px solid #d9c68e66;
+  border-radius:6px;
+  text-align:center;
+  white-space:nowrap;
+}
+.match-seat-score[hidden]{display:none}
+.match-table-settlement{
+  grid-area:summary;
+  display:grid;
+  gap:7px;
+  margin-top:3px;
+  padding:11px 13px;
+  border:1px solid #d9c17e;
+  background:#092d25b8;
+  border-radius:12px;
+  color:#f3eee0;
+  min-width:0;
+}
+.match-table-settlement[hidden]{display:none}
+.match-table-settlement-head{
+  display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:6px;
+}
+.match-table-settlement-head strong{font-size:14px;color:#f6d792}
+.match-table-settlement-head span{font-size:11px;color:#c1e5cb}
+.match-table-scores{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;
+}
+.match-table-score{
+  padding:7px 10px;border-radius:7px;
+  border:1px solid #a0bea474;
+  background:#224b3d;
+  display:grid;gap:2px;min-width:0;
+}
+.match-table-score span{font-size:10px;color:#d4e7d7}
+.match-table-score strong{
+  font-size:17px;font-weight:800;
+  font-variant-numeric:tabular-nums;
+  color:#f7ebc6;
+}
+.match-table-score.is-credit strong{color:#9ae3b2}
+.match-table-score.is-debit strong{color:#ffd0aa}
+.match-table-wins{display:flex;flex-wrap:wrap;gap:6px}
+.match-table-win-row{
+  flex:1 1 230px;display:grid;gap:3px;
+  border-radius:7px;padding:6px 9px;
+  background:#215444aa;border:1px solid #94c9a871;
+}
+.match-table-win-row strong{font-size:11px;color:#f6e6b6}
+.match-table-win-row span{font-size:10px;color:#d0e7d7}
+.match-table-score-note{
+  margin:0;font-size:10px;color:#c3d2cb;line-height:1.5;
+}
+@media(max-width:700px){
+  .match-table-scores{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .match-table-settlement{padding:8px}
+}

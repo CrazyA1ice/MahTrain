@@ -758,6 +758,32 @@ class WebUI(unittest.TestCase):
         _match_public_step(game,len(game._events),steps)
         self.assertEqual(len(steps),empty)
 
+    def test_m319_table_meld_racks_and_settlement_landmarks(self):
+        page,_=self.get("/")
+        js,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        for item in ("match-table-settlement","match-table-scores",
+                     "match-table-wins","match-table-score-note",
+                     "match-table-settlement-title","match-own-score",
+                     "match-table-round-phase"):
+            self.assertEqual(page.count(
+                ('id="%s"' % item).encode()),1)
+        self.assertLess(page.index(b'id="match-seat-0"'),
+                        page.index(b'id="match-table-settlement"'))
+        self.assertLess(page.index(b'id="match-table-settlement"'),
+                        page.index(b'id="match-controls"'))
+        for token in (b"renderTableSettlement",b"settlementAvailable",
+                      b"match-seat-meld--",b"win_ledger.balances",
+                      b"match-table-score-note",b"kong_ledger"):
+            self.assertIn(token,js)
+        for token in (b".match-table-settlement",
+                      b".match-table-scores",
+                      b".match-seat--left .match-seat-melds",
+                      b".match-seat--right .match-seat-melds",
+                      b".match-board .match-seat.is-won::before"):
+            self.assertIn(token,css)
+        self.assertIn(b"grid-area:summary",css)
+
     def test_m318_kong_win_playback_controls_always_available(self):
         page,_=self.get("/")
         script,mime=self.get("/match_playback.js")
