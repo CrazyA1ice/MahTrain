@@ -916,7 +916,7 @@
     if(!alwaysRandom && $("match-lab-enabled").checked){
       const raw=$("match-seed").value.trim();
       const number=Number(raw);
-      if(!/^\\d+$/.test(raw)||!Number.isSafeInteger(number)||
+      if(!/^\d+$/.test(raw)||!Number.isSafeInteger(number)||
          number<0||number>4294967295){
         $("match-error").textContent="实验室种子必须为0至4294967295的整数。";
         return;
