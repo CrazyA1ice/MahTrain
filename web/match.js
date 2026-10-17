@@ -1077,6 +1077,9 @@
       controls.append(el("p","review-intro",
         "本局摸切已结束。胡牌已入账；牌山耗尽时按方案A处理流局赔付（如牌形未核验则暂缓），杠钱仍为独立模拟。可以重新开一局。"));
     }
+    // A claim/rob decision now lives on the TABLE, not an empty sticky
+    // toolbar below it. Keep the toolbar for exchange and manual discard.
+    controls.hidden=controls.children.length===0;
     const publicInfo=$("match-public");publicInfo.replaceChildren();
     if(state.missing_suits){
       publicInfo.append(el("p","review-intro",
