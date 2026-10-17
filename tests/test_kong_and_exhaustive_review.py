@@ -172,6 +172,13 @@ class ExhaustiveReviewTests(unittest.TestCase):
         self.assertTrue(preview["triggered"])
         self.assertFalse(preview["posted"])
         self.assertEqual(preview["policy"],"active_only_preview")
+        comparison=preview["scope_comparison"]
+        self.assertFalse(comparison["posted"])
+        self.assertTrue(comparison["available"])
+        self.assertEqual(len(comparison["scenarios"]),2)
+        for scenario in comparison["scenarios"]:
+            self.assertFalse(scenario["posted"])
+            self.assertEqual(sum(scenario["balances"]),0)
         self.assertEqual(sum(preview["preview_balances"]),0)
         status={x["seat"]:x for x in preview["seats"]}
         self.assertEqual(status[pig]["classification"],"flower_pig")
