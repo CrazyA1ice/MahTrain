@@ -11,7 +11,15 @@ from collections import defaultdict
 from random import Random
 from typing import Any, Sequence
 
-from .ai_independent_benchmark import LEVELS, independent_lineup
+from .ai import AI_LEVELS
+
+LEVELS = ("baseline", *AI_LEVELS)
+
+
+def independent_lineup(rotation: int) -> list[str]:
+    if type(rotation) is not int or rotation not in range(4):
+        raise ValueError("four-seat rotation must be 0..3")
+    return [LEVELS[(seat + rotation) % 4] for seat in range(4)]
 
 MIN_INTERVAL_SEEDS = 5
 
