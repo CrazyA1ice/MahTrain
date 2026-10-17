@@ -8,7 +8,14 @@ assert.equal(api.tileLabel("p3"),"三筒");
 assert.equal(api.tileLabel("private"),"");
 assert.equal(api.phrase({type:"discard",seat:1,publicTile:"m5"}),"五万");
 assert.equal(api.phrase({type:"peng",seat:3,publicTile:"p2"}),"3号碰二筒");
-assert.equal(api.phrase({type:"an_gang",seat:2,publicTile:"s9"}),"2号暗杠");
+assert.equal(api.phrase({type:"an_gang",seat:2,publicTile:"s9"}),"2号暗杠",
+  "without explicit public reveal marker, never say a concealed card");
+assert.equal(api.phrase({type:"an_gang",seat:2,publicTile:"s9",
+  exposedKong:true}),"2号暗杠九条");
+assert.equal(api.phrase({type:"an_gang",seat:0,publicTile:"m4",
+  exposedKong:true}),"我方暗杠四万");
+assert.equal(api.phrase({type:"an_gang",seat:3,publicTile:"SECRET",
+  exposedKong:true}),"3号暗杠");
 assert.equal(api.phrase({type:"multi_ron",winSeats:[1,3],publicTile:"p2"}),
   "1号、3号一炮多响，胡了");
 assert.equal(api.phrase({type:"draw",seat:1,publicTile:"s4"}),"");
@@ -45,14 +52,20 @@ speaker.announceFrame({announcements:[
   {type:"ming_gang",seat:0,publicTile:"s8"},
 ]});
 assert.equal(spoken[1].text,"1号碰四万。我方明杠八条");
+speaker.announceFrame({announcements:[
+  {type:"an_gang",seat:1,publicTile:"p7",exposedKong:true},
+  {type:"kong_supplement",seat:1,publicTile:"hidden"},
+]});
+assert.equal(spoken[2].text,"1号暗杠七筒",
+  "kong supplement identity is never spoken");
 speaker.setEnabled(false);
 assert.equal(speaker.announceEvents([{type:"discard",seat:0,publicTile:"m1"}]),false);
-assert.equal(spoken.length,2);
+assert.equal(spoken.length,3);
 assert.equal(speaker.canRepeat(),false);
 assert.equal(speaker.repeatLast(),false,"mute must block manual replay");
 speaker.setEnabled(true);
 assert.equal(speaker.repeatLast(),true);
-assert.equal(spoken[2].text,"1号碰四万。我方明杠八条");
+assert.equal(spoken[3].text,"1号暗杠七筒");
 assert.equal(speaker.setRate("slow"),"slow");
 assert.equal(speaker.announceEvents([{type:"discard",seat:0,publicTile:"m3"}]),true);
 assert.equal(spokenRates.at(-1),0.85);
