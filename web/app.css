@@ -1882,7 +1882,8 @@
   min-height:18px;margin:3px 0 6px;font-variant-numeric:tabular-nums}
 
 /* M3.42 desktop: hand/meld orientation is defined in each player's OWN
-   coordinate system. A left-seat tile points west; right-seat points east.
+   coordinate system. The top of each printed glyph points toward the table center so the tile
+   is upright when read from the west (left) or east (right) seat.
    From the right player's perspective left-to-right runs bottom-to-top. */
 @media(min-width:901px){
   .match-seat--left .match-seat-backs,
@@ -1892,9 +1893,9 @@
   .match-seat--left .match-seat-melds{flex-direction:column}
   .match-seat--right .match-seat-melds{flex-direction:column-reverse}
   .match-seat--left .match-tile-back,
-  .match-seat--left .match-seat-meld .tile{transform:rotate(-90deg)}
+  .match-seat--left .match-seat-meld .tile{transform:rotate(90deg)}
   .match-seat--right .match-tile-back,
-  .match-seat--right .match-seat-meld .tile{transform:rotate(90deg)}
+  .match-seat--right .match-seat-meld .tile{transform:rotate(-90deg)}
   .match-seat--left .match-seat-backs,
   .match-seat--right .match-seat-backs{gap:0}
   .match-seat--left .match-meld-tiles,
@@ -1914,8 +1915,8 @@
   .match-seat--left .match-seat-melds::-webkit-scrollbar,
   .match-seat--right .match-seat-melds::-webkit-scrollbar{display:none}
   /* A side river must face its owner, not the seated human below. */
-  .match-river--left .match-river-cell .tile{transform:rotate(-90deg)}
-  .match-river--right .match-river-cell .tile{transform:rotate(90deg)}
+  .match-river--left .match-river-cell .tile{transform:rotate(90deg)}
+  .match-river--right .match-river-cell .tile{transform:rotate(-90deg)}
   .match-river--right .match-river-tiles{direction:rtl}
   .match-river--right .match-river-cell{direction:ltr}
 }
