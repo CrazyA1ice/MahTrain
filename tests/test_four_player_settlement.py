@@ -215,6 +215,63 @@ class M32SettlementTests(unittest.TestCase):
             self.assertEqual(item["raw_fan"],5)
             self.assertEqual(item["effective_fan"],3)
 
+    def test_m339_self_draw_quote_matches_actual_booking(self):
+        dealer=FourPlayerOpening(42).dealer
+        hand=["m1"]*3+["m4"]*3+["s1"]*3+["s4"]*3+["s9"]*2
+        for mode,unit in (("add_base",900),("add_fan",1600),
+                          ("legacy",800)):
+            with self.subTest(mode=mode):
+                game=staged_game({dealer:hand.copy()},{dealer:"p"})
+                game.ledger=WinLedger(100,3,mode)
+                quote=game.private_view(dealer)["self_draw_preview"]
+                self.assertTrue(game.private_view(dealer)["can_self_draw_win"])
+                self.assertEqual(quote["amount_per_payer"],unit)
+                self.assertEqual(quote["total_received"],3*unit)
+                self.assertEqual(quote["payment_multiplier"],unit//100)
+                self.assertEqual(quote["raw_fan"],4)
+                self.assertEqual(quote["effective_fan"],3)
+                self.assertFalse(quote["posted"])
+                self.assertEqual(game.ledger.public_state()["balances"],[0]*4,
+                                 "preview must never mutate confirmed balances")
+                self.assertNotIn("self_draw_preview",game.public_state())
+                self.assertIsNone(game.private_view((dealer+1)%4)
+                                  ["self_draw_preview"])
+                self.assertNotIn("hand",quote)
+                self.assertNotIn("tile",quote)
+                self.assertNotIn("wall",str(quote).lower())
+                game.declare_self_win(dealer)
+                booking=game.public_state()["win_ledger"]["wins"][0]
+                self.assertEqual(booking["payers"],quote["payers"])
+                self.assertEqual(booking["amount_per_payer"],
+                                 quote["amount_per_payer"])
+                self.assertEqual(booking["total_received"],
+                                 quote["total_received"])
+                self.assertIsNone(game.private_view(dealer)
+                                  ["self_draw_preview"])
+
+    def test_m339_self_draw_preview_only_charges_active_seats(self):
+        dealer=FourPlayerOpening(42).dealer
+        hand=["m1"]*3+["m4"]*3+["s1"]*3+["s4"]*3+["s9"]*2
+        game=staged_game({dealer:hand},{dealer:"p"})
+        game.ledger=WinLedger(100,3,"add_base")
+        already_won=(dealer+1)%4
+        game._won[already_won]=True
+        quote=game.private_view(dealer)["self_draw_preview"]
+        self.assertNotIn(already_won,quote["payers"])
+        self.assertEqual(len(quote["payers"]),2)
+        self.assertEqual(quote["total_received"],1800)
+        game.declare_self_win(dealer)
+        self.assertEqual(game.public_state()["win_ledger"]
+                         ["balances"][already_won],0)
+        self.assertEqual(sum(game.public_state()["settled_balances"]),0)
+        # Quote validation is strict even when manually invoked by a client.
+        with self.assertRaises(ValueError):
+            game.ledger.preview_self_draw(payers=[1,1],score={
+                "legal":True,"raw_fan":2,"effective_fan":2,
+                "multiplier":4,"main_pattern":"pure_suit"})
+        self.assertIsNone(FourPlayerOpening(17).private_view(0)
+                          ["self_draw_preview"])
+
     def test_self_draw_modes_two_fan_three_payers_and_normal_ron(self):
         score={"legal":True,"raw_fan":2,"effective_fan":2,
                "multiplier":4,"main_pattern":"pure_suit",
