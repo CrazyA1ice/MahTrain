@@ -188,7 +188,7 @@
         " · 累计 "+response.summary.paid_wins+"笔胡牌";
       renderList();
       renderScorecard(response.scorecard);
-      window.MahTrainMatchStats?.render(response.scorecard);
+      window.MahTrainMatchStats?.render(response.scorecard,document);
       lastGrouping=response.scorecard?.groupings||null;
       renderGroupings();
     }catch(err){fail(err)}
