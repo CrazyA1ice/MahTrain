@@ -222,6 +222,33 @@ function fakeClock(){
   assert.equal(timer.count(),0);
 }
 {
+  // Next visible move must wait for BOTH the animation hold and actual
+  // speech completion; pause/skip invalidate pending async completions.
+  (async()=>{
+    const clock=fakeClock();
+    let releaseSpeech;
+    let seen=0;
+    const player=createController({
+      onFrame:()=>{
+        seen++;
+        return seen===1?new Promise(resolve=>{releaseSpeech=resolve;}):undefined;
+      },
+      onDone:()=>{},onStatus:()=>{},
+      clock:clock.set,clearClock:clock.clear,
+    });
+    player.setSpeed(180);
+    player.start([{type:"discard"},{type:"discard"}]);
+    clock.tick();
+    assert.equal(seen,1,"timer alone must not launch next player");
+    releaseSpeech();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(seen,2,"speech onend unlocks the next visible frame");
+    player.skip();
+    assert.equal(clock.count(),0);
+  })().catch(e=>{console.error(e);process.exitCode=1;});
+}
+{
   const playback=require("../web/match_playback.js");
   const board={
     phase:"await_draw",turn:2,wall_count:40,
