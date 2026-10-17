@@ -243,6 +243,19 @@
         <div id="match-stage" hidden>
           <h4 id="match-title"></h4>
           <p id="match-status" class="review-footnote"></p>
+          <div class="match-game-hud" aria-label="本局实时状态和牌桌偏好">
+            <div class="match-hud-readouts" role="status" aria-live="polite">
+              <span class="match-hud-chip match-hud-chip--turn"><b>当前行动</b><strong id="match-hud-turn">准备中</strong></span>
+              <span class="match-hud-chip"><b>牌山剩余</b><strong id="match-hud-wall">—</strong></span>
+              <span class="match-hud-chip"><b>我的定缺</b><strong id="match-hud-missing">待选择</strong></span>
+              <span class="match-hud-chip match-hud-chip--tip"><b>操作提示</b><strong id="match-hud-tip">等待开局</strong></span>
+            </div>
+            <div class="match-hud-actions" role="group" aria-label="牌桌显示与操作偏好">
+              <button id="match-focus-toggle" type="button" class="review-control" aria-pressed="false">沉浸牌桌</button>
+              <button id="match-large-tiles-toggle" type="button" class="review-control" aria-pressed="false">放大手牌</button>
+              <label class="match-confirm-option"><input id="match-confirm-discard" type="checkbox"> 出牌二次确认</label>
+            </div>
+          </div>
           <button id="match-again" type="button" class="primary match-again">再来一局 · 随机开局</button>
           <div class="match-playback-settings" role="group" aria-label="AI 播放设置">
             <label>AI 动作速度
@@ -305,7 +318,7 @@
               </div>
               <section id="match-seat-1" class="match-seat match-seat--right" aria-label="1号下家"></section>
               <section id="match-seat-0" class="match-seat match-seat--bottom" aria-label="0号自己">
-                <div class="match-self-header">0号 · 自己</div>
+                <div class="match-self-header"><span class="match-seat-avatar match-seat-avatar--self" aria-hidden="true">我</span><strong>0号 · 自己</strong></div>
                 <div id="match-self-status" class="match-seat-status"></div>
                 <div id="match-hand" class="retry-hand"></div>
                 <div id="match-ready-hint" class="match-ready-hint" aria-live="polite"></div>
