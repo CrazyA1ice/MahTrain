@@ -8,7 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
-  let pendingDiscard=null,immersive=false,largeTiles=false;
+  let pendingDiscard=null,immersive=false,largeTiles=false,midnightFelt=false;
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   let reviewHistory=[],reviewDropped=0,reviewSelected=null;
@@ -799,6 +799,9 @@
     const stage=$("match-stage");
     stage.classList.toggle("is-immersive",immersive);
     $("match-board").classList.toggle("is-large-tiles",largeTiles);
+    $("match-board").classList.toggle("is-midnight-felt",midnightFelt);
+    $("match-skin-toggle").setAttribute("aria-pressed",String(midnightFelt));
+    $("match-skin-toggle").textContent=midnightFelt?"绿色桌布":"深蓝桌布";
     $("match-focus-toggle").setAttribute("aria-pressed",String(immersive));
     $("match-large-tiles-toggle").setAttribute("aria-pressed",String(largeTiles));
     $("match-focus-toggle").textContent=immersive?"显示详细信息":"沉浸牌桌";
@@ -1179,6 +1182,10 @@
     $("match-hand-draw").addEventListener("click",()=>navigateHand("draw"));
     $("match-hand").addEventListener("scroll",updateHandNavigation);
     updateHandNavigation();
+    $("match-skin-toggle").addEventListener("click",()=>{
+      midnightFelt=!midnightFelt;
+      if(state)renderHUD();
+    });
     $("match-large-tiles-toggle").addEventListener("click",()=>{
       largeTiles=!largeTiles;
       if(state)renderHUD();
