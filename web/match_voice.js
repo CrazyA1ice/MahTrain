@@ -30,7 +30,8 @@
       case "discard":return tile||""; // only tile name, no player prefix
       case "peng":return lead+"碰"+tile;
       case "ming_gang":return lead+"明杠"+tile;
-      case "an_gang":return lead+"暗杠"; // do not reveal concealed tile
+      case "an_gang":return lead+"暗杠"+
+        (item.exposedKong===true?tile:""); // say ONLY verified public flip
       case "bu_gang":return lead+"补杠"+tile;
       case "ron":return (winners.length?winners.map(x=>x+"号").join("、"):lead)+"胡了";
       case "multi_ron":return (winners.length?winners.map(x=>x+"号").join("、"):"多家")+"一炮多响，胡了";
