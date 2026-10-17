@@ -5,7 +5,11 @@ import json
 import sqlite3
 import tempfile
 import unittest
+import sys
 from pathlib import Path
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT/"src"))
 
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.match_archive import MatchArchive, sanitize_board, sanitize_events
