@@ -109,19 +109,84 @@ def sanitize_events(events: list) -> list[dict]:
     return clean
 
 
+_MAIN_PATTERNS = frozenset((
+    "pinghu", "seven_pairs", "dragon_seven_pairs", "pure_seven_pairs",
+    "pure_dragon_seven_pairs", "golden_hook", "all_pungs",
+    "pure_all_pungs", "pure_suit", "heaven_win", "earth_win",
+))
+_BONUS_NAMES = frozenset((
+    "kong_bloom", "kong_discard_ron", "rob_added_kong", "roots",
+))
+_WIN_KINDS = frozenset(("ron", "rob_kong", "self_draw"))
+
+
+def _balances(value, label: str) -> list[int]:
+    if (type(value) is not list or len(value) != 4 or
+            any(type(n) is not int for n in value) or sum(value) != 0):
+        raise ValueError(f"invalid zero-sum {label}")
+    return list(value)
+
+
 def sanitize_win_ledger(ledger: dict) -> dict:
-    balances = ledger.get("balances", [])
-    if len(balances) != 4 or not all(type(x) is int for x in balances):
-        raise ValueError("invalid win ledger balances")
-    allowed = ("winner", "kind", "main_pattern", "raw_fan", "effective_fan",
-               "multiplier", "amount_per_payer", "total_received", "payers",
-               "bonuses")
-    return {
-        "balances": list(balances),
-        "wins": [{key: win[key] for key in allowed if key in win}
-                 for win in ledger.get("wins", [])],
-        "zero_sum": ledger.get("zero_sum") is True,
-    }
+    """Copy typed, rule-known settlement fields only; verify all four balances.
+
+    In particular, the nested payers and bonuses must never be copied from
+    public_state using an unchecked dictionary or list value.
+    """
+    if not isinstance(ledger, dict):
+        raise ValueError("invalid win ledger")
+    balances = _balances(ledger.get("balances"), "win balances")
+    wins = ledger.get("wins")
+    if not isinstance(wins, list) or type(ledger.get("zero_sum")) is not bool or not ledger["zero_sum"]:
+        raise ValueError("invalid win ledger entries/zero_sum")
+    expected = [0, 0, 0, 0]
+    cleaned = []
+    for record in wins:
+        if not isinstance(record, dict):
+            raise ValueError("invalid win settlement")
+        winner = record.get("winner")
+        payers = record.get("payers")
+        if (type(winner) is not int or winner not in range(4) or
+                type(payers) is not list or not 1 <= len(payers) <= 3 or
+                any(type(seat) is not int or seat not in range(4) or
+                    seat == winner for seat in payers) or
+                len(set(payers)) != len(payers)):
+            raise ValueError("invalid win settlement seats")
+        kind = record.get("kind")
+        main = record.get("main_pattern")
+        if type(kind) is not str or kind not in _WIN_KINDS or type(main) is not str or main not in _MAIN_PATTERNS:
+            raise ValueError("invalid win settlement kind/pattern")
+        fields = ("raw_fan", "effective_fan", "multiplier",
+                  "amount_per_payer", "total_received")
+        if any(type(record.get(key)) is not int for key in fields):
+            raise ValueError("invalid win settlement numeric values")
+        raw_fan, fan, multiplier, unit, total = (record[k] for k in fields)
+        if (raw_fan < 0 or fan < 0 or fan > 12 or fan > raw_fan or
+                multiplier != (1 << fan) or unit <= 0 or
+                total != unit * len(payers)):
+            raise ValueError("inconsistent win settlement amounts")
+        bonuses = record.get("bonuses", {})
+        if (type(bonuses) is not dict or any(
+            type(key) is not str or key not in _BONUS_NAMES or
+            type(value) is not int or value < 0 or value > 14
+            for key, value in bonuses.items()
+        )):
+            raise ValueError("invalid win settlement bonuses")
+        if kind in ("ron", "rob_kong") and len(payers) != 1:
+            raise ValueError("discard win requires exactly one payer")
+        expected[winner] += total
+        for seat in payers:
+            expected[seat] -= unit
+        cleaned.append({
+            "winner": winner, "kind": kind, "main_pattern": main,
+            "raw_fan": raw_fan, "effective_fan": fan,
+            "multiplier": multiplier, "amount_per_payer": unit,
+            "total_received": total, "payers": list(payers),
+            "bonuses": dict(bonuses),
+        })
+    if expected != balances:
+        raise ValueError("win balances disagree with settled win records")
+    return {"balances": balances, "wins": cleaned, "zero_sum": True}
 
 
 class MatchArchive:
@@ -153,15 +218,25 @@ class MatchArchive:
                        initial_board: dict, ai_levels: list[str]) -> str:
         if public.get("phase") not in _TERMINAL:
             raise ValueError("only completed matches can be archived")
-        if not isinstance(ai_levels, list) or len(ai_levels) != 3:
+        if (type(ai_levels) is not list or len(ai_levels) != 3 or
+                any(type(level) is not str or level not in
+                    ("basic", "advanced", "challenge") for level in ai_levels)):
             raise ValueError("invalid AI assignment")
+        if type(public.get("dealer")) is not int or public["dealer"] not in range(4):
+            raise ValueError("invalid dealer in match archive")
         safe_steps = [{
             "board": sanitize_board(step["board"]),
             "events": sanitize_events(step.get("events", [])),
         } for step in history[-_MAX_ARCHIVE_STEPS:]]
         safe_board = sanitize_board(public)
         ledger = sanitize_win_ledger(public["win_ledger"])
-        kong = public["kong_ledger"]
+        kong = public.get("kong_ledger")
+        if not isinstance(kong, dict):
+            raise ValueError("invalid kong ledger")
+        kong_balances = _balances(kong.get("balances"), "kong balances")
+        base = kong.get("base")
+        if base is not None and (type(base) is not int or not 1 <= base <= 10**6):
+            raise ValueError("invalid kong base")
         payload = {
             "privacy": "public_board_only", "version": 1,
             "phase": public["phase"], "dealer": public["dealer"],
@@ -170,7 +245,7 @@ class MatchArchive:
             "steps": safe_steps, "truncated": max(0, len(history)-len(safe_steps)),
             "final_board": safe_board,
             "win_ledger": ledger,
-            "kong_balances": list(kong["balances"]),
+            "kong_balances": kong_balances,
             "kong_priced": kong.get("base") is not None,
             "note": "胡牌余额已入账；杠钱仅为可选试验积分；流局赔付未正式入账。",
         }
