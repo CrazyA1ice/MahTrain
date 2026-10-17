@@ -1219,6 +1219,30 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("_hands",view)
         self.assertNotIn("_wall",view)
 
+    def test_m346_home_modules_and_real_match_visualizations(self):
+        page,_=self.get("/")
+        home,mime=self.get("/app_home.js")
+        archives,_=self.get("/match_archives.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b"javascript",mime)
+        self.assertEqual(page.count(b'id="module-home"'),1)
+        self.assertEqual(page.count(b'id="module-navbar"'),1)
+        self.assertEqual(page.count(b'id="match-stats-dashboard"'),1)
+        for name in ("match","archives","training","quiz","history","research","demo"):
+            self.assertIn(('data-open-module="%s"' % name).encode(),page)
+            self.assertIn(('data-module-section="%s"' % name).encode(),page)
+        self.assertIn(b"MahTrainHome",home)
+        self.assertIn(b"hashchange",home)
+        self.assertIn(b"data-module-active",home)
+        self.assertIn(b"MahTrainMatchArchives?.refresh()",home)
+        self.assertIn(b"positive_games",archives)
+        self.assertIn(b"negative_games",archives)
+        self.assertIn(b"draw_total",archives)
+        self.assertIn(b"hu_total",archives)
+        self.assertIn(b".module-home-grid",css)
+        self.assertIn(b".match-stat-stacked",css)
+        self.assertIn(b".match-stat-component-bar",css)
+
     def test_m345_fluid_board_no_horizontal_pan_and_contextual_dialog(self):
         page,_=self.get("/")
         script,_=self.get("/match.js")
