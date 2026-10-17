@@ -905,6 +905,60 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     x.className==="match-self-win-preview"),false,
     "a nonwinning/old round must not retain the prior quote");
 
+  // M3.41: a continuation may include silent authentic steps followed by
+  // one spoken discard. Quiet intermediate visual placeholders are skipped,
+  // while the complete verified snapshots remain inspectable in review.
+  startMatch={...base,events:[]};
+  replyMatch={...next,events:[],public_steps:[],needs_continue:true};
+  dom["match-playback-speed"].value="0";
+  dom["match-playback-speed"].handlers.change();
+  dom["match-new"].handlers.click();
+  await settle();
+  dom["match-hand"].children[0].handlers.click();
+  await settle();
+  const scheduledContinuation=[...pendingTimers.entries()].find(
+    ([,slot])=>slot.delay===0);
+  assert.ok(scheduledContinuation,"AI continuation must be scheduled");
+  dom["match-playback-speed"].value="450";
+  dom["match-playback-speed"].handlers.change();
+  dom["match-playback-focus"].checked=false;
+  const m341DrawBoard={phase:"await_discard",turn:1,wall_count:52,
+    hand_counts:[14,14,10,13],won:base.won,
+    melds:base.melds,discards:next.discards};
+  const m341DiscardBoard={...m341DrawBoard,phase:"claim_window",
+    hand_counts:[14,13,10,13],
+    discards:[...next.discards,
+      {seat:1,tile:"s5",discard_kind:"tedashi"}]};
+  replyMatch={...next,wall_count:52,phase:"claim_window",
+    turn:1,hand_counts:m341DiscardBoard.hand_counts,discards:m341DiscardBoard.discards,
+    events:[{type:"draw",seat:1},
+      {type:"discard",seat:1,tile:"s5",discard_kind:"tedashi"}],
+    public_steps:[
+      {events:[{type:"draw",seat:1}],board:m341DrawBoard},
+      {events:[{type:"discard",seat:1,tile:"s5",
+        discard_kind:"tedashi"}],board:m341DiscardBoard},
+    ],needs_continue:false};
+  pendingTimers.delete(scheduledContinuation[0]);
+  scheduledContinuation[1].fn();
+  await settle();
+  assert.equal(requests.at(-1).action,"match_continue");
+  assert.equal(dom["match-playback"].hidden,false);
+  assert.ok(dom["match-motion-text"].textContent.includes("出牌"),
+    "first visible continuation frame should be the actual audible cut");
+  assert.ok(dom["match-playback-note"].textContent.includes(
+    "已合并1个无声中间画面"));
+  assert.ok(descendants(dom["match-motion-card"],x=>x.tile==="s5").length);
+  dom["match-playback-skip"].handlers.click();
+  await settle();
+  assert.equal(dom["match-wall-count"].textContent,"52");
+  dom["match-review-seat-filter"].value="all";
+  dom["match-review-type-filter"].value="all";
+  dom["match-review-type-filter"].handlers.change();
+  assert.ok(dom["match-review-count"].textContent.includes("4 步"),
+    "full review should keep opening, real manual state, draw and discard");
+  assert.equal(pendingTimers.size,0);
+  console.log("M3.41 silent AI frame coalescing and complete public review: PASS");
+
   console.log("M3.39 server-only HU quote and no booking before confirmation: PASS");
   console.log("M3.24 random rematch, lab seed, speech and privacy DOM smoke: PASS");
   console.log("M3.21 cross-turn public history, seat/filter navigation and reset DOM smoke: PASS");
