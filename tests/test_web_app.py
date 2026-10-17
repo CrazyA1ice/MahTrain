@@ -695,6 +695,32 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"match_win",js)
         self.assertIn(b"match_kong",js)
 
+    def test_m316_public_match_action_playback_assets(self):
+        page,_=self.get("/")
+        script,mime=self.get("/match_playback.js")
+        main,_=self.get("/match.js")
+        style,_=self.get("/app.css")
+        self.assertIn("javascript",mime)
+        self.assertLess(page.index(b'src="/match_playback.js"'),
+                        page.index(b'src="/match.js"'))
+        for item in ("match-playback","match-playback-speed",
+                     "match-playback-pause","match-playback-skip",
+                     "match-playback-status","match-playback-progress",
+                     "match-motion","match-motion-card","match-motion-text"):
+            self.assertEqual(page.count(('id="%s"' % item).encode()),1)
+        for field in (b"normalize",b"createController",b"pause",b"resume",
+                      b"setSpeed",b"VISIBLE_TILE",b"an_gang"):
+            self.assertIn(field,script)
+        for field in (b"showPublicMotion",b"match-playback-speed",
+                      b"match-playback-pause",b"match-playback-skip"):
+            self.assertIn(field,main)
+        self.assertIn(b".match-motion",style)
+        self.assertIn(b"prefers-reduced-motion",style)
+        response=self.post({"action":"match_new","seed":42})
+        self.assertIn("events",response["match"])
+        self.assertNotIn("_hands",response["match"])
+        self.assertNotIn("_wall",response["match"])
+
     def test_m315_match_readiness_and_private_draw_display(self):
         page,_=self.get("/")
         script,_=self.get("/match.js")
