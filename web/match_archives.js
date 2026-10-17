@@ -42,7 +42,7 @@
     }
     panel.append(el("p","",
       "两局差额："+sign(a.win_b0-b.win_b0)+
-      "（列表第一局减第二局；仅已入账胡牌，不含实验杠钱或未结算流局付款）"));
+      "（列表第一局减第二局；本列表是胡牌净额比较，不含可能已单独入账的方案A流局赔付及实验杠钱，详情中展示完整账目）"));
   }
   function renderList(){
     const root=$("match-archives-list");
@@ -164,7 +164,10 @@
         (report.phase==="finished"?"三家胡牌结束":"牌山耗尽")+
         " · 庄家"+report.dealer+"号 · "+report.steps.length+
         "个已保存动作快照 · "+report.win_ledger.wins.length+
-        "笔胡牌（流局赔付未正式入账）"+
+        "笔胡牌"+(report.exhaustive_settlement?.posted?
+          " · "+report.exhaustive_settlement.entries.length+
+          "笔方案A流局赔付已入账":
+          " · 无已入账流局赔付")+
         (report.truncated?" · 最早省略"+report.truncated+"步":"");
       $("match-archives-export").href=uri(archiveId);
       $("match-archives-export").download="mahtrain_"+archiveId+".json";
@@ -173,12 +176,33 @@
         el("span","match-archive-balance",i+"号胡牌已入账 "+sign(n)+
           "（独立杠钱试验额 "+
           sign(report.kong_balances[i])+"）")));
+      const exhaustive=report.exhaustive_settlement;
+      if(exhaustive){
+        const status=el("p","match-net",
+          exhaustive.posted?
+          "方案A流局正式结算："+exhaustive.balances.map((n,i)=>
+            i+"号"+sign(n)).join(" · "):
+          "流局异常牌形待核验，未执行流局赔付");
+        score.append(status);
+        if(exhaustive.posted){
+          score.append(el("p","review-footnote",
+            "正式已入账合计："+report.settled_balances.map((n,i)=>
+              i+"号"+sign(n)).join(" · ")+"（不含独立模拟杠钱）"));
+        }
+      }
       const wins=$("match-archives-wins");wins.replaceChildren();
       for(const w of report.win_ledger.wins)wins.append(el("p","",
         w.winner+"号"+(winType[w.kind]||"胡牌")+
         " · "+w.main_pattern+" · "+w.effective_fan+
         "番 · 实收 "+sign(w.total_received)+
         " · 付款 "+w.payers.join("、")+"号"));
+      if(exhaustive?.posted){
+        for(const e of exhaustive.entries)wins.append(el("p","",
+          "流局"+(e.stage==="flower_pig"?"查花猪":"查大叫")+
+          " · "+e.payer+"号付"+e.recipient+"号 "+
+          e.amount+(e.stage==="da_jiao"?
+            " · "+e.effective_fan+"番":"")));
+      }
       renderSteps();
     }catch(err){fail(err)}
   }
