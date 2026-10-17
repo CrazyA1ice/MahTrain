@@ -31,7 +31,8 @@ const ids=[
   "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
-  "match-focus-toggle","match-large-tiles-toggle","match-confirm-discard",
+  "match-focus-toggle","match-large-tiles-toggle","match-skin-toggle",
+  "match-confirm-discard",
   "match-board",
   "match-hand-prev","match-hand-next","match-hand-draw",
   "match-hand-position","match-table-self-summary",
@@ -207,6 +208,13 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-large-tiles-toggle"].attributes["aria-pressed"],"true");
   dom["match-large-tiles-toggle"].handlers.click();
   assert.equal(dom["match-board"].classList.contains("is-large-tiles"),false);
+  dom["match-skin-toggle"].handlers.click();
+  assert.equal(dom["match-board"].classList.contains("is-midnight-felt"),true);
+  assert.equal(dom["match-skin-toggle"].attributes["aria-pressed"],"true");
+  assert.equal(dom["match-skin-toggle"].textContent,"绿色桌布");
+  dom["match-skin-toggle"].handlers.click();
+  assert.equal(dom["match-board"].classList.contains("is-midnight-felt"),false);
+  assert.equal(dom["match-skin-toggle"].attributes["aria-pressed"],"false");
 
   for(const n of [0,1,2,3]){
     assert.ok(dom["match-seat-"+n]);
