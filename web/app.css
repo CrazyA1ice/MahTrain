@@ -1796,3 +1796,12 @@
 }
 .match-self-draw-help{font-size:12px;color:#557260;line-height:1.65;
   flex-basis:100%;padding:3px 2px}
+
+/* M3.39 desktop self-draw payout preview: a quote, never a posted score. */
+.match-self-win-preview{flex-basis:100%;display:grid;gap:7px;
+  border:1px solid #c8dcbf;border-left:4px solid #4a906a;
+  background:#f2f9f1;border-radius:11px;padding:13px 16px;
+  color:#284d3b;line-height:1.6}
+.match-self-win-preview strong{font-size:15px}
+.match-self-win-preview span{font-size:13px;font-variant-numeric:tabular-nums}
+.match-self-win-preview small{font-size:12px;color:#647d69}
