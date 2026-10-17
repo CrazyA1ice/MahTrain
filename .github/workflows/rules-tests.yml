@@ -43,6 +43,7 @@ jobs:
           node --check web/quiz_history.js
           node --check web/four_player.js
           node --check web/match_playback.js
+          node --check web/match_voice.js
           node --check web/match.js
           node --check web/match_archives.js
           node --check web/ai_replay.js
@@ -54,6 +55,8 @@ jobs:
         run: node tests/test_match_board_dom.js
       - name: Smoke-test SQLite match archive browser and comparison
         run: node tests/test_match_archive_dom.js
+      - name: Smoke-test public Mandarin match voice
+        run: node tests/test_match_voice.js
       - name: Run no-dependency unit tests
         run: python -m unittest discover -s tests -v
       - name: Smoke-test Chinese discard demo
