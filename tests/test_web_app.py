@@ -1132,6 +1132,50 @@ class WebUI(unittest.TestCase):
             self.assertNotIn("_hands",state)
             self.assertNotIn("_wall",state)
 
+    def test_m340_sequential_ai_and_desktop_assets(self):
+        page,_=self.get("/")
+        js,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        voice,_=self.get("/match_voice.js")
+        for attr in (b'id="match-back-color"',
+                     b'id="match-self-missing-flag"',
+                     b'id="match-request-status"'):
+            self.assertIn(attr,page)
+        for key in (b"match_continue",b"needs_continue",
+                    b"data-back-color",b"match-missing-flag"):
+            self.assertIn(key,js)
+        for key in (b".match-river--top .match-river-cell .tile",
+                    b".match-river--left .match-river-cell .tile",
+                    b".match-river--right .match-river-cell .tile",
+                    b".match-river-tiles::-webkit-scrollbar",
+                    b"match-board[data-back-color",b".match-missing-flag"):
+            self.assertIn(key,css)
+        self.assertIn(b"announceFrameWait",voice)
+        created=self.post({"action":"match_new","seed":42,
+                           "self_draw_mode":"add_fan"})
+        token=created["match_token"]
+        self.assertIn("server_elapsed_ms",created)
+        self.assertIsInstance(created["server_elapsed_ms"],(float,int))
+        self.assertFalse(created["match"].get("needs_continue",False))
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_continue","match_token":token})
+        hand=created["match"]["hand"]
+        chosen=next([t for t in hand if t.startswith(s)][:3] for s in "msp"
+                    if sum(x.startswith(s) for x in hand)>=3)
+        self.post({"action":"match_exchange","match_token":token,
+                   "tiles":chosen})
+        turn=self.post({"action":"match_missing","match_token":token,
+                        "suit":"p"})
+        game=turn["match"]
+        self.assertIn("needs_continue",game)
+        self.assertLessEqual(len(game["public_steps"]),4)
+        if game["needs_continue"]:
+            progressed=self.post({"action":"match_continue",
+                                  "match_token":token})
+            self.assertLessEqual(len(progressed["match"]["public_steps"]),1)
+            self.assertNotIn("_hands",progressed["match"])
+            self.assertNotIn("_wall",progressed["match"])
+
     def test_m338_self_draw_mode_is_validated_and_published(self):
         page, _ = self.get("/")
         client, _ = self.get("/match.js")
