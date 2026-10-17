@@ -8,7 +8,8 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
-  let playback=null;
+  let playback=null,liveBoard=null;
+  const publicBoard=()=>liveBoard||state;
   const tileName=t=>window.MahTrainUI.tileName(t);
   function el(tag,css,label){
     const v=document.createElement(tag);
@@ -47,12 +48,16 @@
         const before=state.events?.length||0;
         const newEvents=data.match.events||[];
         if(newEvents.length>=before){
-          const result=window.MahTrainPlayback.normalize(
-            newEvents.slice(before));
+          const recorded=data.match.public_steps;
+          const result=Array.isArray(recorded)
+            ?window.MahTrainPlayback.normalizeSteps(recorded)
+            :window.MahTrainPlayback.normalize(newEvents.slice(before));
           if(result.frames.length){
             $("match-playback").hidden=false;
             $("match-playback-note").textContent=
-              "按公开事件顺序播放；完整牌桌在播放结束时同步。"+
+              (Array.isArray(recorded)
+                ?"逐动作展示真实公开牌山、牌河、副露与各家牌背数；本人的暗手在结束后同步。"
+                :"按公开事件顺序播放；完整牌桌在播放结束时同步。")+
               (result.omitted?" 事件较多，已略过前"+result.omitted+"项。":"");
             await new Promise(resolve=>playback.start(result.frames,resolve));
           }
@@ -63,8 +68,11 @@
         $("match-playback").hidden=true;
         $("match-motion").hidden=true;
       }
+      liveBoard=null;
       token=data.match_token;state=data.match;choice.clear();render();
     }catch(err){
+      liveBoard=null;
+      if(state)renderBoard();
       $("match-error").textContent=err.message||String(err);
     }finally{busy=false;}
   }
@@ -91,6 +99,10 @@
     return back;
   }
   function showPublicMotion(frame,step,total){
+    if(frame.board){
+      liveBoard=frame.board;
+      renderBoard();
+    }
     const root=$("match-motion"),target=$("match-motion-card");
     root.hidden=false;
     root.classList.toggle("is-winning-motion",frame.isWin);
@@ -148,18 +160,22 @@
     }
   }
   function renderSeat(seat){
+    const view=publicBoard();
     const root=$("match-seat-"+seat);
     root.classList.toggle("is-active",
-      state.turn===seat && !state.won[seat] &&
-      ["dealer_discard","await_discard"].includes(state.phase));
-    root.classList.toggle("is-won",!!state.won[seat]);
+      view.turn===seat && !view.won[seat] &&
+      ["dealer_discard","await_discard"].includes(view.phase));
+    root.classList.toggle("is-won",!!view.won[seat]);
     if(seat===0){
       const missing=state.missing_suits?.[0];
-      $("match-self-status").textContent=
-        (state.won[0]?"已胡 · ":"")+
-        (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
-        "庄家"+state.dealer+"号 · 当前手牌"+state.hand.length+"张";
-      renderMelds($("match-self-melds"),state.own_melds,true);
+      root.classList.toggle("is-public-replay",!!liveBoard);
+      $("match-self-status").textContent=liveBoard
+        ?"公开状态：手牌"+view.hand_counts[0]+"张 · 手牌牌面在播放结束后同步"
+        :(state.won[0]?"已胡 · ":"")+
+          (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
+          "庄家"+state.dealer+"号 · 当前手牌"+state.hand.length+"张";
+      renderMelds($("match-self-melds"),
+        liveBoard?view.melds[0]:state.own_melds,!liveBoard);
       return;
     }
     root.replaceChildren();
@@ -169,23 +185,24 @@
       seat+"号 · "+seats[seat].label+(ai?" · "+(levels[ai.difficulty]||ai.difficulty):"")));
     const missing=state.missing_suits?.[seat];
     root.append(el("div","match-seat-status",
-      (state.won[seat]?"已胡 · ":"")+
+      (view.won[seat]?"已胡 · ":"")+
       (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
-      "暗手"+state.hand_counts[seat]+"张"));
+      "暗手"+view.hand_counts[seat]+"张"));
     const backs=el("div","match-seat-backs");
-    backs.setAttribute("aria-label","暗手"+state.hand_counts[seat]+"张，牌面不可见");
-    for(let n=0;n<state.hand_counts[seat];n++)backs.append(tileBack());
+    backs.setAttribute("aria-label","暗手"+view.hand_counts[seat]+"张，牌面不可见");
+    for(let n=0;n<view.hand_counts[seat];n++)backs.append(tileBack());
     root.append(backs);
     const melds=el("div","match-seat-melds");
-    renderMelds(melds,state.melds[seat],false);
+    renderMelds(melds,view.melds[seat],false);
     root.append(melds);
   }
   function renderRiver(seat){
+    const view=publicBoard();
     const root=$("match-river-"+seat);
     root.replaceChildren();
     root.append(el("strong","match-river-title",seats[seat].label+"牌河"));
     const tiles=el("div","match-river-tiles");
-    const entries=state.discards.map((entry,index)=>({...entry,order:index}))
+    const entries=view.discards.map((entry,index)=>({...entry,order:index}))
       .filter(entry=>entry.seat===seat);
     if(!entries.length){
       tiles.append(el("span","match-river-empty","尚无弃牌"));
@@ -212,7 +229,7 @@
         cell.append(el("span","match-discard-kind",drawCut?"摸切":"手切"));
         cell.title+=(drawCut?" · 摸切":" · 手切");
       }
-      if(entry.order===state.discards.length-1){
+      if(entry.order===view.discards.length-1){
         cell.classList.add("is-latest");
       }
       tiles.append(cell);
@@ -257,8 +274,9 @@
     ).join(" ｜ ")));
   }
   function renderWall(){
-    $("match-wall-count").textContent=String(state.wall_count);
-    $("match-wall").classList.toggle("is-exhausted",state.wall_count===0);
+    const remaining=publicBoard().wall_count;
+    $("match-wall-count").textContent=String(remaining);
+    $("match-wall").classList.toggle("is-exhausted",remaining===0);
   }
   function renderBoard(){
     renderWall();

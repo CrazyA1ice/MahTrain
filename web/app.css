@@ -762,3 +762,13 @@
 @media(prefers-reduced-motion:reduce){
   .match-motion{animation:none}
 }
+
+
+/* M3.17: real public board step playback. The seat-zero private hand is NOT
+   a historic snapshot; dim it until the authoritative final response lands. */
+.match-board .match-seat--bottom.is-public-replay #match-hand{
+  opacity:.55;filter:saturate(.72);pointer-events:none;
+}
+.match-board .match-seat--bottom.is-public-replay .match-seat-status{
+  color:#ffedb0;font-weight:700;
+}

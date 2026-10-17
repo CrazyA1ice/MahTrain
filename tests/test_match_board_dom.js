@@ -86,6 +86,7 @@ const window={
 const playbackModule=require("../web/match_playback.js");
 window.MahTrainPlayback={
   normalize:playbackModule.normalize,
+  normalizeSteps:playbackModule.normalizeSteps,
   createController:callbacks=>playbackModule.createController({
     ...callbacks,
     clock:(fn,delay)=>context.setTimeout(fn,delay),

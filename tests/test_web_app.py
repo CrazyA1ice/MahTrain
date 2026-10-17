@@ -636,6 +636,33 @@ class WebUI(unittest.TestCase):
                 result=self.post({"action":"match_discard","match_token":token,
                                    "tile":current["hand"][0]})
             current=result["match"]
+            steps=current.get("public_steps",[])
+            self.assertIsInstance(steps,list)
+            self.assertLessEqual(len(steps),96)
+            for step in steps:
+                board=step["board"]
+                self.assertEqual(set(board),{
+                    "phase","turn","wall_count","hand_counts",
+                    "melds","discards","won",
+                })
+                self.assertEqual(len(board["hand_counts"]),4)
+                self.assertEqual(len(board["melds"]),4)
+                self.assertEqual(len(board["won"]),4)
+                self.assertTrue(step["events"])
+                self.assertNotIn("hand",board)
+                self.assertNotIn("drawn_tile",board)
+                self.assertNotIn("future_wall",board)
+                for seat_melds in board["melds"]:
+                    for meld in seat_melds:
+                        if meld["type"]=="an_gang":
+                            self.assertIsNone(meld["tile"])
+                for event in step["events"]:
+                    if event["type"]=="an_gang":
+                        self.assertNotIn("tile",event)
+            if steps:
+                for field in ("phase","turn","wall_count","hand_counts",
+                              "melds","discards","won"):
+                    self.assertEqual(steps[-1]["board"][field],current[field])
             self.assertTrue(0<=current["wall_count"]<=55)
             self.assertLessEqual(len(current["discards"]),55)
             self.assertNotIn("_wall",current)
@@ -684,8 +711,8 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".match-river--right",css)
         self.assertIn(b".match-board-scroll",css)
         self.assertIn(b"renderBoard()",js)
-        self.assertIn(b"state.discards.map",js)
-        self.assertIn(b"state.hand_counts[seat]",js)
+        self.assertIn(b"view.discards.map",js)
+        self.assertIn(b"view.hand_counts[seat]",js)
         self.assertIn(b"meld.tile===null",js)
         self.assertIn(b"match_discard",js)
         self.assertIn(b"match_exchange",js)
@@ -694,6 +721,42 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"match_claim",js)
         self.assertIn(b"match_win",js)
         self.assertIn(b"match_kong",js)
+
+    def test_m317_public_snapshots_are_from_actual_rule_calls(self):
+        from test_four_player import to_dealer_turn
+        from web_server import _match_record, _match_public_step
+        game=to_dealer_turn(17)
+        seat=game.dealer
+        steps=[]
+        # The dealer cuts WITHOUT drawing first.
+        tile=game.private_view(seat)["hand"][0]
+        _match_record(game,steps,lambda: game.discard(seat,tile))
+        self.assertEqual(len(steps),1)
+        first=steps[0]["board"]
+        self.assertEqual(first["hand_counts"][seat],13)
+        self.assertEqual(first["wall_count"],55)
+        self.assertEqual(first["discards"][0]["tile"],tile)
+        self.assertEqual(steps[0]["events"][-1]["type"],"discard")
+        # All pass + next player's REAL front draw gives distinct boards.
+        _match_record(game,steps,game.pass_all_claims_demo)
+        self.assertEqual(steps[1]["events"][-1]["type"],"demo_no_claims")
+        other=game.turn
+        _match_record(game,steps,lambda: game.draw(other))
+        self.assertEqual(steps[-1]["events"][-1]["type"],"draw")
+        self.assertEqual(steps[-1]["board"]["wall_count"],54)
+        self.assertEqual(steps[-1]["board"]["hand_counts"][other],14)
+        self.assertEqual(game.debug_tile_counts()["total"],108)
+        self.assertEqual(set(steps[-1]["board"]),{
+            "phase","turn","wall_count","hand_counts",
+            "melds","discards","won",
+        })
+        for step in steps:
+            self.assertNotIn("hand",step["board"])
+            self.assertNotIn("_wall",step["board"])
+            self.assertNotIn("drawn_tile",step["board"])
+        empty=len(steps)
+        _match_public_step(game,len(game._events),steps)
+        self.assertEqual(len(steps),empty)
 
     def test_m316_public_match_action_playback_assets(self):
         page,_=self.get("/")

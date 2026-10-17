@@ -55,6 +55,65 @@
       };
     })};
   }
+  // A strict public-board allowlist. Never forward hidden hands, a private
+  // latest draw, unrevealed kong tiles or the actual future wall.
+  function normalizeBoard(board){
+    if(!board||!Array.isArray(board.hand_counts)||
+        board.hand_counts.length!==4||!Array.isArray(board.melds)||
+        board.melds.length!==4||!Array.isArray(board.discards)||
+        !Array.isArray(board.won)||board.won.length!==4||
+        !Number.isInteger(board.wall_count)||board.wall_count<0){
+      return null;
+    }
+    const validTile=t=>typeof t==="string"&&/^[msp][1-9]$/.test(t);
+    const seat=n=>Number.isInteger(n)&&n>=0&&n<=3;
+    const count=n=>Number.isInteger(n)&&n>=0&&n<=14;
+    if(!board.hand_counts.every(count)||!board.melds.every(Array.isArray))
+      return null;
+    const melds=board.melds.map(groups=>groups.map(group=>{
+      const type=["peng","ming_gang","an_gang","bu_gang"].includes(group?.type)
+        ?group.type:"unknown";
+      return {type,tile:type==="an_gang"?null:
+        validTile(group?.tile)?group.tile:null};
+    }));
+    const discards=board.discards.filter(x=>seat(x?.seat)&&validTile(x?.tile))
+      .map(x=>{
+        const item={seat:x.seat,tile:x.tile};
+        if(seat(x.claimed_by))item.claimed_by=x.claimed_by;
+        if(Array.isArray(x.won_by))item.won_by=x.won_by.filter(seat);
+        if(x.discard_kind==="tsumogiri"||x.discard_kind==="tedashi")
+          item.discard_kind=x.discard_kind;
+        if(x.rob_kong===true)item.rob_kong=true;
+        return item;
+      });
+    return {
+      phase:typeof board.phase==="string"?board.phase:"",
+      turn:seat(board.turn)?board.turn:null,
+      wall_count:board.wall_count,hand_counts:[...board.hand_counts],
+      melds,discards,won:board.won.map(Boolean),
+    };
+  }
+  function normalizeSteps(steps,maxFrames=80){
+    const accepted=[];
+    for(const step of Array.isArray(steps)?steps:[]){
+      const board=normalizeBoard(step?.board);
+      const events=normalize(step?.events).frames;
+      if(!board||!events.length)continue;
+      // A rules call may emit several events. The post-call public board
+      // is authoritative; we do NOT fake an intermediate board per event.
+      const last=events[events.length-1];
+      const winner=events.find(f=>f.isWin);
+      const exposed=[...events].reverse().find(f=>f.publicTile);
+      accepted.push({
+        ...last,label:events.map(f=>f.label).join(" → "),
+        publicTile:exposed?.publicTile||null,
+        isWin:events.some(f=>f.isWin),
+        winSeats:winner?.winSeats||last.winSeats,board,
+      });
+    }
+    const omitted=Math.max(0,accepted.length-maxFrames);
+    return {omitted,frames:accepted.slice(omitted)};
+  }
   function createController({onFrame,onDone,onStatus,clock,clearClock}){
     if(typeof onFrame!=="function"||typeof onDone!=="function"||
         typeof onStatus!=="function")throw new TypeError("playback callbacks required");
@@ -102,5 +161,5 @@
       getState(){return {playing,paused,index,total:items.length,duration};},
     };
   }
-  return {normalize,createController};
+  return {normalize,normalizeSteps,createController};
 });

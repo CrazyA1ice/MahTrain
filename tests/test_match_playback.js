@@ -101,4 +101,45 @@ function fakeClock(){
   assert.equal(timer.count(),0);
   assert.throws(()=>player.setSpeed(10),RangeError);
 }
+{
+  // Real transition snapshots, deliberately containing extra secret fields
+  // to prove a strict UI allowlist is enforced.
+  const before={
+    phase:"await_discard",turn:1,wall_count:53,
+    hand_counts:[13,14,13,13],won:[false,false,false,false],
+    melds:[[],[],[{type:"an_gang",tile:"s9"}],[]],discards:[],
+    hand:["private"],drawn_tile:"never-export",future_wall:["hidden"]
+  };
+  const after={...before,phase:"claim_window",wall_count:53,
+    hand_counts:[13,13,13,13],
+    discards:[{seat:1,tile:"p7",discard_kind:"tedashi",
+      hand:["private"],future_wall:["hidden"]}]};
+  const steps=[
+    {events:[{type:"draw",seat:1,tile:"private-drawn",hand:["private"]}],
+      board:before},
+    {events:[{type:"discard",seat:1,tile:"p7",discard_kind:"tedashi"}],
+      board:after},
+  ];
+  const packed=require("../web/match_playback.js").normalizeSteps(steps);
+  assert.equal(packed.frames.length,2);
+  assert.equal(packed.frames[0].board.hand_counts[1],14);
+  assert.equal(packed.frames[1].board.hand_counts[1],13);
+  assert.equal(packed.frames[0].board.wall_count,53);
+  assert.equal(packed.frames[1].board.discards[0].tile,"p7");
+  assert.equal(packed.frames[0].board.melds[2][0].tile,null);
+  for(const secret of ["private","never-export","future_wall","s9"]){
+    assert.ok(!JSON.stringify(packed).includes(secret),secret+" leaked");
+  }
+  assert.equal(require("../web/match_playback.js").normalizeSteps(steps,1)
+    .omitted,1);
+  assert.equal(require("../web/match_playback.js").normalizeSteps([
+    {events:[{type:"an_gang",seat:2,tile:"s9"},
+      {type:"kong_supplement",seat:2,tile:"p4"}],board:before},
+  ]).frames.length,1,"two in-call events share one actual post-call board");
+  assert.equal(require("../web/match_playback.js").normalizeSteps([
+    {events:[{type:"draw",seat:1}],board:{
+      ...before,hand_counts:[13],future_wall:["hidden"]}},
+  ]).frames.length,0,"reject malformed board rather than fake it");
+}
+console.log("M3.17 recorded public board steps and privacy: PASS");
 console.log("M3.16 public replay privacy and pause/skip/speed: PASS");
