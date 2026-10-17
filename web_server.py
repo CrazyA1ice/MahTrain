@@ -31,17 +31,24 @@ from mahtrain_core.error_focus import (
     ERROR_LABELS, supports_focus, select_focused_question, diagnose_quiz,
 )
 from mahtrain_core.history import HistoryStore  # noqa: E402
+from mahtrain_core.match_archive import MatchArchive  # noqa: E402
 
 # Override MAHTRAIN_HISTORY_DB to relocate the local, single-user SQLite file.
 import os
-_HISTORY = HistoryStore(Path(os.environ.get("MAHTRAIN_HISTORY_DB",
-                                     str(ROOT / "data" / "mahtrain_history.sqlite3"))))
+_HISTORY_DB = Path(os.environ.get("MAHTRAIN_HISTORY_DB",
+                                     str(ROOT / "data" / "mahtrain_history.sqlite3")))
+_HISTORY = HistoryStore(_HISTORY_DB)
+_MATCH_ARCHIVE = MatchArchive(Path(os.environ.get("MAHTRAIN_MATCH_DB",
+                                               str(_HISTORY_DB))))
 
 _SESSIONS: dict[str, SoloTrainingSession] = {}
 _QUIZZES: dict[str, dict] = {}
 _TABLE_DEMOS: dict[str, FourPlayerOpening] = {}
 _MATCH_SESSIONS: dict[str, FourPlayerOpening] = {}
 _MATCH_AGENTS: dict[str, dict[int, MahjongAgent]] = {}
+_MATCH_HISTORY: dict[str, list[dict]] = {}
+_MATCH_OPENING: dict[str, dict] = {}
+_MATCH_ARCHIVE_IDS: dict[str, str] = {}
 _AI_REPLAY_JOBS: dict[str, dict] = {}
 _MAX_REPLAY_JOBS = 4
 _MAX_ACTIVE_REPLAY_JOBS = 1
@@ -477,8 +484,13 @@ def _process(action: str, payload: dict) -> dict:
                 stale=next(iter(_MATCH_SESSIONS))
                 _MATCH_SESSIONS.pop(stale)
                 _MATCH_AGENTS.pop(stale,None)
+                _MATCH_HISTORY.pop(stale,None)
+                _MATCH_OPENING.pop(stale,None)
+                _MATCH_ARCHIVE_IDS.pop(stale,None)
             _MATCH_SESSIONS[token]=game
             _MATCH_AGENTS[token]=agents
+            _MATCH_HISTORY[token]=[]
+            _MATCH_OPENING[token]=_match_public_board(game)
             return {"match_token":token,
                     "match":_match_private_view(game,agents)}
         if action in ("match_exchange","match_missing","match_discard",
@@ -528,6 +540,16 @@ def _process(action: str, payload: dict) -> dict:
                 _match_script_until_human(game,agents,steps)
             view=_match_private_view(game,agents)
             view["public_steps"]=steps
+            if token in _MATCH_HISTORY:
+                _MATCH_HISTORY[token].extend(steps)
+            if (game.phase in ("finished","wall_exhausted")
+                    and token not in _MATCH_ARCHIVE_IDS):
+                published=game.public_state()
+                archive_id=_MATCH_ARCHIVE.save_completed(
+                    published,_MATCH_HISTORY[token],_MATCH_OPENING[token],
+                    [agents[n].level for n in (1,2,3)])
+                _MATCH_ARCHIVE_IDS[token]=archive_id
+            view["match_archive_id"]=_MATCH_ARCHIVE_IDS.get(token)
             return {"match_token":token,"match":view}
         if action == "table_new":
             seed = payload.get("seed", 42)
@@ -801,6 +823,19 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         url = urlparse(self.path)
         path = unquote(url.path)
+        if path == "/api/match_archives":
+            query = parse_qs(url.query)
+            try:
+                with _LOCK:
+                    if "archive_id" in query:
+                        self._json(200,_MATCH_ARCHIVE.detail(
+                            query["archive_id"][0]))
+                    else:
+                        limit=int(query.get("limit",["30"])[0])
+                        self._json(200,_MATCH_ARCHIVE.list_completed(limit))
+            except (ValueError,TypeError) as exc:
+                self._json(400,{"error":str(exc)})
+            return
         if path == "/api/history":
             query = parse_qs(url.query)
             try:
