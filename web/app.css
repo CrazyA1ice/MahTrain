@@ -2163,3 +2163,63 @@
    Inactive claim dialogs are removed by the [hidden] attribute. */
 .match-decision[hidden]{display:none!important}
 .match-open-kong{border-color:#bd9955!important}
+
+/* M3.46: real feature hub, one workspace at a time. Explicit hidden state
+   remains owned by each feature; route visibility is independent of it. */
+.module-home{padding:clamp(26px,4vw,58px) 0 38px}
+.module-home h1{font-size:clamp(29px,3.5vw,46px);line-height:1.15;
+  margin:0 0 12px;color:#193d32}
+.module-home-lead{font-size:14px;line-height:1.7;color:#617d6e;margin:0 0 25px}
+.module-home-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:16px;align-items:stretch}
+.module-home-card{display:flex;flex-direction:column;align-items:flex-start;
+  gap:10px;min-width:0;min-height:200px;padding:24px;text-align:left;
+  border-radius:17px;border:1px solid #d6e4d9;background:#fff;
+  box-shadow:0 8px 24px #193e2d0d;cursor:pointer;color:#264939;
+  transition:transform .15s,box-shadow .15s,border-color .15s}
+.module-home-card:hover{transform:translateY(-3px);border-color:#91b7a0;
+  box-shadow:0 15px 30px #193e2d18}
+.module-home-card:focus-visible{outline:3px solid #d0a962;outline-offset:3px}
+.module-home-card>span{font-size:11px;letter-spacing:.12em;color:#608a70;font-weight:800}
+.module-home-card>strong{font-size:22px;line-height:1.35}
+.module-home-card>small{font-size:13px;line-height:1.65;color:#687e71}
+.module-home-card>b{margin-top:auto;font-size:13px;color:#21674d}
+.module-home-featured{background:linear-gradient(135deg,#153e33,#296b50);
+  color:#ffefc9;border-color:#234b39;grid-column:span 2}
+.module-home-featured>span,.module-home-featured>small{color:#d9e6d2}
+.module-home-featured>b{color:#ffdb86}
+.module-navbar{display:flex;align-items:center;gap:15px;margin:18px 0 16px;
+  padding:8px 0 14px;border-bottom:1px solid #dfe8dc}
+.module-navbar[hidden],.module-home[hidden]{display:none!important}
+.module-navbar strong{font-size:17px;color:#275540}
+[data-module-section]{display:none!important}
+[data-module-section][data-module-active="true"]:not([hidden]){display:revert!important}
+body[data-current-module="home"] .module-home{display:block}
+body[data-current-module="match"] .match-panel,
+body[data-current-module="archives"] .match-archives-panel{margin-top:4px}
+@media(max-width:900px){.module-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:590px){.module-home-grid{grid-template-columns:1fr}
+  .module-home-featured{grid-column:span 1}
+  .module-home-card{min-height:160px;padding:18px}
+  .module-home-card>strong{font-size:19px}}
+/* Stats chart uses the audited public SQLite scorecard only. */
+.match-stats-dashboard{display:grid;grid-template-columns:1fr 1fr;
+  gap:14px;margin:17px 0}
+.match-stat-visual{min-width:0;border:1px solid #dde9dc;background:#f7fbf6;
+  border-radius:13px;padding:16px}
+.match-stat-visual h5{margin:0 0 16px;font-size:14px;color:#2b5941}
+.match-stat-stacked{display:flex;width:100%;height:26px;border-radius:8px;
+  background:#e3ece5;overflow:hidden}
+.match-stat-segment.positive{background:#2c9370}
+.match-stat-segment.negative{background:#cc7961}
+.match-stat-segment.even{background:#9baaa0}
+.match-stat-legend{margin:12px 0 0;font-size:12px;line-height:1.6;color:#536b5b}
+.match-stat-component-row{display:grid;grid-template-columns:55px 1fr 1fr 64px;
+  align-items:center;gap:8px;margin:9px 0;font-size:11px}
+.match-stat-component-row>strong{text-align:right;font-size:12px}
+.match-stat-component-track{background:#e2eae2;height:13px;border-radius:4px;overflow:hidden}
+.match-stat-component-bar{display:block;height:100%;min-width:0}
+.match-stat-component-bar.credit{background:#339271}
+.match-stat-component-bar.debit{background:#d27761}
+.match-stat-component-bar.draw{opacity:.58}
+@media(max-width:880px){.match-stats-dashboard{grid-template-columns:1fr}}
