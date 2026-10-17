@@ -214,6 +214,13 @@
         <div class="table-demo-toolbar">
           <label>房间系数 <input id="match-coefficient" type="number" min="1" max="1000000" value="100"/></label>
           <label>番数封顶 <input id="match-fan-cap" type="number" min="0" max="12" value="3"/></label>
+          <label>自摸结算方式
+            <select id="match-self-draw-mode" aria-label="自摸计分规则">
+              <option value="add_base" selected>自摸加底（4+1倍）</option>
+              <option value="add_fan">自摸加番（8倍）</option>
+            </select>
+          </label>
+          <span class="match-self-draw-help">例：2番自摸、三家付款；加底每家5倍底分，加番每家8倍底分。点炮不变。</span>
           <label>1号AI <select id="match-ai-1" aria-label="1号AI难度">
             <option value="basic" selected>入门</option><option value="advanced">进阶</option><option value="challenge">挑战</option>
           </select></label>
