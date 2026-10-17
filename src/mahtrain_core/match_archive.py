@@ -276,6 +276,15 @@ class MatchArchive:
                 CREATE INDEX IF NOT EXISTS idx_matches_created
                     ON completed_matches(created_at DESC,archive_id DESC);
             """)
+            # Additive, backward-compatible SQLite migration: legacy archives
+            # keep win_b0 and implicitly use it as their settled total.
+            columns = {row[1] for row in db.execute(
+                "PRAGMA table_info(completed_matches)"
+            )}
+            if "settled_b0" not in columns:
+                db.execute(
+                    "ALTER TABLE completed_matches ADD COLUMN settled_b0 INTEGER"
+                )
 
     def _connect(self):
         db = sqlite3.connect(str(self.path), timeout=10)
@@ -336,11 +345,11 @@ class MatchArchive:
             db.execute("""
                 INSERT INTO completed_matches(
                     archive_id,created_at,phase,dealer,win_count,
-                    steps_count,win_b0,record_json
-                ) VALUES(?,?,?,?,?,?,?,?)
+                    steps_count,win_b0,settled_b0,record_json
+                ) VALUES(?,?,?,?,?,?,?,?,?)
             """, (archive_id,stamp,public["phase"],public["dealer"],
                   len(ledger["wins"]),len(safe_steps),
-                  ledger["balances"][0],
+                  ledger["balances"][0],payload["settled_balances"][0],
                   json.dumps(payload,ensure_ascii=False,separators=(",",":"))))
         return archive_id
 
@@ -356,15 +365,21 @@ class MatchArchive:
         with self._connect() as db:
             rows = db.execute("""
                 SELECT archive_id,created_at,phase,dealer,win_count,
-                       steps_count,win_b0 FROM completed_matches
+                       steps_count,win_b0,
+                       COALESCE(settled_b0,win_b0) AS settled_b0
+                       FROM completed_matches
                 ORDER BY created_at DESC,archive_id DESC LIMIT ?""",(limit,)).fetchall()
             total = db.execute("""
                 SELECT COUNT(*) AS games,COALESCE(AVG(win_b0),0) AS average_b0,
+                COALESCE(AVG(COALESCE(settled_b0,win_b0)),0)
+                    AS average_settled_b0,
                 COALESCE(SUM(win_count),0) AS paid_wins
                 FROM completed_matches""").fetchone()
         return {"matches":[dict(x) for x in rows],
                 "summary":{"games":total["games"],
                            "average_player0_win_balance":total["average_b0"],
+                           "average_player0_settled_balance":
+                               total["average_settled_b0"],
                            "paid_wins":total["paid_wins"]}}
 
     def detail(self, archive_id: str) -> dict:
