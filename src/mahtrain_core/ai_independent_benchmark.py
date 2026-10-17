@@ -13,6 +13,7 @@ from typing import Any
 from .ai import AI_LEVELS
 from .ai_tournament import simulate_match
 from .ai_independent_scores import controlled_four_policy_scores
+from .ai_decision_score_diagnostics import analyze_decision_score_diagnostics
 
 LEVELS=("baseline",*AI_LEVELS)
 EXPLORATORY_MIN_SEEDS=5
@@ -112,6 +113,8 @@ def independent_benchmark(seed_start: int=11, seeds: int=1, *,
         })
     official_score_analysis=controlled_four_policy_scores(
         all_games,bootstrap_replicates=bootstrap_replicates)
+    decision_score_diagnostics=analyze_decision_score_diagnostics(
+        all_games,official_score_analysis)
     totals=_totals(all_games)
     results=_measure(all_games)
     metrics=("win_event_fraction","min_shanten_fraction",
@@ -172,6 +175,7 @@ def independent_benchmark(seed_start: int=11, seeds: int=1, *,
         } for level in LEVELS},
         "paired_differences_vs_baseline":comparisons,
         "official_score_analysis":official_score_analysis,
+        "decision_score_diagnostics":decision_score_diagnostics,
         "per_seed":by_seed,
         "interval_status":(
             "exploratory_only" if intervals is not None
