@@ -9,6 +9,7 @@
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
   let pendingDiscard=null,immersive=false,largeTiles=false,midnightFelt=false;
+  let backColor="jade";
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   function syncVoiceControls(){
@@ -387,6 +388,11 @@
     root.classList.toggle("is-won",!!view.won[seat]);
     if(seat===0){
       const missing=state.missing_suits?.[0];
+      const flag=$("match-self-missing-flag");
+      flag.hidden=!missing;
+      flag.textContent=missing?"缺"+names[missing]:"";
+      flag.className="match-missing-flag"+
+        (missing?" match-missing-flag--"+missing:"");
       root.classList.toggle("is-public-replay",!!liveBoard);
       $("match-self-status").textContent=liveBoard
         ?"公开状态：手牌"+view.hand_counts[0]+"张 · 手牌牌面在播放结束后同步"
@@ -408,8 +414,14 @@
       String(seat)));
     identity.append(el("strong","match-seat-name",
       seat+"号 · "+seats[seat].label+(ai?" · "+(levels[ai.difficulty]||ai.difficulty):"")));
-    root.append(identity);
     const missing=state.missing_suits?.[seat];
+    if(missing){
+      const flag=el("strong","match-missing-flag match-missing-flag--"+missing,
+        "缺"+names[missing]);
+      flag.setAttribute("aria-label",seat+"号定缺"+names[missing]);
+      identity.append(flag);
+    }
+    root.append(identity);
     root.append(el("div","match-seat-status",
       (view.won[seat]?"已胡 · ":"")+
       (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
@@ -1250,6 +1262,15 @@
     $("match-skin-toggle").addEventListener("click",()=>{
       midnightFelt=!midnightFelt;
       if(state)renderHUD();
+    });
+    const picker=$("match-back-color");
+    picker.value=backColor;
+    $("match-board").setAttribute("data-back-color",backColor);
+    picker.addEventListener("change",()=>{
+      if(["jade","indigo","red","gold"].includes(picker.value))
+        backColor=picker.value;
+      picker.value=backColor;
+      $("match-board").setAttribute("data-back-color",backColor);
     });
     $("match-large-tiles-toggle").addEventListener("click",()=>{
       largeTiles=!largeTiles;
