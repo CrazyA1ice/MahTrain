@@ -59,8 +59,9 @@ class ControlledOfficialAITests(unittest.TestCase):
         self.assertEqual(report["paired_differences"]["challenge_minus_advanced"],11.25)
         self.assertEqual([item["levels"]["challenge"]["official_total"]
                           for item in report["per_seed"]],[30,60])
-        self.assertNotIn("hand",json.dumps(report))
-        self.assertNotIn("wall",json.dumps(report))
+        self.assertNotIn("opponent_hands",json.dumps(report))
+        self.assertNotIn("future_wall",json.dumps(report))
+        self.assertNotIn("hidden_tiles",json.dumps(report))
         self.assertEqual(controlled_official_scores(list(reversed(games))),report)
 
     def test_unresolved_wall_excludes_entire_seed_not_one_rotation(self):
