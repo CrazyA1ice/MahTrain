@@ -288,11 +288,46 @@
               <p id="match-round-report-status"></p>
             </div>
             <div id="match-round-report-seats" class="match-round-report-seats"></div>
+            <div class="match-review-filters" role="group" aria-label="复盘筛选">
+              <label>查看玩家
+                <select id="match-review-seat-filter">
+                  <option value="all">全部玩家</option>
+                  <option value="0">0号 · 自己</option>
+                  <option value="1">1号 · 下家</option>
+                  <option value="2">2号 · 对家</option>
+                  <option value="3">3号 · 上家</option>
+                </select>
+              </label>
+              <label>动作类别
+                <select id="match-review-type-filter">
+                  <option value="all">全部公开动作</option>
+                  <option value="key">只看关键动作</option>
+                  <option value="win">胡牌</option>
+                  <option value="kong">杠牌</option>
+                  <option value="peng">碰牌</option>
+                  <option value="discard">出牌</option>
+                </select>
+              </label>
+            </div>
             <div id="match-round-report-wins" class="match-round-report-wins"></div>
-            <details id="match-round-report-timeline" class="match-round-report-timeline">
-              <summary>展开公开关键动作时间线</summary>
-              <div id="match-round-report-events"></div>
+            <details id="match-round-report-timeline" class="match-round-report-timeline" open>
+              <summary>定位动作并查看当时公开牌桌</summary>
+              <p id="match-review-count" class="match-review-count"></p>
+              <div id="match-round-report-events" class="match-review-actions"></div>
             </details>
+            <section id="match-review-inspector" class="match-review-inspector"
+                     aria-label="历史公开牌桌快照">
+              <div class="match-review-inspector-head">
+                <strong id="match-review-selected">选择左侧动作查看公开局面</strong>
+                <div class="match-review-navigator">
+                  <button id="match-review-prev" type="button" disabled>上一步</button>
+                  <button id="match-review-next" type="button" disabled>下一步</button>
+                </div>
+              </div>
+              <p id="match-review-board-status"></p>
+              <div id="match-review-preview-seats" class="match-review-preview-seats"></div>
+              <p class="match-review-privacy">仅显示该次真实规则动作完成后的公开牌桌：牌山、各家背牌张数、公开副露、牌河和已胡状态；不显示历史暗手及墙牌顺序，也不会修改当前正式牌桌。</p>
+            </section>
             <p id="match-round-report-note" class="match-round-report-note"></p>
           </section>
           <div id="match-public" class="match-public"></div>
