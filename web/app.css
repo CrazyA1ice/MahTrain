@@ -1334,3 +1334,21 @@
 .match-history-group-item small{font-size:11px;color:#637d67;line-height:1.5}
 .match-history-group-item .match-history-group-warning{color:#9e6236}
 .match-history-groups>.review-footnote{margin:0;color:#607e66;font-size:11px;line-height:1.6}
+
+/* M3.32: seven-metric decision quality versus official rule-A payoffs. */
+.ai-decision-table{overflow-x:auto;border:1px solid #cfdfd4;border-radius:10px;background:#fff}
+.ai-decision-row{display:grid;grid-template-columns:112px 119px 132px 120px 122px 150px 85px;
+  gap:0;align-items:stretch;min-width:840px;border-bottom:1px solid #dce8df}
+.ai-decision-row:last-child{border-bottom:0}
+.ai-decision-row>strong,.ai-decision-row>span{
+  display:flex;flex-direction:column;justify-content:center;gap:6px;
+  padding:11px 9px;border-right:1px solid #edf3ee;
+  font-size:12px;line-height:1.4;font-variant-numeric:tabular-nums;
+}
+.ai-decision-row>strong:last-child,.ai-decision-row>span:last-child{border-right:0}
+.ai-decision-heading{background:#eaf3ec;color:#305941}
+.ai-decision-row:not(.ai-decision-heading):nth-child(odd){background:#f6faf7}
+.ai-decision-row>span:first-child{font-weight:700;color:#2c5841}
+.ai-decision-row .ai-decision-official{font-weight:700;color:#356e49}
+.ai-decision-rail{display:block;width:100%;height:6px;border-radius:9px;background:#dce8df;overflow:hidden}
+.ai-decision-bar{display:block;height:100%;background:#63a77d}
