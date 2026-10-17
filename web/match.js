@@ -40,6 +40,8 @@
   async function action(name,fields={}){
     if(busy)return;
     busy=true;
+    $("match-request-status").textContent=
+      name==="match_continue"?"正在执行下一步 AI 操作…":"已收到操作，正在计算本步…";
     $("match-error").textContent="";
     const previousEvents=state?.events?.length||0;
     const previousWinCount=state?.win_ledger?.wins?.length||0;
@@ -53,6 +55,10 @@
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"对局操作失败");
+      const service=Number(data.server_elapsed_ms);
+      $("match-request-status").textContent=Number.isFinite(service)?
+        "服务器本步计算 "+service.toFixed(0)+" ms · 正在同步牌桌与语音":
+        "服务器已完成本步 · 正在同步牌桌与语音";
       // Preserve real, sanitized post-action boards EVEN when playback is
       // disabled or focus mode skips animation frames. Never archive a
       // remote private view or reconstruct intermediate wall contents.
@@ -135,6 +141,9 @@
         }
       }
       render();
+      $("match-request-status").textContent=Number.isFinite(service)?
+        "服务器本步计算 "+service.toFixed(0)+" ms · 牌桌已同步":
+        "牌桌已同步";
       if(name==="match_new")renderScoreBursts([]);
       else if(!announcedByPlayback){
         // Disabled/empty replay still exposes ONLY already-booked ledger
@@ -149,6 +158,7 @@
       liveBoard=null;
       if(state)renderBoard();
       $("match-error").textContent=err.message||String(err);
+      $("match-request-status").textContent="操作未完成，请检查错误提示";
     }finally{
       busy=false;
       // One AI transition per request: never submit the next transition
@@ -345,6 +355,7 @@
     $("match-playback-skip").disabled=!status.playing;
   }
   function onPlaybackDone(){
+    voice?.clear();
     $("match-motion").hidden=true;
     $("match-playback").hidden=true;
     for(const seat of seats)$("match-seat-"+seat.id)
