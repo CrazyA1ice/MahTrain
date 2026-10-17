@@ -1352,3 +1352,159 @@
 .ai-decision-row .ai-decision-official{font-weight:700;color:#356e49}
 .ai-decision-rail{display:block;width:100%;height:6px;border-radius:9px;background:#dce8df;overflow:hidden}
 .ai-decision-bar{display:block;height:100%;background:#63a77d}
+
+
+/* M3.34: gameplay-first tabletop. Uses existing tile assets; no copied game
+   artwork, external fonts, hidden information or third-party dependencies. */
+.match-game-hud{
+  display:grid;gap:10px;padding:12px;margin:12px 0 13px;
+  border:1px solid #bed8cb;border-radius:14px;
+  background:linear-gradient(125deg,#f2f8f1,#e5f0e8);
+}
+.match-hud-readouts{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px
+}
+.match-hud-chip{
+  min-width:0;display:flex;flex-direction:column;justify-content:center;
+  gap:5px;padding:10px 12px;background:#fff;
+  border:1px solid #d7e6d9;border-radius:10px;
+}
+.match-hud-chip b{font-size:10px;color:#6a8271;letter-spacing:.02em}
+.match-hud-chip strong{font-size:16px;color:#245743;line-height:1.3}
+.match-hud-chip--turn{
+  background:linear-gradient(135deg,#155442,#27745c);
+  border-color:#4b9c73;
+}
+.match-hud-chip--turn b{color:#cce8d7}
+.match-hud-chip--turn strong{color:#f8e4a7}
+.match-hud-chip--tip strong{font-size:12px;line-height:1.5}
+.match-hud-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.match-hud-actions button{
+  min-height:37px;padding:7px 12px;border:1px solid #bad4c4;
+  background:#fff;border-radius:8px;color:#25543f;font-size:12px;
+  font-weight:700;cursor:pointer
+}
+.match-hud-actions button[aria-pressed="true"]{
+  color:#fff;background:#23634b;border-color:#23634b
+}
+.match-hud-actions button:focus-visible,
+.match-confirm-option:focus-within{
+  outline:3px solid #d89f43;outline-offset:2px
+}
+.match-confirm-option{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 9px;border-radius:8px;color:#285943;
+  font-size:12px;font-weight:700;background:#fff;
+  border:1px solid #d5e4d8;min-height:37px;cursor:pointer
+}
+.match-confirm-option input{accent-color:#257451;width:16px;height:16px}
+.match-stage.is-immersive #match-public{display:none}
+.match-stage.is-immersive .match-board-scroll{margin-top:5px}
+.match-stage.is-immersive .match-game-hud{background:#e8f3e8}
+.match-board{
+  background:
+    radial-gradient(ellipse at center,#258a86 0%,#197569 47%,#105745 100%);
+  border:11px solid #986239;
+  box-shadow:
+    inset 0 0 0 3px #ce9859,inset 0 0 55px #052c3159,
+    0 2px 0 2px #603e24,0 18px 32px #143b3036
+}
+.match-board .match-seat{
+  background:#07372f33;border-radius:12px;
+}
+.match-board .match-seat.is-active{
+  border-color:#f0cd7b;background:#f4cf8350;
+  box-shadow:0 0 0 2px #f8e9b861,inset 0 0 18px #f5d17b2a
+}
+.match-seat-identity,.match-self-header{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  min-width:0;flex-wrap:wrap;text-align:center
+}
+.match-seat-avatar{
+  display:inline-flex;flex:0 0 29px;
+  align-items:center;justify-content:center;
+  width:29px;height:29px;border-radius:50%;
+  border:2px solid #f2db9d;background:linear-gradient(145deg,#d3b36f,#7f573b);
+  color:#fff5df;font-size:12px;font-weight:900;
+  box-shadow:0 2px 6px #081e1b6b
+}
+.match-seat-avatar--1{background:linear-gradient(145deg,#5aa5a1,#164d5f)}
+.match-seat-avatar--2{background:linear-gradient(145deg,#658ec0,#273d74)}
+.match-seat-avatar--3{background:linear-gradient(145deg,#c88a7b,#804650)}
+.match-seat-avatar--self{background:linear-gradient(145deg,#eac277,#a86b35)}
+.match-seat-name{font-size:12px;color:#ffebbb}
+.match-seat-status{font-size:11px;color:#e2eee3}
+.match-river{
+  background:#0a52452b;border-color:#e7f5eb24;
+  box-shadow:inset 0 0 16px #01271d1a
+}
+.match-river--top,.match-river--bottom{justify-content:flex-start}
+.match-river .tile{box-shadow:0 2px 0 #9eaaa0,0 4px 7px #002a266e}
+.match-wall{background:#0c493fa8;border-color:#c5a568}
+.match-wall>strong{font-size:41px}
+.match-wall-row{
+  background:repeating-linear-gradient(90deg,#e8f1dc 0 10px,#408369 10px 13px)
+}
+.match-board .match-seat--bottom #match-hand{
+  scroll-padding-inline:20px;scrollbar-width:thin;
+  scrollbar-color:#d9ac64 #0c493b40;
+}
+.match-board .match-seat--bottom #match-hand .tile{
+  width:60px;height:82px;border-radius:6px;padding:3px;
+  border-color:#f3f0e7;box-shadow:0 4px 0 #c1c9bf,0 7px 13px #071f1b8c
+}
+.match-board.is-large-tiles .match-seat--bottom #match-hand .tile{
+  width:69px;height:92px;
+}
+.match-board .match-seat--bottom #match-hand .tile.selectable:hover{
+  border-color:#f7bd62;transform:translateY(-7px);
+}
+.match-board .match-seat--bottom #match-hand .tile.selectable:focus-visible{
+  outline:3px solid #ffd46a;outline-offset:3px;
+}
+.match-board .match-seat--bottom #match-hand .tile.match-pending-discard{
+  transform:translateY(-12px);
+  border-color:#ffd26f;outline:3px solid #ffdb87;outline-offset:2px;
+  box-shadow:0 0 0 7px #f6cf6655,0 7px 16px #061b17
+}
+.match-board .match-seat--bottom #match-hand .tile.match-new-draw{
+  margin-left:19px;outline-color:#edb653;
+}
+.match-controls{
+  position:sticky;bottom:8px;z-index:6;
+  border:1px solid #d3dfce;border-radius:12px;
+  padding:12px 14px;margin:10px 0 17px;
+  background:#f8fcf7f5;backdrop-filter:blur(8px);
+  box-shadow:0 9px 24px #183f2c23
+}
+.match-controls .primary{min-height:42px;font-size:14px}
+.match-controls .review-control{min-height:40px}
+.match-controls .match-confirm-cut{
+  background:#e8b356;color:#283822;border:1px solid #b78b41;
+  box-shadow:0 3px 0 #ad8240;
+}
+.match-controls .review-intro{
+  margin:2px 0;font-size:12px;color:#416451;line-height:1.6
+}
+.match-win-alert{font-weight:750;box-shadow:0 8px 24px #b46f2b20}
+@media(max-width:900px){
+  .match-hud-readouts{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:650px){
+  .match-game-hud{padding:9px;margin:9px 0}
+  .match-hud-chip{padding:8px 10px}
+  .match-hud-chip strong{font-size:14px}
+  .match-hud-chip--tip strong{font-size:12px}
+  .match-hud-actions button{flex:1 0 auto}
+  .match-board .match-seat--bottom #match-hand .tile{
+    width:55px;height:75px
+  }
+  .match-board.is-large-tiles .match-seat--bottom #match-hand .tile{
+    width:65px;height:88px
+  }
+  .match-controls{bottom:4px;max-height:40vh;overflow-y:auto;padding:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .match-board .match-seat--bottom #match-hand .tile,
+  .match-board .match-seat--bottom #match-hand .tile.selectable{transition:none}
+}
