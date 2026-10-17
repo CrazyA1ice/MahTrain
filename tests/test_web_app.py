@@ -645,7 +645,15 @@ class WebUI(unittest.TestCase):
                 # request; old all-AI-at-once assumptions are no longer valid.
                 result=self.post({"action":"match_continue",
                                   "match_token":token})
-                self.assertLessEqual(len(result["match"].get("public_steps",[])),1)
+                events=[event for step in result["match"].get("public_steps",[])
+                        for event in step["events"]]
+                self.assertLessEqual(
+                    sum(event["type"] in web_server._MATCH_TURN_BEATS
+                        for event in events),1,
+                    "a continuation must stop before the second voiced action")
+                self.assertLessEqual(
+                    len(result["match"].get("public_steps",[])),
+                    web_server._MAX_SILENT_CONTINUATIONS)
             elif phase=="claim_window":
                 choices=current["claim_options"]
                 self.assertGreater(len(choices),1)
@@ -1138,6 +1146,45 @@ class WebUI(unittest.TestCase):
             self.assertNotIn("_hands",state)
             self.assertNotIn("_wall",state)
 
+    def test_m341_silent_draw_and_ai_discard_are_one_server_response(self):
+        # A real physically conserved 108-tile setup at an AI draw boundary:
+        # the concealed draw can run immediately into an audible discard.
+        from test_four_player_claims import staged_game
+        from mahtrain_core.ai import MahjongAgent
+        game=staged_game({}, seed=19)
+        ai_seat=next(seat for seat in (1,2,3) if seat!=game.dealer)
+        game.phase="await_draw"
+        game.turn=ai_seat
+        token="m341-private-fixture"
+        agents={
+            seat:MahjongAgent("basic",seed=19,seat=seat)
+            for seat in (1,2,3)
+        }
+        with patch.dict(web_server._MATCH_SESSIONS,{token:game}), \
+             patch.dict(web_server._MATCH_AGENTS,{token:agents}):
+            result=self.post({"action":"match_continue",
+                              "match_token":token})
+        view=result["match"]
+        steps=view["public_steps"]
+        self.assertEqual([e["type"] for step in steps
+                          for e in step["events"]][:1],["draw"])
+        self.assertEqual(len(steps),2,
+                         "one silent draw and one audible discard per request")
+        self.assertEqual(steps[-1]["events"][-1]["type"],"discard")
+        self.assertEqual(
+            sum(e["type"] in web_server._MATCH_TURN_BEATS
+                for step in steps for e in step["events"]),1)
+        self.assertEqual(steps[-1]["board"]["discards"],view["discards"])
+        self.assertEqual(steps[-1]["board"]["wall_count"],view["wall_count"])
+        self.assertNotIn("_wall",view)
+        self.assertNotIn("_hands",view)
+        for step in steps:
+            self.assertNotIn("hand",step["board"])
+            self.assertNotIn("drawn_tile",step["board"])
+            self.assertNotIn("tile",steps[0]["events"][0],
+                             "AI concealed draw identity must stay private")
+        self.assertTrue(game.debug_tile_counts()["total"]==108)
+
     def test_m340_sequential_ai_and_desktop_assets(self):
         page,_=self.get("/")
         js,_=self.get("/match.js")
@@ -1178,7 +1225,10 @@ class WebUI(unittest.TestCase):
         if game["needs_continue"]:
             progressed=self.post({"action":"match_continue",
                                   "match_token":token})
-            self.assertLessEqual(len(progressed["match"]["public_steps"]),1)
+            self.assertLessEqual(
+                sum(e["type"] in web_server._MATCH_TURN_BEATS
+                    for step in progressed["match"]["public_steps"]
+                    for e in step["events"]),1)
             self.assertNotIn("_hands",progressed["match"])
             self.assertNotIn("_wall",progressed["match"])
 
