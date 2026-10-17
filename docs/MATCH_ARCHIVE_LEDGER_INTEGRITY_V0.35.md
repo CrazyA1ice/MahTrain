@@ -23,7 +23,7 @@ M3.22 的公开快照、事件、暗杠牌面已做脱敏，但之前的 `saniti
 在项目根目录执行：
 
 ```bash
-python -m unittest tests.test_match_archive -v
+python -m unittest discover -s tests -p 'test_match_archive.py' -v
 python -m unittest discover -s tests -v
 node tests/test_match_archive_dom.js
 ```
