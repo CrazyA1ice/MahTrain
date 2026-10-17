@@ -97,6 +97,43 @@ class MatchArchiveTests(unittest.TestCase):
         self.assertNotIn("private",json.dumps(clean))
         self.assertEqual(clean[-1]["amount"],30)
 
+    def test_m338_modes_archive_exact_amount_and_split_rule_grouping(self):
+        before,finished=self.fixture()
+        ids=[]
+        score={"legal":True,"main_pattern":"pure_suit",
+               "raw_fan":2,"effective_fan":2,"multiplier":4,
+               "combinations":{},"bonuses":{}}
+        for mode,unit in (("add_base",500),("add_fan",800)):
+            ledger=WinLedger(100,3,mode)
+            ledger.pay_win(winner=0,payers=[1,2,3],source=0,
+                           kind="self_draw",tile="m2",score=score)
+            saved=self.store.save_completed(
+                {**finished,"win_ledger":ledger.public_state()},
+                [],before,["basic","advanced","challenge"])
+            report=self.store.detail(saved)["report"]
+            self.assertEqual(report["match_config"]["self_draw_mode"],mode)
+            self.assertEqual(report["win_ledger"]["wins"][0]
+                             ["amount_per_payer"],unit)
+            self.assertEqual(report["settled_balances"],
+                             [unit*3,-unit,-unit,-unit])
+            ids.append(saved)
+        grouped=self.store.four_seat_scorecard()
+        rules=grouped["groupings"]["room_rules"]
+        self.assertEqual({x["self_draw_mode"] for x in rules},
+                         {"add_base","add_fan"})
+        self.assertEqual(grouped["valid_games"],2)
+        # A forged mode or per-payer unit cannot inflate archived score.
+        with sqlite3.connect(self.db) as db:
+            report=json.loads(db.execute(
+                "SELECT record_json FROM completed_matches WHERE archive_id=?",
+                (ids[0],)).fetchone()[0])
+            report["match_config"]["self_draw_mode"]="add_fan"
+            db.execute("UPDATE completed_matches SET record_json=? WHERE archive_id=?",
+                       (json.dumps(report),ids[0]))
+        audited=self.store.four_seat_scorecard()
+        self.assertEqual(audited["valid_games"],1)
+        self.assertEqual(audited["excluded_games"],1)
+
     def test_real_win_ledger_is_archived_without_private_nested_fields(self):
         opening, finished = self.fixture()
         ledger = WinLedger(room_coefficient=100, fan_cap=3)
