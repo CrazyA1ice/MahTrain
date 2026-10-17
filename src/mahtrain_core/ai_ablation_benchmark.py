@@ -11,6 +11,7 @@ from random import Random
 from typing import Any
 
 from .ai_tournament import simulate_match
+from .ai_ablation_official import analyze_official_ablation
 
 LEVELS = ("baseline", "advanced", "challenge_no_ukeire",
           "challenge_no_pressure", "challenge")
@@ -257,6 +258,12 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
         by_seed.append({"seed": seed, "rotations": 5, "levels": subtotal,
                         "pressure_diagnostics": _pressure_totals(batch)})
 
+    official_score_analysis = analyze_official_ablation(
+        matches, bootstrap_replicates=bootstrap_replicates)
+    official_pressure_diagnostics = _pressure_totals([
+        game for game in matches
+        if game["seed"] not in official_score_analysis["excluded_seed_ids"]
+    ])
     totals = _totals(matches)
     if any(row["exposures"] != 4*seeds for row in totals.values()):
         raise RuntimeError("unbalanced total ablation seat exposure")
@@ -328,6 +335,8 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
         "paired_differences": differences,
         "per_seed": by_seed,
         "pressure_diagnostics": _pressure_totals(matches),
+        "official_score_analysis": official_score_analysis,
+        "official_pressure_diagnostics": official_pressure_diagnostics,
         "seed_analysis": _seed_stability(by_seed),
         "terminal_phase_counts": {
             phase: sum(game["terminal_phase"] == phase for game in matches)
@@ -346,7 +355,9 @@ def ablation_benchmark(seed_start: int = 11, seeds: int = 1, *,
             "the 5-policy comparisons are shared-shuffle but different-seat games",
             "the same internal oracle evaluates shanten and local optimality",
             "prototype win events do not establish official settled win rates",
-            "unconfirmed kong and exhaustive-draw payments are not posted",
+            "kong money remains unpriced; verified active-only rule-A exhaustive payouts count in official_score_analysis",
+            "an unresolved wall draw excludes its full five-game seed cluster from official scores",
+            "original draft win events and decision comparisons still cover all original matches",
             "a weak public meld pressure heuristic is not validated danger prediction",
             "same-state shadow ties do not reveal the alternative physical tile",
             "wins and deal-ins from changed games are associations, not counterfactual outcomes",
