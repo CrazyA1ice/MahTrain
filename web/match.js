@@ -128,7 +128,7 @@
       $("match-error").textContent=err.message||String(err);
     }finally{busy=false;}
   }
-  function chooseDiscard(tile,fromDraw){
+  function chooseDiscard(tile,fromDraw,index=null){
     if(busy||!state||state.turn!==0||
        !["dealer_discard","await_discard"].includes(state.phase))return;
     if(!$("match-confirm-discard").checked){
@@ -137,7 +137,7 @@
     }
     // Keep drawn and hand copies of the same tile distinct: a physical
     // draw-cut must never silently turn into a hand-cut.
-    pendingDiscard={tile,fromDraw};
+    pendingDiscard={tile,fromDraw,index};
     render();
   }
   function toggle(i){
@@ -743,16 +743,16 @@
       let onclick=null;
       if(phase==="exchange_select")onclick=()=>toggle(i);
       if((phase==="dealer_discard"||phase==="await_discard")&&state.turn===0)
-        onclick=()=>chooseDiscard(tile,false);
+        onclick=()=>chooseDiscard(tile,false,i);
       const tileNode=card(tile,onclick,choice.has(i));
-      if(pendingDiscard?.tile===tile&&!pendingDiscard.fromDraw){
-        // Multiple identical hand tiles are equivalent for an explicit hand-cut.
+      if(pendingDiscard?.index===i&&!pendingDiscard.fromDraw){
+        // Visually lift only the physical hand copy the player tapped.
         tileNode.classList.add("match-pending-discard");
       }
       hand.append(tileNode);
     });
     if(drawnIndex>=0){
-      const last=card(drawn,()=>chooseDiscard(drawn,true),false);
+      const last=card(drawn,()=>chooseDiscard(drawn,true,drawnIndex),false);
       if(pendingDiscard?.fromDraw&&pendingDiscard.tile===drawn){
         last.classList.add("match-pending-discard");
       }
