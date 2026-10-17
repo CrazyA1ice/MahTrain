@@ -219,7 +219,7 @@ class FourPlayerClaimsTests(unittest.TestCase):
         self.assertEqual(g._melds[p],[{"type":"ming_gang","tile":"m9"}])
         self.assertEqual(g.debug_tile_counts()["total"],108)
 
-    def test_concealed_gang_hidden_from_public_and_tail_supplement(self):
+    def test_concealed_gang_one_public_flip_and_tail_supplement(self):
         g=FourPlayerOpening(19)
         d=g.dealer
         deck=Counter({t:4 for t in TILES})
@@ -237,9 +237,17 @@ class FourPlayerClaimsTests(unittest.TestCase):
         self.assertEqual(g.phase,"await_discard")
         self.assertEqual(g._effective(d),14)
         self.assertEqual(g.private_view(d)["own_melds"][0]["tile"],"m9")
-        self.assertIsNone(g.public_state()["melds"][d][0]["tile"])
-        self.assertNotIn("tile",next(e for e in g.public_state()["events"]
-                            if e["type"]=="an_gang"))
+        # The four physical tiles remain inside one meld. Exactly one
+        # representative face is explicitly published for table rendering.
+        public_meld=g.public_state()["melds"][d][0]
+        self.assertEqual(public_meld,
+            {"type":"an_gang","tile":"m9","revealed":True})
+        event=next(e for e in g.public_state()["events"]
+                   if e["type"]=="an_gang")
+        self.assertEqual(event["tile"],"m9")
+        self.assertIs(event["revealed"],True)
+        self.assertNotIn("hand",event)
+        self.assertNotIn("future_wall",event)
         self.assertIn(old_tail,g.private_view(d)["hand"])
         self.assertEqual(g.public_state()["wall_count"],54)
         self.assertEqual(g.debug_tile_counts()["total"],108)

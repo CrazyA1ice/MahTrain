@@ -690,10 +690,16 @@ class WebUI(unittest.TestCase):
                 for seat_melds in board["melds"]:
                     for meld in seat_melds:
                         if meld["type"]=="an_gang":
-                            self.assertIsNone(meld["tile"])
+                            if meld.get("revealed") is True:
+                                self.assertRegex(meld["tile"],r"^[msp][1-9]$")
+                            else:
+                                self.assertIsNone(meld["tile"])
                 for event in step["events"]:
                     if event["type"]=="an_gang":
-                        self.assertNotIn("tile",event)
+                        if event.get("revealed") is True:
+                            self.assertRegex(event["tile"],r"^[msp][1-9]$")
+                        else:
+                            self.assertNotIn("tile",event)
             if steps:
                 for field in ("phase","turn","wall_count","hand_counts",
                               "melds","discards","won"):
@@ -1189,6 +1195,29 @@ class WebUI(unittest.TestCase):
             self.assertNotIn("tile",steps[0]["events"][0],
                              "AI concealed draw identity must stay private")
         self.assertTrue(game.debug_tile_counts()["total"]==108)
+
+    def test_m342_revealed_concealed_kong_public_board_without_other_hands(self):
+        from test_four_player_claims import staged_game
+        from mahtrain_core.rules import TILES
+        from collections import Counter
+        from mahtrain_core.four_player import FourPlayerOpening
+        dealer=FourPlayerOpening(19).dealer
+        source=["m9"]*4
+        available=Counter({t:4 for t in TILES})
+        available["m9"]-=4
+        for tile in TILES:
+            while available[tile] and len(source)<14:
+                source.append(tile)
+                available[tile]-=1
+        game=staged_game({dealer:source},{dealer:"p"},seed=19)
+        game.declare_kong(dealer,"an_gang","m9")
+        view=game.public_state()
+        self.assertEqual(view["melds"][dealer][0],
+            {"type":"an_gang","tile":"m9","revealed":True})
+        self.assertFalse(any("hand" in e for e in view["events"]))
+        self.assertFalse(any("wall" in e for e in view["events"]))
+        self.assertNotIn("_hands",view)
+        self.assertNotIn("_wall",view)
 
     def test_m340_sequential_ai_and_desktop_assets(self):
         page,_=self.get("/")

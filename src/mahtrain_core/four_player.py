@@ -617,10 +617,14 @@ class FourPlayerOpening:
             "missing_suits":(None if self.phase in
                 ("exchange_select","missing_select") else list(self.missing_suits)),
             "hand_counts":[len(h) for h in self._hands],
+            # Official table presentation for NEW concealed kongs: three
+            # covered backs and one public face identifying the four-of-kind.
+            # This is an intentional rules/display disclosure, not a hand leak.
             "melds":[[
-                {"type":m["type"], "tile":(
-                    None if m["type"]=="an_gang" else m["tile"]
-                )} for m in groups
+                ({"type":"an_gang", "tile":m["tile"], "revealed":True}
+                 if m["type"]=="an_gang"
+                 else {"type":m["type"], "tile":m["tile"]})
+                for m in groups
             ] for groups in self._melds],
             "won":list(self._won),
             "winners":[dict(w) for w in self._winners],
@@ -662,10 +666,10 @@ class FourPlayerOpening:
                                  if self._pending_kong else None),
             "claim_submitted":sorted(self._responses),
             "discards":[dict(e) for e in self._discards],
-            # An-gang tiles must not leak via public event logs even though
-            # the trusted internal event keeps the actual tile.
+            # Only a DECLARED concealed kong publishes its tile kind.
+            # A player's concealed hand, draws and future wall remain secret.
             "events":[(
-                {k:v for k,v in event.items() if k!="tile"}
+                {**event,"revealed":True}
                 if event["type"]=="an_gang" else dict(event)
             ) for event in self._events],
             "prototype_limitations":{

@@ -214,7 +214,8 @@
       cell.append(backs);
       cell.append(el("p","",
         "公开副露："+board.melds[seat].map(m=>
-          (m.type==="an_gang"?"暗杠（隐牌）":
+          (m.type==="an_gang"?(m.revealed===true&&m.tile?
+            "暗杠 "+m.tile+"（翻一张）":"暗杠（历史隐牌）"):
            (m.type==="peng"?"碰":m.type==="ming_gang"?"明杠":"补杠")+
            " "+m.tile)).join("、")||"无"));
       cell.append(el("p","",

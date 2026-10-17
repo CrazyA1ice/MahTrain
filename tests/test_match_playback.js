@@ -42,6 +42,33 @@ function fakeClock(){
   assert.equal(normalize(raw,2).frames.length,2);
 }
 {
+  // A new declared kong is explicitly public as ONE face; older/unmarked
+  // payloads remain secret even if an attacker supplies a fake tile field.
+  const api=require("../web/match_playback.js");
+  const old=api.normalize([{type:"an_gang",seat:1,tile:"p6"}]).frames[0];
+  assert.equal(old.publicTile,null);
+  const fresh=api.normalize([{type:"an_gang",seat:1,
+    tile:"p6",revealed:true}]).frames[0];
+  assert.equal(fresh.publicTile,"p6");
+  const board={phase:"await_discard",turn:1,wall_count:46,
+    hand_counts:[13,11,13,13],won:[false,false,false,false],
+    melds:[[],[{type:"an_gang",tile:"p6",revealed:true}],[],[]],
+    discards:[],future_wall:["top-secret"]};
+  const shown=api.normalizeBoard(board);
+  assert.deepEqual(shown.melds[1][0],{type:"an_gang",tile:"p6",revealed:true});
+  assert.equal(api.normalizeBoard({...board,
+    melds:[[],[{type:"an_gang",tile:"p6"}],[],[]]}).melds[1][0].tile,null);
+  const replay=api.normalizeSteps([{
+    events:[{type:"an_gang",seat:1,tile:"p6",revealed:true},
+      {type:"kong_supplement",seat:1,tile:"private-tail"}],
+    board,
+  }]).frames[0];
+  assert.equal(replay.publicTile,"p6");
+  assert.equal(replay.board.melds[1][0].revealed,true);
+  assert.ok(!JSON.stringify(replay).includes("private-tail"));
+  assert.ok(!JSON.stringify(replay).includes("top-secret"));
+}
+{
   const timer=fakeClock(),shown=[],statuses=[];
   let done=0,completed=0;
   const player=createController({

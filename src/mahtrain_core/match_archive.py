@@ -54,10 +54,17 @@ def sanitize_board(raw: dict) -> dict:
             if not isinstance(meld, dict) or meld.get("type") not in _MELDS:
                 raise ValueError("invalid public meld")
             kind = meld["type"]
-            tile = None if kind == "an_gang" else _tile(meld.get("tile"))
-            if kind != "an_gang" and tile is None:
+            # Archived games before M3.42 have NO revealed marker and
+            # therefore remain concealed, even if malformed input supplies
+            # a tile. Only an explicitly disclosed NEW kong may show a face.
+            revealed=(kind=="an_gang" and meld.get("revealed") is True)
+            tile=(_tile(meld.get("tile"))
+                  if kind!="an_gang" or revealed else None)
+            if (kind!="an_gang" or revealed) and tile is None:
                 raise ValueError("invalid exposed meld tile")
-            out.append({"type": kind, "tile": tile})
+            cleaned={"type":kind,"tile":tile}
+            if revealed:cleaned["revealed"]=True
+            out.append(cleaned)
         melds.append(out)
     discards = []
     for item in raw.get("discards", []):
@@ -92,10 +99,13 @@ def sanitize_events(events: list) -> list[dict]:
         for field in ("seat", "source"):
             if type(entry.get(field)) is int and entry[field] in range(4):
                 event[field] = entry[field]
-        if entry["type"] in _PUBLIC_TILE_EVENTS:
+        revealed_kong=(entry["type"]=="an_gang" and
+                       entry.get("revealed") is True)
+        if entry["type"] in _PUBLIC_TILE_EVENTS or revealed_kong:
             tile = _tile(entry.get("tile"))
             if tile:
                 event["tile"] = tile
+                if revealed_kong:event["revealed"]=True
         if entry.get("discard_kind") in ("tsumogiri", "tedashi") and entry["type"]=="discard":
             event["discard_kind"] = entry["discard_kind"]
         if entry["type"] == "win_settlement":

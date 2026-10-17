@@ -70,6 +70,29 @@ class MatchArchiveTests(unittest.TestCase):
         self.assertNotIn("seed",json.dumps(report))
         self.assertNotIn("future_wall",json.dumps(report))
 
+    def test_m342_explicit_kong_flip_and_legacy_protection(self):
+        before,finished=self.fixture()
+        board={**before,"melds":[[],
+            [{"type":"an_gang","tile":"m6","revealed":True}],
+            [{"type":"an_gang","tile":"p9"}],[]]}
+        event={"type":"an_gang","seat":1,"tile":"m6","revealed":True}
+        old={"type":"an_gang","seat":2,"tile":"p9"}
+        record=self.store.save_completed(finished,[
+            {"board":board,"events":[event,old]}
+        ],before,["basic","advanced","challenge"])
+        step=self.store.detail(record)["report"]["steps"][0]
+        self.assertEqual(step["board"]["melds"][1][0],
+            {"type":"an_gang","tile":"m6","revealed":True})
+        self.assertEqual(step["board"]["melds"][2][0],
+            {"type":"an_gang","tile":None})
+        self.assertEqual(step["events"][0],
+            {"type":"an_gang","seat":1,"tile":"m6","revealed":True})
+        self.assertEqual(step["events"][1],{"type":"an_gang","seat":2})
+        # A forged reveal must carry a legitimate kind, not arbitrary bytes.
+        with self.assertRaises(ValueError):
+            sanitize_board({**board,"melds":[[],
+                [{"type":"an_gang","tile":"private!","revealed":True}],[],[]]})
+
     def test_bad_identifiers_and_bounded_list(self):
         for bad in ("", "x"*101, 42):
             with self.assertRaises(ValueError):

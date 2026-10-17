@@ -86,7 +86,8 @@ class KongLedgerTests(unittest.TestCase):
         self.assertEqual(st["combined_balances"],st["kong_ledger"]["balances"])
         self.assertEqual(st["pending_kong_payments"][0]["status"],"posted")
         self.assertNotIn("tile",st["pending_kong_payments"][0])
-        self.assertIsNone(st["melds"][dealer][0]["tile"])
+        self.assertEqual(st["melds"][dealer][0],
+                         {"type":"an_gang","tile":"m9","revealed":True})
         self.assertTrue(st["kong_ledger"]["zero_sum"])
 
     def test_real_an_gang_then_two_rons_exactly_reverses_that_kong(self):
