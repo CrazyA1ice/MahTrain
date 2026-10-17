@@ -141,6 +141,17 @@
     }
     delta.textContent=notes.join(" · ");
     delta.hidden=notes.length===0;
+    const payouts=$("match-motion-settlements");
+    payouts.replaceChildren();
+    const posted=frame.settlements||[];
+    for(const [index,entry] of posted.entries()){
+      const chip=el("span","match-motion-payment",
+        entry.seat+"号胡牌 · 已入账 +"+entry.amount+
+        " · "+entry.fan+"番");
+      chip.classList.add("match-motion-payment--"+Math.min(index,3));
+      payouts.append(chip);
+    }
+    payouts.hidden=posted.length===0;
     target.replaceChildren();
     // Only publicly revealed physical tile kinds are depicted face-up.
     if(frame.publicTile){
@@ -333,6 +344,98 @@
     const amount=state.win_ledger.balances[seat];
     return "胡牌积分 "+signedScore(amount);
   }
+  function appendWinRecord(container,win,index){
+    const type={self_draw:"自摸",ron:"点炮胡",rob_kong:"抢杠胡"}[win.kind]||
+      "胡牌";
+    const detail=el("details","match-win-record");
+    detail.append(el("summary","",
+      "第"+(index+1)+"笔 · "+win.winner+"号"+type+
+      " · "+(win.main_pattern||"已确认胡牌")+
+      " · 实收 "+signedScore(win.total_received)));
+    const body=el("div","match-win-record-body");
+    body.append(el("p","",
+      "原始"+win.raw_fan+"番 → 计分"+win.effective_fan+
+      "番 · 倍率 ×"+win.multiplier));
+    body.append(el("p","",
+      "付款："+win.payers.map(n=>n+"号").join("、")+
+      " · 每人支付 "+win.amount_per_payer+
+      " · 赢家实收 "+signedScore(win.total_received)));
+    const bonuses=Object.entries(win.bonuses||{}).map(
+      ([label,value])=>label+" +"+value);
+    body.append(el("p","",
+      "附加番："+(bonuses.length?bonuses.join("、"):"无")));
+    detail.append(body);
+    container.append(detail);
+  }
+  function renderRoundReport(){
+    const report=$("match-round-report");
+    const terminal=!!state && !liveBoard &&
+      (state.phase==="finished"||state.phase==="wall_exhausted");
+    report.hidden=!terminal;
+    if(!terminal)return;
+    const wallEnd=state.phase==="wall_exhausted";
+    $("match-round-report-title").textContent=wallEnd?
+      "牌山耗尽 · 本局复盘":"三家胡牌 · 本局复盘";
+    const ledger=state.win_ledger;
+    const postedWins=ledger?.wins||[];
+    const kong=state.kong_ledger;
+    const discarded=seats.map(seat=>
+      state.discards.filter(item=>item.seat===seat.id).length);
+    $("match-round-report-status").textContent=
+      "本局共"+postedWins.length+"笔胡牌入账 · "+
+      state.discards.length+"次公开弃牌 · 牌山剩余"+
+      state.wall_count+"张";
+    const summary=$("match-round-report-seats");
+    summary.replaceChildren();
+    for(const seat of seats){
+      const id=seat.id;
+      const seatCard=el("div","match-round-seat");
+      const winnerCount=postedWins.filter(win=>win.winner===id).length;
+      seatCard.append(el("strong","",id+"号 · "+seat.label+
+        (state.won[id]?" · 已胡":"")));
+      seatCard.append(el("span","",
+        "胡牌"+winnerCount+"次 · 弃牌"+discarded[id]+"张"+
+        " · 公开副露"+state.melds[id].length+"组"));
+      seatCard.append(el("b","match-round-seat-balance",
+        "胡牌积分 "+signedScore(ledger?.balances?.[id]??0)));
+      seatCard.append(el("small","",
+        kong?.base===null?"独立杠钱：未启用定价":
+        "独立杠钱试验积分 "+signedScore(kong?.balances?.[id]??0)));
+      summary.append(seatCard);
+    }
+    const winnings=$("match-round-report-wins");
+    winnings.replaceChildren();
+    winnings.append(el("h5","","逐笔胡牌流水 · "+postedWins.length+"笔"));
+    if(!postedWins.length)winnings.append(
+      el("p","match-round-no-wins","本局没有已入账胡牌。"));
+    for(const [index,win] of postedWins.entries())
+      appendWinRecord(winnings,win,index);
+    const timeline=$("match-round-report-events");
+    timeline.replaceChildren();
+    const labels={
+      discard:"出牌",peng:"碰牌",ming_gang:"明杠",
+      an_gang:"暗杠（牌种保密）",bu_gang:"补杠",
+      kong_supplement:"杠后补摸",ron:"点炮胡",
+      multi_ron:"一炮多响",rob_kong:"抢杠胡",
+      self_draw_win:"自摸胡牌",win_settlement:"胡牌入账",
+    };
+    const moments=(state.events||[]).filter(event=>labels[event.type]);
+    for(const [index,event] of moments.slice(-64).entries()){
+      const seat=Number.isInteger(event.seat)?event.seat:
+        Number.isInteger(event.source)?event.source:null;
+      const who=seat===null?"多人/牌桌":seat+"号";
+      timeline.append(el("p","",
+        (moments.length>64?moments.length-64+index+1:index+1)+
+        " · "+who+" · "+labels[event.type]+
+        (event.type==="win_settlement"&&Number.isFinite(event.amount)?
+          " · 已入账 +"+event.amount:"")));
+    }
+    $("match-round-report-note").textContent=
+      "复盘依据真实公开事件与已入账胡牌账本；"+
+      (moments.length>64?"关键动作较多，时间线仅列最后64条。":"")+
+      (wallEnd?" 牌山耗尽后的查花猪、查大叫仍属未入账预览。":"")+
+      " 独立杠钱仅为可选试验积分，绝不计入胡牌余额。";
+  }
   function renderTableSettlement(){
     const panel=$("match-table-settlement");
     const visible=settlementAvailable();
@@ -367,6 +470,14 @@
         win.payers.map(x=>x+"号").join("、")));
       wins.append(row);
     }
+    const history=$("match-table-history");
+    history.replaceChildren();
+    const all=el("details","match-win-history");
+    all.append(el("summary","",
+      "查看本局全部"+ledger.wins.length+"笔胡牌详情"));
+    for(const [index,win] of ledger.wins.entries())
+      appendWinRecord(all,win,index);
+    history.append(all);
     const kongEnabled=state.kong_ledger?.base!=null;
     $("match-table-score-note").textContent=
       "以上仅为胡牌已入账积分"+(kongEnabled?
@@ -432,6 +543,7 @@
     renderBoard();
     renderReadyHint();
     renderWinAlert();
+    renderRoundReport();
     const controls=$("match-controls");controls.replaceChildren();
     if(phase==="exchange_select"){
       controls.append(el("p","review-intro","已选择"+choice.size+
