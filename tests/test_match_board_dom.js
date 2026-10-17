@@ -33,6 +33,8 @@ const ids=[
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
   "match-focus-toggle","match-large-tiles-toggle","match-confirm-discard",
   "match-board",
+  "match-hand-prev","match-hand-next","match-hand-draw",
+  "match-hand-position","match-table-self-summary",
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
   "match-own-score","match-table-settlement","match-table-settlement-title",
   "match-table-round-phase","match-table-scores","match-table-wins",
@@ -174,6 +176,23 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-stage"].hidden,false);
   assert.equal(dom["match-wall-count"].textContent,"54");
   assert.equal(dom["match-hand"].children.length,14);
+  // Simulate a narrow handset scroll region; navigation is local only and
+  // must not generate any server request or alter hand order.
+  const handStrip=dom["match-hand"];
+  handStrip.scrollWidth=1120;
+  handStrip.clientWidth=320;
+  handStrip.scrollLeft=0;
+  handStrip.handlers.scroll();
+  const originalRequests=requests.length;
+  assert.equal(dom["match-hand-prev"].disabled,true);
+  dom["match-hand-next"].handlers.click();
+  assert.ok(handStrip.scrollLeft>0);
+  assert.equal(dom["match-hand-prev"].disabled,false);
+  const afterRight=handStrip.scrollLeft;
+  dom["match-hand-prev"].handlers.click();
+  assert.ok(handStrip.scrollLeft<afterRight);
+  assert.equal(requests.length,originalRequests);
+  assert.ok(dom["match-hand-position"].textContent.includes("14张手牌"));
   assert.equal(dom["match-hud-turn"].textContent,"轮到你出牌");
   assert.equal(dom["match-hud-wall"].textContent,"54 张");
   assert.equal(dom["match-hud-missing"].textContent,"缺筒");
@@ -242,6 +261,13 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(newCopy.tile,"m1");
   assert.equal(newCopy.classList.contains("match-new-draw"),true);
   assert.equal(oldCopy.classList.contains("match-new-draw"),false);
+  assert.equal(dom["match-hand-draw"].disabled,false);
+  const countBeforeJump=requests.length;
+  dom["match-hand-draw"].handlers.click();
+  assert.equal(dom["match-hand"].scrollLeft,800);
+  assert.equal(requests.length,countBeforeJump,
+    "locating the drawn tile is purely visual");
+  const rightEnd=dom["match-hand"].scrollLeft;
   assert.ok(descendants(dom["match-ready-hint"],x=>x.tile==="m3").length);
   // Optional tap-confirm: selecting a hand copy must NOT submit a discard.
   // Even when the same tile is the new draw, hand-cut must stay explicit.
@@ -253,6 +279,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(requests.length,priorCount);
   assert.ok(dom["match-hud-tip"].textContent.includes("已选"));
+  assert.equal(dom["match-hand"].scrollLeft,rightEnd,
+    "rerendering selected cards must preserve phone scroll location");
   assert.equal(dom["match-hand"].children.filter(x=>
     x.classList.contains("match-pending-discard")).length,1,
     "a duplicate of the same tile must not be raised together");
@@ -263,6 +291,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const cancel=dom["match-controls"].children.find(x=>
     x.textContent==="取消选牌");
   cancel.handlers.click();
+  assert.equal(dom["match-hand"].scrollLeft,rightEnd);
   assert.equal(requests.length,priorCount);
   assert.equal(dom["match-hand"].children.some(x=>
     x.classList.contains("match-pending-discard")),false);
@@ -480,6 +509,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-hand"].children[0].handlers.click();
   await settle();
   assert.equal(dom["match-table-settlement"].hidden,false);
+  assert.ok(dom["match-table-self-summary"].textContent.includes("-8"));
+  assert.ok(dom["match-table-self-summary"].textContent.includes("仅含已确认胡牌"));
   const scores=dom["match-table-scores"];
   assert.equal(scores.children.length,4);
   assert.ok(descendants(scores,x=>x.textContent==="-8").length===2);
@@ -613,7 +644,10 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-new"].handlers.click();
   await settle();
   assert.equal(dom["match-round-report"].hidden,false);
-  assert.equal(dom["match-table-settlement"].hidden,true);
+  assert.equal(dom["match-table-settlement"].hidden,false,
+    "a terminal draw without HU should still explain why the final settlement is pending");
+  assert.ok(dom["match-table-self-summary"].textContent.includes("待核验"));
+  assert.ok(dom["match-table-score-note"].textContent.includes("不能视为最终净积分"));
   assert.ok(dom["match-round-report-note"].textContent.includes("查花猪"));
   assert.ok(descendants(dom["match-round-report-wins"],
     x=>x.textContent.includes("没有已入账胡牌")).length>0);
@@ -718,6 +752,49 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-round-report-events"].children.length,1);
   assert.equal(dom["match-review-preview-seats"].children.length,4);
   assert.equal(dom["match-wall-count"].textContent,"0");
+  // M3.36: high-stakes claim actions are large, prioritized and retain
+  // real action payloads. PASS must remain visually quieter than HU.
+  startMatch={...base,phase:"claim_window",turn:2,
+    claim_options:["pass","peng","hu","ming_gang"],
+    pending_discard:{seat:2,tile:"p2"}};
+  replyMatch={...next};
+  dom["match-new"].handlers.click();
+  await settle();
+  const reaction=dom["match-controls"].children.find(x=>
+    x.className==="match-reaction-actions");
+  assert.ok(reaction);
+  assert.deepEqual(reaction.children.map(x=>x.textContent),[
+    "胡 · 优先响应","明杠","碰","过 · 放弃本次响应"
+  ]);
+  assert.ok(reaction.children[0].className.includes("match-reaction--hu"));
+  assert.ok(reaction.children[3].className.includes("match-reaction--pass"));
+  const beforeReaction=requests.length;
+  reaction.children[0].handlers.click();
+  await settle();
+  assert.equal(requests.length,beforeReaction+1);
+  assert.equal(requests.at(-1).action,"match_claim");
+  assert.equal(requests.at(-1).choice,"hu");
+  startMatch={...base,phase:"rob_kong_window",
+    rob_options:["pass","hu"],
+    pending_rob_kong:{seat:2,tile:"s2"}};
+  dom["match-new"].handlers.click();
+  await settle();
+  const rob=dom["match-controls"].children.find(x=>
+    x.className==="match-reaction-actions");
+  assert.deepEqual(rob.children.map(x=>x.textContent),
+    ["胡 · 优先响应","过 · 放弃本次响应"]);
+  rob.children[1].handlers.click();
+  await settle();
+  assert.equal(requests.at(-1).action,"match_rob");
+  assert.equal(requests.at(-1).choice,"pass");
+  // Starting a new game resets stale navigation even after scrolling far.
+  dom["match-hand"].scrollLeft=600;
+  startMatch={...base};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-hand"].scrollLeft,0);
+  assert.equal(dom["match-hand-draw"].disabled,true);
+
   // M3.24: seed is ONLY supplied when the laboratory fixed mode is chosen.
   dom["match-lab-enabled"].checked=true;
   dom["match-lab-enabled"].handlers.change();
