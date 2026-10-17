@@ -32,8 +32,10 @@ const ids=[
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
   "match-self-melds","match-self-status","match-ready-hint","match-win-alert",
   "match-playback","match-playback-progress","match-playback-status",
-  "match-playback-speed","match-playback-pause","match-playback-skip",
+  "match-playback-speed","match-playback-pause","match-playback-step",
+  "match-playback-focus","match-playback-skip",
   "match-playback-note","match-motion","match-motion-text","match-motion-card",
+  "match-motion-chain","match-motion-delta",
   ...[0,1,2,3].flatMap(n=>["match-seat-"+n,"match-river-"+n])
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
@@ -87,6 +89,7 @@ const playbackModule=require("../web/match_playback.js");
 window.MahTrainPlayback={
   normalize:playbackModule.normalize,
   normalizeSteps:playbackModule.normalizeSteps,
+  highlightFrames:playbackModule.highlightFrames,
   createController:callbacks=>playbackModule.createController({
     ...callbacks,
     clock:(fn,delay)=>context.setTimeout(fn,delay),
@@ -315,6 +318,67 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-seat-0"].classList.contains("is-public-replay"),false);
   assert.equal(dom["match-wall-count"].textContent,"53");
   assert.equal(requests.at(-1).action,"match_discard");
+  // M3.18 focus mode is selected BEFORE the action; it keeps the kong
+  // with its linked tail draw and the final completed public board.
+  dom["match-playback-focus"].checked=true;
+  startMatch={...base,events:[],wall_count:54};
+  const drawBoard={
+    phase:"await_discard",turn:1,wall_count:53,
+    hand_counts:[13,14,10,13],won:[false,false,false,false],
+    melds:base.melds,discards:base.discards,
+  };
+  const kongBoard={
+    ...drawBoard,wall_count:52,hand_counts:[13,11,10,13],
+    melds:[[],[{type:"an_gang",tile:null}],...base.melds.slice(2)],
+  };
+  const winBoard={...kongBoard,won:[false,false,false,true]};
+  replyMatch={...next,wall_count:52,
+    hand_counts:winBoard.hand_counts,won:winBoard.won,
+    events:[{type:"draw",seat:1},
+      {type:"an_gang",seat:1},{type:"kong_supplement",seat:1},
+      {type:"self_draw_win",seat:3}],
+    public_steps:[
+      {events:[{type:"draw",seat:1,tile:"hidden-draw"}],board:drawBoard},
+      {events:[{type:"an_gang",seat:1,tile:"secret-kong"},
+        {type:"kong_supplement",seat:1,tile:"secret-tail"}],board:kongBoard},
+      {events:[{type:"self_draw_win",seat:3}],board:winBoard},
+    ],
+  };
+  dom["match-new"].handlers.click();
+  await settle();
+  dom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.equal(dom["match-playback"].hidden,false);
+  assert.equal(dom["match-wall-count"].textContent,"52",
+    "focus mode starts at authentic post-kong board, not a guessed wall");
+  assert.equal(dom["match-motion"].classList.contains("is-kong-motion"),true);
+  assert.ok(dom["match-motion-text"].textContent.includes("暗杠"));
+  assert.ok(dom["match-motion-text"].textContent.includes("杠后补摸"));
+  assert.ok(descendants(dom["match-motion-chain"],
+    x=>x.className==="match-motion-chip").length===2);
+  assert.ok(dom["match-motion-delta"].textContent.includes("牌山 -1"));
+  assert.ok(dom["match-playback-note"].textContent.includes("精简模式"));
+  assert.equal(descendants(dom["match-motion-card"],
+    x=>x.tile==="secret-kong"||x.tile==="secret-tail").length,0);
+  assert.equal(descendants(dom["match-motion-card"],
+    x=>x.className==="match-tile-back").length,1);
+  assert.equal(pendingTimers.size,1);
+  dom["match-playback-pause"].handlers.click();
+  assert.equal(pendingTimers.size,0);
+  assert.equal(dom["match-playback-step"].disabled,false);
+  dom["match-playback-step"].handlers.click();
+  assert.equal(dom["match-motion"].classList.contains("is-winning-motion"),true);
+  assert.equal(dom["match-playback-status"].textContent,"已暂停");
+  assert.equal(pendingTimers.size,0);
+  assert.equal(dom["match-seat-3"].classList.contains("is-won"),true);
+  dom["match-playback-step"].handlers.click();
+  await settle();
+  assert.equal(dom["match-playback"].hidden,true);
+  assert.equal(dom["match-playback-step"].disabled,true);
+  assert.equal(dom["match-wall-count"].textContent,"52");
+  assert.equal(requests.at(-1).action,"match_discard");
+  dom["match-playback-focus"].checked=false;
+  console.log("M3.18 focused kong/win and manual-step live DOM smoke: PASS");
   console.log("M3.17 real wall/back/river incremental DOM smoke: PASS");
   console.log("M3.16 live match public action playback DOM smoke: PASS");
 })().catch(error=>{console.error(error);process.exitCode=1;});

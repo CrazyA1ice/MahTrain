@@ -772,3 +772,54 @@
 .match-board .match-seat--bottom.is-public-replay .match-seat-status{
   color:#ffedb0;font-weight:700;
 }
+
+
+/* M3.18: controls are visible between turns; staged kong -> tail draw and
+   winning actions get distinct treatment but never invent hidden faces. */
+.match-playback-settings{
+  display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;
+  padding:8px 12px;margin:6px 0 10px;
+  border:1px solid #82ad9d77;border-radius:9px;
+  color:#d6eadb;background:#143f34;
+  font-size:12px;font-weight:700;
+}
+.match-playback-settings label{display:inline-flex;align-items:center;gap:7px}
+.match-playback-settings select{
+  border-radius:6px;padding:5px;
+  background:#f7f5e9;color:#193e32;max-width:120px
+}
+.match-playback-settings input[type="checkbox"]{width:17px;height:17px;accent-color:#b6dfbb}
+.match-playback-controls button:disabled{opacity:.45;cursor:not-allowed}
+.match-motion.is-kong-motion{
+  border-color:#80c9e0;background:#e2f4fa; color:#1f4960;
+  box-shadow:0 8px 22px #10516b7a;
+}
+.match-motion.is-peng-motion{
+  border-color:#a1d0ae;background:#e6f6d9;color:#335b39;
+}
+.match-motion.is-winning-motion{
+  border-color:#f6a15c;background:#ffe0a4;color:#8d311f;
+  box-shadow:0 8px 24px #a6382699;
+}
+.match-motion-chain{
+  display:flex;justify-content:center;align-items:center;
+  gap:4px;flex-wrap:wrap;max-width:235px;
+}
+.match-motion-chain:empty{display:none}
+.match-motion-chip{
+  padding:3px 5px;border:1px solid #bdac7d;
+  border-radius:5px;font-size:10px;background:#ffffff94;
+}
+.match-motion-arrow{font-size:12px;font-weight:800;color:#5a7c66}
+.match-motion-delta{
+  font-size:10px;font-weight:750;line-height:1.5;
+  color:#375f49;text-align:center;max-width:225px;
+  padding:4px 7px;margin:0;border-radius:5px;
+  background:#ffffff9c;
+}
+.match-motion-delta[hidden]{display:none}
+@media (max-width:640px){
+  .match-playback-settings{gap:6px;justify-content:space-between}
+  .match-motion{max-width:205px;padding:8px}
+  .match-motion-chain{max-width:190px}
+}

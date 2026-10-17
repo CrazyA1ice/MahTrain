@@ -758,6 +758,32 @@ class WebUI(unittest.TestCase):
         _match_public_step(game,len(game._events),steps)
         self.assertEqual(len(steps),empty)
 
+    def test_m318_kong_win_playback_controls_always_available(self):
+        page,_=self.get("/")
+        script,mime=self.get("/match_playback.js")
+        match,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        self.assertIn("javascript",mime)
+        for name in ("match-playback-speed","match-playback-focus",
+                     "match-playback-step","match-motion-chain",
+                     "match-motion-delta"):
+            self.assertEqual(
+                page.count(('id="%s"' % name).encode()),1)
+        self.assertLess(
+            page.index(b'class="match-playback-settings"'),
+            page.index(b'id="match-playback"'))
+        for token in (b"highlightFrames",b"holdScale",b"tailDraw",
+                      b"changes",b"step()",b"normalizeSteps"):
+            self.assertIn(token,script)
+        for token in (b"match-playback-step",b"match-playback-focus",
+                      b"match-motion-chain",b"match-motion-delta"):
+            self.assertIn(token,match)
+        for token in (b".match-motion.is-kong-motion",
+                      b".match-motion.is-peng-motion",
+                      b".match-motion.is-winning-motion",
+                      b".match-playback-settings"):
+            self.assertIn(token,css)
+
     def test_m316_public_match_action_playback_assets(self):
         page,_=self.get("/")
         script,mime=self.get("/match_playback.js")
