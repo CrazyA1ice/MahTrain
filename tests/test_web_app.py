@@ -1133,7 +1133,7 @@ class WebUI(unittest.TestCase):
         legacy=self.post({"action":"match_new","seed":81})
         self.assertEqual(legacy["match"]["win_ledger"]["self_draw_mode"],
                          "legacy")
-        for invalid in ("boost",None,[],True,0,{"private":"x"}):
+        for invalid in ("boost","legacy",None,[],True,0,{"private":"x"}):
             with self.subTest(invalid=invalid),self.assertRaises(HTTPError):
                 self.post({"action":"match_new","seed":81,
                            "self_draw_mode":invalid})
