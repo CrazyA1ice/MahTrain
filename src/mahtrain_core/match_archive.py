@@ -13,6 +13,8 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .settlement import SELF_DRAW_MODES, payer_multiplier
+
 _TERMINAL = frozenset(("finished", "wall_exhausted"))
 _TILES = re.compile(r"^[msp][1-9]$")
 _MELDS = frozenset(("peng", "ming_gang", "an_gang", "bu_gang"))
@@ -136,6 +138,9 @@ def sanitize_win_ledger(ledger: dict) -> dict:
     if not isinstance(ledger, dict):
         raise ValueError("invalid win ledger")
     balances = _balances(ledger.get("balances"), "win balances")
+    mode = ledger.get("self_draw_mode", "legacy")
+    if type(mode) is not str or mode not in SELF_DRAW_MODES:
+        raise ValueError("invalid win ledger self draw mode")
     wins = ledger.get("wins")
     if not isinstance(wins, list) or type(ledger.get("zero_sum")) is not bool or not ledger["zero_sum"]:
         raise ValueError("invalid win ledger entries/zero_sum")
@@ -165,6 +170,8 @@ def sanitize_win_ledger(ledger: dict) -> dict:
                 multiplier != (1 << fan) or unit <= 0 or
                 total != unit * len(payers)):
             raise ValueError("inconsistent win settlement amounts")
+        if record.get("self_draw_mode", mode) != mode:
+            raise ValueError("win record self draw mode mismatch")
         bonuses = record.get("bonuses", {})
         if (type(bonuses) is not dict or any(
             type(key) is not str or key not in _BONUS_NAMES or
@@ -178,6 +185,7 @@ def sanitize_win_ledger(ledger: dict) -> dict:
         for seat in payers:
             expected[seat] -= unit
         cleaned.append({
+            **({"self_draw_mode": mode} if mode != "legacy" else {}),
             "winner": winner, "kind": kind, "main_pattern": main,
             "raw_fan": raw_fan, "effective_fan": fan,
             "multiplier": multiplier, "amount_per_payer": unit,
@@ -186,7 +194,8 @@ def sanitize_win_ledger(ledger: dict) -> dict:
         })
     if expected != balances:
         raise ValueError("win balances disagree with settled win records")
-    return {"balances": balances, "wins": cleaned, "zero_sum": True}
+    return {"balances": balances, "wins": cleaned, "zero_sum": True,
+            **({"self_draw_mode": mode} if mode != "legacy" else {})}
 
 
 def sanitize_exhaustive_settlement(raw, final_board: dict) -> dict | None:
@@ -304,7 +313,7 @@ def _archive_ai_lineup(report: dict) -> tuple[str, str, str] | None:
     return tuple(values)
 
 
-def _archive_scoring_rules(report: dict) -> tuple[int, int] | None:
+def _archive_scoring_rules(report: dict) -> tuple[int, int, str] | None:
     config = report.get("match_config")
     if config is None:
         # Pre-M3.29 did NOT archive the game's room parameters; don't
@@ -313,8 +322,10 @@ def _archive_scoring_rules(report: dict) -> tuple[int, int] | None:
     if type(config) is not dict:
         raise ValueError("unverified historical match config")
     coefficient, cap = config.get("room_coefficient"), config.get("fan_cap")
+    mode = config.get("self_draw_mode", "legacy")
     if (type(coefficient) is not int or coefficient <= 0 or
-            type(cap) is not int or not 0 <= cap <= 12):
+            type(cap) is not int or not 0 <= cap <= 12 or
+            type(mode) is not str or mode not in SELF_DRAW_MODES):
         raise ValueError("unverified historical match config")
     ledger = report.get("win_ledger")
     for payment in ledger.get("wins", []) if isinstance(ledger, dict) else []:
@@ -323,19 +334,21 @@ def _archive_scoring_rules(report: dict) -> tuple[int, int] | None:
                 payment["effective_fan"] > cap or
                 type(payment.get("multiplier")) is not int or
                 type(payment.get("amount_per_payer")) is not int or
-                payment["amount_per_payer"] !=
-                coefficient * payment["multiplier"]):
+                payment.get("self_draw_mode",mode) != mode or
+                payment["amount_per_payer"] != coefficient *
+                payer_multiplier(payment.get("kind"),
+                                 payment["multiplier"], mode)):
             raise ValueError("archived HU payout incompatible with room rules")
     terminal = report.get("exhaustive_settlement")
     if terminal is not None and (
             coefficient != terminal.get("room_coefficient") or
             cap != terminal.get("fan_cap")):
         raise ValueError("historic HU/draw scoring settings disagree")
-    return (coefficient, cap)
+    return (coefficient, cap, mode)
 
 
 def _group_score(groups: dict, key: tuple, score: int, hu: int, draw: int,
-                 rules: tuple[int, int] | None) -> None:
+                 rules: tuple[int, int, str] | None) -> None:
     item = groups.setdefault(key, {
         "games": 0, "settled_total": 0, "hu_total": 0, "draw_total": 0,
         "positive_games": 0, "negative_games": 0, "zero_games": 0,
@@ -379,7 +392,7 @@ def _group_rows(groups: dict, kind: str) -> list[dict]:
         if kind == "ai":
             row["ai_levels"] = list(key)
         else:
-            row["room_coefficient"], row["fan_cap"] = key
+            row["room_coefficient"], row["fan_cap"], row["self_draw_mode"] = key
         rows.append(row)
     if kind == "ai":
         return sorted(rows, key=lambda x: (-x["games"], x["ai_levels"]))
@@ -442,13 +455,17 @@ class MatchArchive:
         raw_ledger = public["win_ledger"]
         coefficient = raw_ledger.get("room_coefficient")
         fan_cap = raw_ledger.get("fan_cap")
+        self_draw_mode = raw_ledger.get("self_draw_mode","legacy")
+        if type(self_draw_mode) is not str or self_draw_mode not in SELF_DRAW_MODES:
+            raise ValueError("invalid archived self draw mode")
         if (type(coefficient) is not int or coefficient <= 0 or
                 type(fan_cap) is not int or not 0 <= fan_cap <= 12):
             raise ValueError("invalid archived room scoring configuration")
         for win in ledger["wins"]:
             if (win["effective_fan"] > fan_cap or
-                    win["amount_per_payer"] !=
-                    coefficient * win["multiplier"]):
+                    win.get("self_draw_mode",self_draw_mode) != self_draw_mode or
+                    win["amount_per_payer"] != coefficient *
+                    payer_multiplier(win["kind"],win["multiplier"],self_draw_mode)):
                 raise ValueError("win payout incompatible with room configuration")
         exhaustive = sanitize_exhaustive_settlement(
             public.get("exhaustive_settlement"), safe_board,
@@ -471,6 +488,8 @@ class MatchArchive:
             "match_config": {
                 "room_coefficient": coefficient,
                 "fan_cap": fan_cap,
+                **({"self_draw_mode": self_draw_mode}
+                   if self_draw_mode != "legacy" else {}),
             },
             "opening": sanitize_board(initial_board),
             "steps": safe_steps, "truncated": max(0, len(history)-len(safe_steps)),
