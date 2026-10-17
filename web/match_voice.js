@@ -39,30 +39,35 @@
       default:return "";
     }
   }
+  // Speech is entirely client-side and receives only public playback frames.
+  // A manual repeat replays the last sanitized spoken phrase, not match state.
+  const RATES=Object.freeze({slow:0.85,normal:1.12,fast:1.35});
   function create(env){
     const host=env||{};
     const synth=host.speechSynthesis;
     const Utterance=host.SpeechSynthesisUtterance;
     const supported=!!(synth&&typeof synth.speak==="function"&&typeof Utterance==="function");
-    let enabled=supported;
+    let enabled=supported,rate="normal",lastText="";
     function clear(){
       if(supported&&typeof synth.cancel==="function")synth.cancel();
     }
-    function announceEvents(events){
-      if(!enabled||!supported)return false;
-      const text=(Array.isArray(events)?events:[]).map(phrase).filter(Boolean).slice(-8).join("。");
-      if(!text)return false;
+    function speakText(text){
+      if(!enabled||!supported||!text)return false;
       try{
-        // Clear stale queued chatter when the next authoritative action
-        // arrives. Never create a many-minute voice backlog in fast replay.
+        // Interrupt stale speech, especially during fast public playback.
         clear();
         const speech=new Utterance(text);
         speech.lang="zh-CN";
-        speech.rate=1.12;
+        speech.rate=RATES[rate];
         speech.volume=0.95;
         synth.speak(speech);
+        lastText=text;
         return true;
       }catch(_error){return false;}
+    }
+    function announceEvents(events){
+      const text=(Array.isArray(events)?events:[]).map(phrase).filter(Boolean).slice(-8).join("。");
+      return speakText(text);
     }
     function announceFrame(frame){
       const actions=Array.isArray(frame?.announcements)?
@@ -71,6 +76,15 @@
     }
     return {
       supported,announceEvents,announceFrame,clear,
+      // A new round must never offer a repeat from the previous round.
+      reset(){lastText="";clear();},
+      canRepeat:()=>supported&&enabled&&!!lastText,
+      repeatLast(){return speakText(lastText);},
+      getRate:()=>rate,
+      setRate(value){
+        if(Object.prototype.hasOwnProperty.call(RATES,value))rate=value;
+        return rate;
+      },
       getEnabled:()=>enabled,
       setEnabled(value){
         enabled=supported&&value===true;
