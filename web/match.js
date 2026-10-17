@@ -9,6 +9,7 @@
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
   let pendingDiscard=null,immersive=false,largeTiles=false,midnightFelt=false;
+  let backColor="jade";
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   function syncVoiceControls(){
@@ -39,10 +40,13 @@
   async function action(name,fields={}){
     if(busy)return;
     busy=true;
+    $("match-request-status").textContent=
+      name==="match_continue"?"正在执行下一步 AI 操作…":"已收到操作，正在计算本步…";
     $("match-error").textContent="";
     const previousEvents=state?.events?.length||0;
     const previousWinCount=state?.win_ledger?.wins?.length||0;
-    let announcedByPlayback=false;
+    let announcedByPlayback=false,needsContinue=false;
+    const requestToken=token;
     try{
       const response=await fetch("/api/action",{
         method:"POST",
@@ -51,6 +55,10 @@
       });
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"对局操作失败");
+      const service=Number(data.server_elapsed_ms);
+      $("match-request-status").textContent=Number.isFinite(service)?
+        "服务器本步计算 "+service.toFixed(0)+" ms · 正在同步牌桌与语音":
+        "服务器已完成本步 · 正在同步牌桌与语音";
       // Preserve real, sanitized post-action boards EVEN when playback is
       // disabled or focus mode skips animation frames. Never archive a
       // remote private view or reconstruct intermediate wall contents.
@@ -97,13 +105,10 @@
           $("match-playback").hidden=true;
           $("match-motion").hidden=true;
         }
-      }else if(!announcedByPlayback && voice){
-        // Playback disabled/empty: still announce NEW publicly revealed
-        // events, never the complete historical event log or private draw.
-        const events=(data.match.events||[]).slice(previousEvents);
-        voice.announceEvents(window.MahTrainPlayback.normalize(events,96).frames);
-        syncVoiceControls();
       }
+      // On playback-off games, show the confirmed river / scoreboard first.
+      // Speech starts only AFTER the public tile is actually in the DOM;
+      // waiting here would produce invisible spoken discards.
       liveBoard=null;
       if(name==="match_new"){
         reviewHistory=[];reviewDropped=0;reviewSelected=null;
@@ -112,6 +117,7 @@
         $("match-review-type-filter").value="all";
       }
       token=data.match_token;state=data.match;choice.clear();
+      needsContinue=data.match.needs_continue===true;
       pendingDiscard=null;
       if(name==="match_new"){
         const opening=window.MahTrainPlayback.openingFrame(state);
@@ -131,6 +137,9 @@
         }
       }
       render();
+      $("match-request-status").textContent=Number.isFinite(service)?
+        "服务器本步计算 "+service.toFixed(0)+" ms · 牌桌已同步":
+        "牌桌已同步";
       if(name==="match_new")renderScoreBursts([]);
       else if(!announcedByPlayback){
         // Disabled/empty replay still exposes ONLY already-booked ledger
@@ -141,11 +150,25 @@
           payers:win.payers,amount_per_payer:win.amount_per_payer,
         })));
       }
+      if(name!=="match_new" && !announcedByPlayback && voice){
+        const events=(data.match.events||[]).slice(previousEvents);
+        await voice.announceEventsWait(
+          window.MahTrainPlayback.normalize(events,96).frames);
+        syncVoiceControls();
+      }
     }catch(err){
       liveBoard=null;
       if(state)renderBoard();
       $("match-error").textContent=err.message||String(err);
-    }finally{busy=false;}
+      $("match-request-status").textContent="操作未完成，请检查错误提示";
+    }finally{
+      busy=false;
+      // One AI transition per request: never submit the next transition
+      // before visual playback and speech have both reached their ends.
+      if(needsContinue && token && (name==="match_new"||requestToken===token)){
+        setTimeout(()=>{if(!busy)action("match_continue");},0);
+      }
+    }
   }
   // Preserve the user's scroll focus across redraws (including touch
   // confirm/cancel) without changing the order or identity of the tiles.
@@ -249,8 +272,6 @@
     }
   }
   function showPublicMotion(frame,step,total){
-    voice?.announceFrame(frame);
-    syncVoiceControls();
     if(frame.board){
       liveBoard=frame.board;
       renderBoard();
@@ -317,6 +338,11 @@
         "is-replay-acting",seat.id===frame.seat||
           frame.winSeats.includes(seat.id));
     }
+    // Start speaking only after the physical tile is on the visible table.
+    // Playback may move forward only after both visual hold and speech end.
+    const finished=voice?.announceFrameWait(frame);
+    syncVoiceControls();
+    return finished;
   }
   function onPlaybackStatus(status){
     $("match-playback-progress").textContent=
@@ -331,6 +357,7 @@
     $("match-playback-skip").disabled=!status.playing;
   }
   function onPlaybackDone(){
+    voice?.clear();
     $("match-motion").hidden=true;
     $("match-playback").hidden=true;
     for(const seat of seats)$("match-seat-"+seat.id)
@@ -374,6 +401,11 @@
     root.classList.toggle("is-won",!!view.won[seat]);
     if(seat===0){
       const missing=state.missing_suits?.[0];
+      const flag=$("match-self-missing-flag");
+      flag.hidden=!missing;
+      flag.textContent=missing?"缺"+names[missing]:"";
+      flag.className="match-missing-flag"+
+        (missing?" match-missing-flag--"+missing:"");
       root.classList.toggle("is-public-replay",!!liveBoard);
       $("match-self-status").textContent=liveBoard
         ?"公开状态：手牌"+view.hand_counts[0]+"张 · 手牌牌面在播放结束后同步"
@@ -395,8 +427,14 @@
       String(seat)));
     identity.append(el("strong","match-seat-name",
       seat+"号 · "+seats[seat].label+(ai?" · "+(levels[ai.difficulty]||ai.difficulty):"")));
-    root.append(identity);
     const missing=state.missing_suits?.[seat];
+    if(missing){
+      const flag=el("strong","match-missing-flag match-missing-flag--"+missing,
+        "缺"+names[missing]);
+      flag.setAttribute("aria-label",seat+"号定缺"+names[missing]);
+      identity.append(flag);
+    }
+    root.append(identity);
     root.append(el("div","match-seat-status",
       (view.won[seat]?"已胡 · ":"")+
       (missing?"定缺"+names[missing]+" · ":"定缺待公开 · ")+
@@ -1237,6 +1275,15 @@
     $("match-skin-toggle").addEventListener("click",()=>{
       midnightFelt=!midnightFelt;
       if(state)renderHUD();
+    });
+    const picker=$("match-back-color");
+    picker.value=backColor;
+    $("match-board").setAttribute("data-back-color",backColor);
+    picker.addEventListener("change",()=>{
+      if(["jade","indigo","red","gold"].includes(picker.value))
+        backColor=picker.value;
+      picker.value=backColor;
+      $("match-board").setAttribute("data-back-color",backColor);
     });
     $("match-large-tiles-toggle").addEventListener("click",()=>{
       largeTiles=!largeTiles;

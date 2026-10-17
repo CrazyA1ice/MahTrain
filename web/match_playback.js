@@ -229,20 +229,43 @@
         typeof onStatus!=="function")throw new TypeError("playback callbacks required");
     const later=clock||setTimeout, cancel=clearClock||clearTimeout;
     let items=[],index=-1,timer=null,playing=false,paused=false,
-      duration=550,completed=null;
+      duration=550,completed=null,gateReady=true,dwellReady=false,
+      generation=0;
     function clear(){if(timer!==null){cancel(timer);timer=null;}}
     function schedule(){
+      dwellReady=false;
       const multiplier=items[index]?.holdScale;
-      timer=later(advance,Math.round(duration*(
+      timer=later(()=>{
+        timer=null;
+        dwellReady=true;
+        if(gateReady)advance();
+      },Math.round(duration*(
         Number.isFinite(multiplier)&&multiplier>=1&&multiplier<=4
         ?multiplier:1)));
+    }
+    function deliver(){
+      const token=++generation;
+      gateReady=true;
+      const result=onFrame(items[index],index+1,items.length);
+      if(result && typeof result.then==="function"){
+        gateReady=false;
+        Promise.resolve(result).then(()=>{
+          if(token!==generation)return;
+          gateReady=true;
+          if(dwellReady&&playing&&!paused)advance();
+        },()=>{
+          if(token!==generation)return;
+          gateReady=true;
+          if(dwellReady&&playing&&!paused)advance();
+        });
+      }
     }
     function status(){onStatus({
       playing,paused,index,total:items.length,duration,
     });}
     function finish(){
       if(!playing)return;
-      clear();playing=false;paused=false;
+      clear();generation++;playing=false;paused=false;
       const done=completed;completed=null;
       status();if(done)done();onDone();
     }
@@ -251,13 +274,13 @@
       if(!playing||paused)return;
       index++;
       if(index>=items.length){finish();return;}
-      onFrame(items[index],index+1,items.length);
+      deliver();
       status();
       schedule();
     }
     return {
       start(frames,done){
-        clear();items=Array.isArray(frames)?frames.slice():[];
+        clear();generation++;items=Array.isArray(frames)?frames.slice():[];
         index=-1;playing=items.length>0;paused=false;
         completed=typeof done==="function"?done:null;
         if(playing){advance();}
@@ -270,11 +293,11 @@
         if(!playing||!paused)return;
         index++;
         if(index>=items.length){finish();return;}
-        onFrame(items[index],index+1,items.length);
+        deliver();
         status();
       },
       skip(){finish();},
-      cancel(){clear();playing=false;paused=false;completed=null;status();},
+      cancel(){clear();generation++;playing=false;paused=false;completed=null;status();},
       setSpeed(ms){
         if(![180,450,900].includes(ms))throw new RangeError("unsupported animation speed");
         duration=ms;

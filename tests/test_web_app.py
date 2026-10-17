@@ -636,11 +636,17 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("seed",started)
         self.assertNotIn("wall",started)
         current=started
-        for index in range(4):
+        for index in range(12):
             phase=current["phase"]
             if phase in ("finished","wall_exhausted"):
                 break
-            if phase=="claim_window":
+            if current.get("needs_continue"):
+                # Interactive game explicitly advances ONE AI transition per
+                # request; old all-AI-at-once assumptions are no longer valid.
+                result=self.post({"action":"match_continue",
+                                  "match_token":token})
+                self.assertLessEqual(len(result["match"].get("public_steps",[])),1)
+            elif phase=="claim_window":
                 choices=current["claim_options"]
                 self.assertGreater(len(choices),1)
                 result=self.post({"action":"match_claim","match_token":token,
@@ -689,7 +695,7 @@ class WebUI(unittest.TestCase):
             self.assertNotIn("_wall",current)
         self.assertIn(current["phase"],(
             "finished","wall_exhausted","claim_window","rob_kong_window",
-            "dealer_discard","await_discard"))
+            "dealer_discard","await_discard","await_draw"))
         with self.assertRaises(HTTPError) as exc:
             self.post({"action":"match_discard","match_token":"forged",
                        "seat":1,"tile":"m1"})
@@ -1131,6 +1137,50 @@ class WebUI(unittest.TestCase):
             self.assertNotIn("opponent_self_draw_preview",state)
             self.assertNotIn("_hands",state)
             self.assertNotIn("_wall",state)
+
+    def test_m340_sequential_ai_and_desktop_assets(self):
+        page,_=self.get("/")
+        js,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        voice,_=self.get("/match_voice.js")
+        for attr in (b'id="match-back-color"',
+                     b'id="match-self-missing-flag"',
+                     b'id="match-request-status"'):
+            self.assertIn(attr,page)
+        for key in (b"match_continue",b"needs_continue",
+                    b"data-back-color",b"match-missing-flag"):
+            self.assertIn(key,js)
+        for key in (b".match-river--top .match-river-cell .tile",
+                    b".match-river--left .match-river-cell .tile",
+                    b".match-river--right .match-river-cell .tile",
+                    b".match-river-tiles::-webkit-scrollbar",
+                    b"match-board[data-back-color",b".match-missing-flag"):
+            self.assertIn(key,css)
+        self.assertIn(b"announceFrameWait",voice)
+        created=self.post({"action":"match_new","seed":42,
+                           "self_draw_mode":"add_fan"})
+        token=created["match_token"]
+        self.assertIn("server_elapsed_ms",created)
+        self.assertIsInstance(created["server_elapsed_ms"],(float,int))
+        self.assertFalse(created["match"].get("needs_continue",False))
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_continue","match_token":token})
+        hand=created["match"]["hand"]
+        chosen=next([t for t in hand if t.startswith(s)][:3] for s in "msp"
+                    if sum(x.startswith(s) for x in hand)>=3)
+        self.post({"action":"match_exchange","match_token":token,
+                   "tiles":chosen})
+        turn=self.post({"action":"match_missing","match_token":token,
+                        "suit":"p"})
+        game=turn["match"]
+        self.assertIn("needs_continue",game)
+        self.assertLessEqual(len(game["public_steps"]),4)
+        if game["needs_continue"]:
+            progressed=self.post({"action":"match_continue",
+                                  "match_token":token})
+            self.assertLessEqual(len(progressed["match"]["public_steps"]),1)
+            self.assertNotIn("_hands",progressed["match"])
+            self.assertNotIn("_wall",progressed["match"])
 
     def test_m338_self_draw_mode_is_validated_and_published(self):
         page, _ = self.get("/")

@@ -27,7 +27,7 @@
     const winners=Array.isArray(item.winSeats)?
       [...new Set(item.winSeats.filter(n=>Number.isInteger(n)&&n>=0&&n<=3))]:[];
     switch(item.type){
-      case "discard":return tile?lead+"打"+tile:"";
+      case "discard":return tile||""; // only tile name, no player prefix
       case "peng":return lead+"碰"+tile;
       case "ming_gang":return lead+"明杠"+tile;
       case "an_gang":return lead+"暗杠"; // do not reveal concealed tile
@@ -48,7 +48,14 @@
     const Utterance=host.SpeechSynthesisUtterance;
     const supported=!!(synth&&typeof synth.speak==="function"&&typeof Utterance==="function");
     let enabled=supported,rate="normal",lastText="";
+    let pendingFinish=null;
+    const later=typeof host.setTimeout==="function"
+      ?host.setTimeout.bind(host):setTimeout;
+    const cancelLater=typeof host.clearTimeout==="function"
+      ?host.clearTimeout.bind(host):clearTimeout;
     function clear(){
+      // Explicit skips/mutes must release the playback gate as well as audio.
+      if(pendingFinish)pendingFinish();
       if(supported&&typeof synth.cancel==="function")synth.cancel();
     }
     function speakText(text){
@@ -65,6 +72,44 @@
         return true;
       }catch(_error){return false;}
     }
+    function speakTextWait(text){
+      if(!supported||!enabled||!text)return Promise.resolve();
+      return new Promise(resolve=>{
+        let completed=false,watchdog=null;
+        function finish(){
+          if(completed)return;
+          completed=true;
+          if(watchdog!==null)cancelLater(watchdog);
+          if(pendingFinish===finish)pendingFinish=null;
+          resolve();
+        }
+        clear();
+        try{
+          const speech=new Utterance(text);
+          speech.lang="zh-CN";
+          speech.rate=RATES[rate];
+          speech.volume=0.95;
+          speech.onend=finish;
+          speech.onerror=finish;
+          pendingFinish=finish;
+          lastText=text;
+          // Some engines never fire onend after a background tab or failed
+          // voice. Unlock interaction rather than freezing the table.
+          watchdog=later(finish,2500);
+          synth.speak(speech);
+        }catch(_error){finish();}
+      });
+    }
+    function announceEventsWait(events){
+      const text=(Array.isArray(events)?events:[]).map(phrase)
+        .filter(Boolean).slice(-8).join("。");
+      return speakTextWait(text);
+    }
+    function announceFrameWait(frame){
+      const actions=Array.isArray(frame?.announcements)
+        ?frame.announcements:[frame];
+      return announceEventsWait(actions);
+    }
     function announceEvents(events){
       const text=(Array.isArray(events)?events:[]).map(phrase).filter(Boolean).slice(-8).join("。");
       return speakText(text);
@@ -75,7 +120,8 @@
       return announceEvents(actions);
     }
     return {
-      supported,announceEvents,announceFrame,clear,
+      supported,announceEvents,announceFrame,
+      announceEventsWait,announceFrameWait,clear,
       // A new round must never offer a repeat from the previous round.
       reset(){lastText="";clear();},
       canRepeat:()=>supported&&enabled&&!!lastText,

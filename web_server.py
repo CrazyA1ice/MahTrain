@@ -13,6 +13,7 @@ import mimetypes
 import secrets
 import sys
 import threading
+from time import perf_counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
@@ -153,7 +154,11 @@ def _match_private_view(game: FourPlayerOpening,
     hand = view["hand"]
     melds = view["own_melds"]
     effective = len(hand) + 3*len(melds)
-    if (missing in ("m", "s", "p") and not game._won[0]
+    # During AI-only transitions, skip expensive 27-tile wait scans;
+    # they are rebuilt when seat zero actually gets its turn.
+    if (game.turn == 0 and game.phase in
+            ("dealer_discard","await_discard")
+            and missing in ("m", "s", "p") and not game._won[0]
             and not any(tile[0] == missing for tile in hand)):
         if effective == 13:
             view["ready_waits"] = winning_tiles(hand, melds, missing)
@@ -215,9 +220,14 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
 
 def _match_script_until_human(
     game: FourPlayerOpening, agents: dict[int, MahjongAgent],
-    steps: list[dict] | None = None,
+    steps: list[dict] | None = None, *, max_actions: int = 512,
 ) -> None:
-    """Run three fair-visibility heuristic opponents until seat zero can act.
+    """Run fair-visibility AI actions, bounded for interactive playback.
+
+    Full automation retains the historical default of 512. Web interaction
+    requests only one transition and waits for the browser to complete its
+    spoken + visible turn before triggering the next request.
+
 
     Rule engine alone can adjudicate all legal claims and response priority;
     each bot chooses from its OWN seat-authorized private view and public
@@ -225,7 +235,7 @@ def _match_script_until_human(
     """
     if steps is None:
         steps = []
-    for _ in range(512):
+    for _ in range(max_actions):
         phase = game.phase
         if phase in ("exchange_select", "missing_select",
                      "finished", "wall_exhausted"):
@@ -252,6 +262,8 @@ def _match_script_until_human(
                 else:
                     _match_record(game,steps,lambda seat=seat,selection=selection:
                                   game.respond_rob_kong(seat,selection))
+                if max_actions != 512:
+                    return  # One confirmed response at a time.
                 if game.phase!=phase:
                     break
             else:
@@ -279,7 +291,28 @@ def _match_script_until_human(
             _match_record(game,steps,lambda: game.discard(seat,choice))
             continue
         raise RuntimeError("unexpected AI match phase: "+str(phase))
-    raise RuntimeError("AI script exceeded 512 transitions")
+    if max_actions == 512:
+        raise RuntimeError("AI script exceeded 512 transitions")
+
+
+def _match_requires_continue(game: FourPlayerOpening) -> bool:
+    """True only when the human has no required decision yet."""
+    if game.phase in ("exchange_select","missing_select",
+                      "finished","wall_exhausted"):
+        return False
+    if game.phase in ("dealer_discard","await_discard"):
+        return game.turn != 0
+    if game.phase == "await_draw":
+        return True
+    if game.phase in ("claim_window","rob_kong_window"):
+        source=(game._pending_discard["seat"]
+                if game.phase=="claim_window" else game._pending_kong["seat"])
+        if source == 0 or 0 in game._responses:
+            return True
+        options=(game.claim_options(0) if game.phase=="claim_window"
+                 else game.rob_options(0))
+        return len(options) <= 1
+    return False
 
 
 def _replay_worker(token: str, seed_start: int, seeds: int) -> None:
@@ -523,7 +556,8 @@ def _process(action: str, payload: dict) -> dict:
             return {"match_token":token,
                     "match":_match_private_view(game,agents)}
         if action in ("match_exchange","match_missing","match_discard",
-                      "match_claim","match_kong","match_rob","match_win"):
+                      "match_claim","match_kong","match_rob","match_win",
+                      "match_continue"):
             token=payload.get("match_token")
             game=(_MATCH_SESSIONS.get(token) if type(token) is str else None)
             if game is None:
@@ -532,7 +566,11 @@ def _process(action: str, payload: dict) -> dict:
             if agents is None:
                 raise ValueError("试验对局AI未初始化，请重新开局")
             steps: list[dict] = []
-            if action=="match_exchange":
+            if action=="match_continue":
+                if not _match_requires_continue(game):
+                    raise ValueError("当前需等待玩家操作，无法自动推进")
+                _match_script_until_human(game,agents,steps,max_actions=1)
+            elif action=="match_exchange":
                 _match_record(game,steps,lambda: game.select_exchange(
                     0,payload.get("tiles")))
                 for s in (1,2,3):
@@ -546,28 +584,29 @@ def _process(action: str, payload: dict) -> dict:
                     suit=agents[s].missing(game.private_view(s))
                     _match_record(game,steps,lambda s=s,suit=suit:
                                   game.select_missing(s,suit))
-                _match_script_until_human(game,agents,steps)
+                # AI acts via match_continue after animation and speech finish.
             elif action=="match_discard":
                 _match_record(game,steps,lambda: game.discard(
                     0,payload.get("tile"),
                     from_draw=payload.get("from_draw")))
-                _match_script_until_human(game,agents,steps)
+                # AI acts via match_continue after animation and speech finish.
             elif action=="match_claim":
                 _match_record(game,steps,lambda: game.respond_discard(
                     0,payload.get("choice")))
-                _match_script_until_human(game,agents,steps)
+                # AI acts via match_continue after animation and speech finish.
             elif action=="match_rob":
                 _match_record(game,steps,lambda: game.respond_rob_kong(
                     0,payload.get("choice")))
-                _match_script_until_human(game,agents,steps)
+                # AI acts via match_continue after animation and speech finish.
             elif action=="match_kong":
                 _match_record(game,steps,lambda: game.declare_kong(
                     0,payload.get("kind"),payload.get("tile")))
-                _match_script_until_human(game,agents,steps)
+                # AI acts via match_continue after animation and speech finish.
             elif action=="match_win":
                 _match_record(game,steps,lambda: game.declare_self_win(0))
-                _match_script_until_human(game,agents,steps)
+                # AI acts via match_continue after animation and speech finish.
             view=_match_private_view(game,agents)
+            view["needs_continue"]=_match_requires_continue(game)
             view["public_steps"]=steps
             if token in _MATCH_HISTORY:
                 _MATCH_HISTORY[token].extend(steps)
@@ -927,7 +966,12 @@ class Handler(BaseHTTPRequestHandler):
             if type(payload) is not dict:
                 raise ValueError("请求必须为JSON对象")
             action = payload.get("action")
-            self._json(200, _process(action, payload))
+            started=perf_counter()
+            result=_process(action,payload)
+            # Distinguish server compute time from client animation/speech.
+            # This does not expose RNG, hands or internal AI decisions.
+            result["server_elapsed_ms"]=round((perf_counter()-started)*1000,1)
+            self._json(200,result)
         except (ValueError, TypeError, UnicodeError) as exc:
             self._json(400, {"error": str(exc)})
 

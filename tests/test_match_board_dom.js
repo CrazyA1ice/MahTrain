@@ -30,9 +30,10 @@ const ids=[
   "match-voice-status","match-voice-speed","match-voice-repeat",
   "match-enable-kong","match-kong-base","match-seed",
   "match-coefficient","match-fan-cap","match-self-draw-mode","match-ai-1","match-ai-2","match-ai-3",
-  "match-error","match-stage","match-title","match-status",
+  "match-error","match-stage","match-title","match-status","match-request-status",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
   "match-focus-toggle","match-large-tiles-toggle","match-skin-toggle",
+  "match-back-color","match-self-missing-flag",
   "match-confirm-discard",
   "match-board",
   "match-hand-prev","match-hand-next","match-hand-draw",
@@ -68,6 +69,7 @@ dom["match-fan-cap"].value="3";
 dom["match-self-draw-mode"].value="add_base";
 dom["match-playback-speed"].value="450";
 dom["match-voice-speed"].value="normal";
+dom["match-back-color"].value="jade";
 for(const n of [1,2,3])dom["match-ai-"+n].value="advanced";
 const hand=["m1","m2","m3","m4","m5","m6","m7","s1","s2","s3","s4","s5","p1","p2"];
 const base={
@@ -101,7 +103,10 @@ const speechCalls=[];
 const window={
   speechSynthesis:{
     cancel:()=>speechCalls.push({kind:"cancel"}),
-    speak:utterance=>speechCalls.push({kind:"speak",text:utterance.text}),
+    speak:utterance=>{
+      speechCalls.push({kind:"speak",text:utterance.text});
+      utterance.onend?.();
+    },
   },
   SpeechSynthesisUtterance:class{
     constructor(text){this.text=text;}
@@ -202,6 +207,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-voice-speed"].value="normal";
   dom["match-voice-speed"].handlers.change();
   assert.equal(dom["match-stage"].hidden,false);
+  assert.ok(dom["match-request-status"].textContent.includes("已同步"));
   assert.equal(dom["match-wall-count"].textContent,"54");
   assert.equal(dom["match-hand"].children.length,14);
   // Simulate a narrow handset scroll region; navigation is local only and
@@ -224,6 +230,21 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-hud-turn"].textContent,"轮到你出牌");
   assert.equal(dom["match-hud-wall"].textContent,"54 张");
   assert.equal(dom["match-hud-missing"].textContent,"缺筒");
+  assert.equal(dom["match-self-missing-flag"].textContent,"缺筒");
+  assert.equal(dom["match-self-missing-flag"].hidden,false);
+  assert.ok(descendants(dom["match-seat-1"],x=>
+    x.className.includes("match-missing-flag")&&
+    x.textContent==="缺条").length);
+  dom["match-back-color"].value="indigo";
+  dom["match-back-color"].handlers.change();
+  assert.equal(dom["match-board"].attributes["data-back-color"],"indigo");
+  dom["match-back-color"].value="red";
+  dom["match-back-color"].handlers.change();
+  assert.equal(dom["match-board"].attributes["data-back-color"],"red");
+  dom["match-back-color"].value="__unsafe";
+  dom["match-back-color"].handlers.change();
+  assert.equal(dom["match-back-color"].value,"red");
+  assert.equal(dom["match-board"].attributes["data-back-color"],"red");
   assert.ok(dom["match-hud-tip"].textContent.includes("点击手牌"));
   dom["match-focus-toggle"].handlers.click();
   assert.equal(dom["match-stage"].classList.contains("is-immersive"),true);
