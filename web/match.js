@@ -393,18 +393,27 @@
       const kind=["peng","ming_gang","an_gang","bu_gang"].includes(meld.type)
         ?meld.type:"other";
       item.classList.add("match-seat-meld--"+kind);
+      const flipped=kind==="an_gang"&&
+        typeof meld.tile==="string"&&/^[msp][1-9]$/.test(meld.tile)&&
+        (showOwn||meld.revealed===true);
       item.setAttribute("aria-label",label+
-        (kind==="an_gang"&&!showOwn?"，牌种保密":"，"+
-          (kind==="peng"?"3":"4")+"张牌"));
+        (kind==="an_gang"?(flipped?"，三张盖牌、一张翻开"+tileName(meld.tile):
+          "，历史未公开牌种"):
+          "，"+(kind==="peng"?"3":"4")+"张牌"));
       item.append(el("small","",label));
       const tiles=el("div","match-meld-tiles");
       for(let n=0;n<(meld.type==="peng"?3:4);n++){
-        // Public an-gang is intentionally redacted by public_state().
-        if(meld.tile===null || meld.tile===undefined){
+        if(kind==="an_gang"){
+          // Three backs face down. One server-authorized public face is
+          // flipped for new kongs; legacy redacted archives stay private.
+          if(n===3&&flipped){
+            const face=card(meld.tile,null,false);
+            face.classList.add("match-kong-revealed");
+            tiles.append(face);
+          }else tiles.append(tileBack());
+        }else if(meld.tile===null || meld.tile===undefined){
           tiles.append(tileBack());
-        }else{
-          tiles.append(card(meld.tile,null,false));
-        }
+        }else tiles.append(card(meld.tile,null,false));
       }
       item.append(tiles);
       root.append(item);
