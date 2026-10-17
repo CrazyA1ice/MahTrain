@@ -34,7 +34,7 @@ const board={
 };
 const s=stats.summary(board);
 assert.equal(s.games,3);assert.equal(s.settled,4);
-assert.equal(s.positiveRate,100/3);
+assert.ok(Math.abs(s.positiveRate-100/3)<1e-10);
 assert.equal(s.avg,4/3);
 stats.render(board,doc);
 assert.equal(nodes["match-stats-metrics"].children.length,4);
