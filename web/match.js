@@ -8,7 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
-  let pendingDiscard=null,immersive=false,largeTiles=false,midnightFelt=false;
+  let pendingDiscard=null,immersive=false,midnightFelt=false;
   let backColor="jade";
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
@@ -477,6 +477,10 @@
       root.append(el("div","match-seat-score",seatScoreText(seat)));
     }
   }
+  // In each side player's own coordinate system: screen-left river runs
+  // top-to-bottom; screen-right river runs bottom-to-top. Group into
+  // chronological vertical lanes, never reverse the authoritative entries.
+  const SIDE_RIVER_LANE_SIZE=8;
   function renderRiver(seat){
     const view=publicBoard();
     const root=$("match-river-"+seat);
@@ -488,7 +492,14 @@
     if(!entries.length){
       tiles.append(el("span","match-river-empty","尚无弃牌"));
     }
-    for(const entry of entries){
+    let lane=null;
+    for(const [index,entry] of entries.entries()){
+      if((seat===1||seat===3)&&index%SIDE_RIVER_LANE_SIZE===0){
+        lane=el("div","match-river-lane");
+        lane.setAttribute("aria-label","第"+
+          (Math.floor(index/SIDE_RIVER_LANE_SIZE)+1)+"列牌河");
+        tiles.append(lane);
+      }
       const cell=el("div","match-river-cell");
       const claimed=entry.claimed_by!==undefined;
       if(claimed){
@@ -513,7 +524,8 @@
       if(entry.order===view.discards.length-1){
         cell.classList.add("is-latest");
       }
-      tiles.append(cell);
+      cell.setAttribute("data-discard-order",String(entry.order));
+      (lane||tiles).append(cell);
     }
     root.append(tiles);
   }
@@ -871,14 +883,11 @@
     $("match-hud-tip").textContent=tip;
     const stage=$("match-stage");
     stage.classList.toggle("is-immersive",immersive);
-    $("match-board").classList.toggle("is-large-tiles",largeTiles);
     $("match-board").classList.toggle("is-midnight-felt",midnightFelt);
     $("match-skin-toggle").setAttribute("aria-pressed",String(midnightFelt));
     $("match-skin-toggle").textContent=midnightFelt?"绿色桌布":"深蓝桌布";
     $("match-focus-toggle").setAttribute("aria-pressed",String(immersive));
-    $("match-large-tiles-toggle").setAttribute("aria-pressed",String(largeTiles));
     $("match-focus-toggle").textContent=immersive?"显示详细信息":"沉浸牌桌";
-    $("match-large-tiles-toggle").textContent=largeTiles?"标准手牌":"放大手牌";
   }
   function renderBoard(){
     renderHUD();
@@ -947,6 +956,8 @@
     renderWinAlert();
     renderRoundReport();
     const controls=$("match-controls");controls.replaceChildren();
+    const decision=$("match-decision");
+    decision.replaceChildren();decision.hidden=true;
     if(phase==="exchange_select"){
       controls.append(el("p","review-intro","已选择"+choice.size+
         "/3张相同花色牌，等待四家确认后统一换牌。"));
@@ -967,9 +978,11 @@
     }else if(phase==="claim_window"||phase==="rob_kong_window"){
       const options=phase==="claim_window"?state.claim_options:state.rob_options;
       const target=phase==="claim_window"?state.pending_discard:state.pending_rob_kong;
-      controls.append(el("p","review-intro",
-        "当前目标："+(target?tileName(target.tile):"—")+
-        "。必须确认响应，胡牌优先于杠、碰；系统会等待所有活跃玩家提交。"));
+      decision.append(el("strong","match-decision-title",
+        phase==="claim_window"?"请选择碰、杠、胡或过":"请选择抢杠胡或过"));
+      decision.append(el("p","match-decision-hint",
+        "目标："+(target?tileName(target.tile):"—")+
+        " · 胡牌优先；请确认本次响应"));
       const reactions=el("div","match-reaction-actions");
       reactions.setAttribute("role","group");
       reactions.setAttribute("aria-label","本次碰杠胡响应");
@@ -989,7 +1002,8 @@
           (option==="pass"?"，跳过本次机会":"，提交本次响应"));
         reactions.append(btn);
       }
-      controls.append(reactions);
+      decision.append(reactions);
+      decision.hidden=false;
     }else if(phase==="dealer_discard"||phase==="await_discard"){
       if(state.can_self_draw_win){
         // Server-confirmed, seat-0-only quote. Never calculate payouts from
@@ -1022,14 +1036,26 @@
           "primary match-self-win-action",
           ()=>action("match_win")));
       }
-      for(const kong of state.kong_options||[]){
-        controls.append(button(actionNames[kong.type]+" "+tileName(kong.tile),
-          "review-control",()=>{
-            if(confirm("确认"+actionNames[kong.type]+tileName(kong.tile)+
-                "？合法杠后从牌墙尾部补牌。")){
-              action("match_kong",{kind:kong.type,tile:kong.tile});
-            }
-          }));
+      if(state.kong_options?.length){
+        decision.append(el("strong","match-decision-title","本回合可杠牌"));
+        decision.append(el("p","match-decision-hint",
+          "确认杠牌后将按规则补摸一张"));
+        const kongActions=el("div","match-reaction-actions");
+        kongActions.setAttribute("role","group");
+        kongActions.setAttribute("aria-label","本回合可执行的杠牌操作");
+        for(const kong of state.kong_options){
+          kongActions.append(button(
+            actionNames[kong.type]+" "+tileName(kong.tile),
+            "match-reaction-button match-reaction--ming_gang",
+            ()=>{
+              if(confirm("确认"+actionNames[kong.type]+tileName(kong.tile)+
+                  "？合法杠后从牌墙尾部补牌。")){
+                action("match_kong",{kind:kong.type,tile:kong.tile});
+              }
+            }));
+        }
+        decision.append(kongActions);
+        decision.hidden=false;
       }
       if(pendingDiscard && $("match-confirm-discard").checked){
         const selected=pendingDiscard;
@@ -1051,6 +1077,9 @@
       controls.append(el("p","review-intro",
         "本局摸切已结束。胡牌已入账；牌山耗尽时按方案A处理流局赔付（如牌形未核验则暂缓），杠钱仍为独立模拟。可以重新开一局。"));
     }
+    // A claim/rob decision now lives on the TABLE, not an empty sticky
+    // toolbar below it. Keep the toolbar for exchange and manual discard.
+    controls.hidden=controls.children.length===0;
     const publicInfo=$("match-public");publicInfo.replaceChildren();
     if(state.missing_suits){
       publicInfo.append(el("p","review-intro",
@@ -1311,10 +1340,6 @@
         backColor=picker.value;
       picker.value=backColor;
       $("match-board").setAttribute("data-back-color",backColor);
-    });
-    $("match-large-tiles-toggle").addEventListener("click",()=>{
-      largeTiles=!largeTiles;
-      if(state)renderHUD();
     });
     // Prefer safer two-tap confirmation on touch-first phones and tablets.
     // Desktop mouse keeps the fast existing one-click behavior by default.

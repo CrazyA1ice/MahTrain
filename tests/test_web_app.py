@@ -802,7 +802,7 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".match-board-scroll",css)
         for ident in ("match-hud-turn","match-hud-wall",
                       "match-hud-missing","match-hud-tip",
-                      "match-focus-toggle","match-large-tiles-toggle",
+                      "match-focus-toggle","match-decision",
                       "match-confirm-discard"):
             self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
         self.assertIn(b"#match-stage.is-immersive #match-public",css)
@@ -1218,6 +1218,31 @@ class WebUI(unittest.TestCase):
         self.assertFalse(any("wall" in e for e in view["events"]))
         self.assertNotIn("_hands",view)
         self.assertNotIn("_wall",view)
+
+    def test_m344_owner_ordered_river_and_center_controls_assets(self):
+        page,_=self.get("/")
+        script,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        self.assertEqual(page.count(b'id="match-decision"'),1)
+        self.assertNotIn(b'id="match-large-tiles-toggle"',page)
+        self.assertNotIn(b"match-large-tiles-toggle",script)
+        self.assertNotIn(b"is-large-tiles",script)
+        self.assertIn(b"SIDE_RIVER_LANE_SIZE=8",script)
+        self.assertIn(b"match-river-lane",script)
+        self.assertIn(b"data-discard-order",script)
+        self.assertIn(b'const decision=$("match-decision")',script)
+        self.assertIn(b"decision.append(reactions)",script)
+        self.assertIn(b"decision.append(kongActions)",script)
+        for token in (b".match-river--right .match-river-lane",
+                      b"flex-direction:column-reverse",
+                      b".match-river--left .match-river-lane",
+                      b".match-river--right .match-river-tiles",
+                      b"flex-direction:row-reverse",
+                      b".match-decision[hidden]",
+                      b".match-decision .match-reaction-button",
+                      b"width:49px;height:68px",
+                      b"width:34px;height:46px"):
+            self.assertIn(token,css)
 
     def test_m340_sequential_ai_and_desktop_assets(self):
         page,_=self.get("/")
