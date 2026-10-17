@@ -27,10 +27,11 @@ _KONG_TYPES = ("ming_gang", "an_gang", "bu_gang")
 
 class FourPlayerOpening:
     def __init__(self, seed: int, *, room_coefficient: int = 100,
-                 fan_cap: int = 3, kong_base: int | None = None) -> None:
+                 fan_cap: int = 3, kong_base: int | None = None,
+                 self_draw_mode: str = "legacy") -> None:
         if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
             raise ValueError("seed must be an integer from 0 to 2^64 - 1")
-        self.ledger = WinLedger(room_coefficient, fan_cap)
+        self.ledger = WinLedger(room_coefficient, fan_cap, self_draw_mode)
         self.kong_ledger = KongLedger(kong_base)
         rng = random.Random(seed)
         deck = [tile for tile in TILES for _ in range(4)]
