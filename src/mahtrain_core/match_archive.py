@@ -316,6 +316,16 @@ def _archive_scoring_rules(report: dict) -> tuple[int, int] | None:
     if (type(coefficient) is not int or coefficient <= 0 or
             type(cap) is not int or not 0 <= cap <= 12):
         raise ValueError("unverified historical match config")
+    ledger = report.get("win_ledger")
+    for payment in ledger.get("wins", []) if isinstance(ledger, dict) else []:
+        if (type(payment) is not dict or
+                type(payment.get("effective_fan")) is not int or
+                payment["effective_fan"] > cap or
+                type(payment.get("multiplier")) is not int or
+                type(payment.get("amount_per_payer")) is not int or
+                payment["amount_per_payer"] !=
+                coefficient * payment["multiplier"]):
+            raise ValueError("archived HU payout incompatible with room rules")
     terminal = report.get("exhaustive_settlement")
     if terminal is not None and (
             coefficient != terminal.get("room_coefficient") or
