@@ -386,7 +386,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-playback-speed"].value="0";
   startMatch={...base,won:[false,false,false,false],
     win_ledger:{balances:[0,0,0,0],wins:[]},
-    kong_ledger:{base:null,balances:[0,0,0,0]}};
+    kong_ledger:{base:null,balances:[0,0,0,0],events:[],entries:[]}};
   replyMatch={...next,
     won:[false,true,false,false],
     melds:[[],[{type:"peng",tile:"p3"},{type:"ming_gang",tile:"s2"}],
@@ -395,7 +395,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     win_ledger:{
       balances:[-8,16,-8,0],
       wins:[{winner:1,kind:"ron",main_pattern:"平胡",effective_fan:1,
-        total_received:16,payers:[0,2]}]
+        total_received:16,payers:[0,2],bonuses:{},raw_fan:1,multiplier:2,amount_per_payer:8}]
     },
     kong_ledger:{base:null,balances:[0,0,0,0]},
   };
