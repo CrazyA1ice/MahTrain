@@ -40,8 +40,9 @@ def sanitize_board(raw: dict) -> dict:
             or not all(type(x) is bool for x in won)
             or type(raw.get("wall_count")) is not int
             or raw["wall_count"] < 0
-            or type(raw.get("turn")) is not int
-            or raw["turn"] not in range(4)
+            or not (raw.get("turn") is None or
+                    (type(raw.get("turn")) is int and
+                     raw["turn"] in range(4)))
             or type(raw.get("phase")) is not str):
         raise ValueError("invalid public board for match archive")
     melds = []
