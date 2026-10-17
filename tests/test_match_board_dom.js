@@ -845,6 +845,18 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(requests.at(-1).action,"match_rob");
   assert.equal(requests.at(-1).choice,"pass");
+  // A human response already submitted must NEVER show an old popup
+  // while the other 2 AI seats finish arbitration.
+  startMatch={...base,phase:"claim_window",turn:2,
+    claim_options:["pass","peng","hu"],
+    claim_submitted:[0],pending_discard:{seat:2,tile:"p2"},
+    needs_continue:false};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-decision"].hidden,true,
+    "already committed response must not reappear during AI arbitration");
+  assert.equal(dom["match-controls"].hidden,true);
+
   // M3.45: PASS-only claim is already auto-resolved by the server.
   // Do not flash a modal or make the human click an unnecessary "过".
   startMatch={...base,phase:"claim_window",turn:2,
