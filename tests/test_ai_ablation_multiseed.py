@@ -139,6 +139,10 @@ class MultiSeedReportTests(unittest.TestCase):
         self.assertIn("留一种子",page)
         self.assertIn("公开副露弱风险规则触发诊断",page)
         self.assertIn("M3.11",page)
+        self.assertIn("M3.33",page)
+        self.assertIn("正式积分/出场",page)
+        self.assertIn("未核验流局整组排除",page)
+        self.assertIn("有效张均值",page)
         self.assertNotIn("<script",page)
         self.assertNotIn('src="http',page)
         self.assertNotIn('href="http',page)
@@ -164,6 +168,7 @@ class MultiSeedReportTests(unittest.TestCase):
                     "--csv-out", str(root/"policy.csv"),
                     "--contrast-csv-out", str(root/"contrasts.csv"),
                     "--pressure-csv-out", str(root/"pressure.csv"),
+                    "--official-csv-out", str(root/"official.csv"),
                     "--html-out", str(root/"report.html")]
             with (patch.object(benchmark_ablation_ai, "ablation_benchmark",
                                return_value=self.report),
@@ -184,6 +189,14 @@ class MultiSeedReportTests(unittest.TestCase):
             self.assertIn("win_event_fraction_delta_pp",rows[0])
             self.assertIn("M3.11", (root/"report.html").read_text(
                 encoding="utf-8"))
+            with (root/"official.csv").open(
+                    encoding="utf-8-sig",newline="") as fh:
+                official_rows=list(csv.DictReader(fh))
+            self.assertEqual(len(official_rows),5*5)
+            self.assertEqual(official_rows[0]["seed"],"30")
+            self.assertEqual(official_rows[0]["policy"],"baseline")
+            self.assertIn("official_total",official_rows[0])
+            self.assertIn("effective_copies_total",official_rows[0])
             with (root/"report.json").open(encoding="utf-8") as fh:
                 output = json.load(fh)
             self.assertEqual(
