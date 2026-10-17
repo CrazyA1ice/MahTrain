@@ -29,7 +29,7 @@ const ids=[
   "match-new","match-again","match-lab-enabled","match-voice-enabled",
   "match-voice-status","match-voice-speed","match-voice-repeat",
   "match-enable-kong","match-kong-base","match-seed",
-  "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
+  "match-coefficient","match-fan-cap","match-self-draw-mode","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
   "match-focus-toggle","match-large-tiles-toggle","match-skin-toggle",
@@ -65,6 +65,7 @@ for(const id of ids)dom[id].id=id;
 dom["match-seed"].value="42";
 dom["match-coefficient"].value="100";
 dom["match-fan-cap"].value="3";
+dom["match-self-draw-mode"].value="add_base";
 dom["match-playback-speed"].value="450";
 dom["match-voice-speed"].value="normal";
 for(const n of [1,2,3])dom["match-ai-"+n].value="advanced";
@@ -173,9 +174,19 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-new"].handlers.click();
   await settle();
   assert.equal(requests[0].action,"match_new");
+  assert.equal(requests[0].self_draw_mode,"add_base");
   assert.equal(Object.hasOwn(requests[0],"seed"),false,
     "ordinary match must let the server select an unused random seed");
   assert.equal(dom["match-voice-enabled"].checked,true);
+  // Changing the next game's house rule is a real game-setting request,
+  // unlike purely visual/tabletop navigation.
+  dom["match-self-draw-mode"].value="add_fan";
+  const beforeModeChange=requests.length;
+  assert.equal(requests.length,beforeModeChange);
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(requests.at(-1).self_draw_mode,"add_fan");
+  dom["match-self-draw-mode"].value="add_base";
   assert.equal(dom["match-voice-speed"].disabled,false);
   assert.equal(dom["match-voice-repeat"].disabled,true,
     "new round must forget the previous round's spoken actions");
