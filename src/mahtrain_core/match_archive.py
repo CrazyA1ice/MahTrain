@@ -414,7 +414,8 @@ class MatchArchive:
                            "average_player0_win_balance":total["average_b0"],
                            "average_player0_settled_balance":
                                total["average_settled_b0"],
-                           "paid_wins":total["paid_wins"]}}
+                           "paid_wins":total["paid_wins"]},
+                "scorecard":self.four_seat_scorecard()}
 
     def four_seat_scorecard(self, *, trend_limit: int = 30) -> dict:
         """Aggregate ALL completed public archive scores for fixed seats.
