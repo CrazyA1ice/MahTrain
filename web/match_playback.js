@@ -52,6 +52,9 @@
         (cut?"（"+cut+"）":"");
       return {
         type:item.type,seat,winSeats,publicTile:revealed,
+        // Only a real declared public marker can authorize saying which
+        // concealed kong was flipped. A stray publicTile is not enough.
+        exposedKong:item.type==="an_gang"&&item.revealed===true&&!!revealed,
         concealed:!revealed&&["draw","kong_supplement","an_gang"].includes(item.type),
         label,isWin,
       };
@@ -158,7 +161,7 @@
         // A rule-call frame can contain several sequential public actions.
         announcements:events.map(e=>({
           type:e.type,seat:e.seat,winSeats:e.winSeats,
-          publicTile:e.publicTile,
+          publicTile:e.publicTile,exposedKong:e.exposedKong,
         })),
         publicTile:exposed?.publicTile||null,
         isWin,winSeats:[...new Set([...(winner?.winSeats||last.winSeats||[]),
