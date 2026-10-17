@@ -636,11 +636,17 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("seed",started)
         self.assertNotIn("wall",started)
         current=started
-        for index in range(4):
+        for index in range(12):
             phase=current["phase"]
             if phase in ("finished","wall_exhausted"):
                 break
-            if phase=="claim_window":
+            if current.get("needs_continue"):
+                # Interactive game explicitly advances ONE AI transition per
+                # request; old all-AI-at-once assumptions are no longer valid.
+                result=self.post({"action":"match_continue",
+                                  "match_token":token})
+                self.assertLessEqual(len(result["match"].get("public_steps",[])),1)
+            elif phase=="claim_window":
                 choices=current["claim_options"]
                 self.assertGreater(len(choices),1)
                 result=self.post({"action":"match_claim","match_token":token,
@@ -689,7 +695,7 @@ class WebUI(unittest.TestCase):
             self.assertNotIn("_wall",current)
         self.assertIn(current["phase"],(
             "finished","wall_exhausted","claim_window","rob_kong_window",
-            "dealer_discard","await_discard"))
+            "dealer_discard","await_discard","await_draw"))
         with self.assertRaises(HTTPError) as exc:
             self.post({"action":"match_discard","match_token":"forged",
                        "seat":1,"tile":"m1"})
