@@ -15,6 +15,7 @@ class Node{
   append(...children){this.children.push(...children)}
   replaceChildren(...children){this.children=[...children]}
   addEventListener(event,handler){this.handlers[event]=handler}
+  setAttribute(key,value){(this.attributes||(this.attributes={}))[key]=String(value)}
 }
 const ids=[
   "match-archives-refresh","match-archives-list","match-archives-summary",
@@ -25,6 +26,7 @@ const ids=[
   "match-archives-balances","match-archives-wins",
   "match-archives-count","match-archives-actions",
   "match-scorecard-status","match-scorecard-seats","match-scorecard-trend",
+  "match-stats-metrics","match-stats-cumulative","match-stats-outcomes",
   "match-history-groups-mode","match-history-groups-status",
   "match-history-groups-rows",
 ];
@@ -109,12 +111,14 @@ const fetch=async url=>{
   };
   return {ok:true,json:async()=>data};
 };
-const win={MahTrainPlayback:require("../web/match_playback.js")};
+const win={MahTrainPlayback:require("../web/match_playback.js"),
+  MahTrainMatchStats:require("../web/match_stats.js")};
 const context={document:{
   getElementById:id=>{
     assert.ok(dom[id],"missing archive DOM id "+id);return dom[id];
   },
   createElement:tag=>new Node(tag),
+  createElementNS:(_,tag)=>new Node(tag),
 },window:win,fetch,console};
 vm.runInNewContext(
   fs.readFileSync(path.join(__dirname,"../web/match_archives.js"),"utf8"),
@@ -133,6 +137,13 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-scorecard-seats"].children[0].children[1].textContent.includes("+10"));
   assert.ok(dom["match-scorecard-seats"].children[0].children[2].textContent.includes("胡牌 -8"));
   assert.equal(dom["match-scorecard-trend"].children.length,2);
+  assert.equal(dom["match-stats-metrics"].children.length,4);
+  assert.equal(dom["match-stats-metrics"].children[1].children[1].textContent,"+10");
+  assert.equal(dom["match-stats-cumulative"].children[0].tagName,"svg");
+  assert.equal(dom["match-stats-outcomes"].children.length,4);
+  assert.equal(dom["match-stats-outcomes"].children[0].children[2].textContent,
+    "1 局 · 50.0%");
+
   assert.equal(dom["match-scorecard-trend"].children[0].children[3].textContent,"-8");
   assert.equal(dom["match-scorecard-trend"].children[1].children[4].textContent,"累计 +10");
   assert.ok(dom["match-scorecard-trend"].children[0].children[1].children[0].style.width.endsWith("%"));
