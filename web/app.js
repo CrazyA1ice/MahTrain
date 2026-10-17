@@ -312,3 +312,4 @@ window.MahTrainMatch?.init();
 window.MahTrainMatchArchives?.init();
 window.MahTrainAIReplay?.init();
 window.MahTrainAIBaseline?.init();
+window.MahTrainNavigation?.init();

@@ -16,19 +16,72 @@
   <script src="/match_playback.js" defer></script>
   <script src="/match_voice.js" defer></script>
   <script src="/match.js" defer></script>
+  <script src="/match_stats.js" defer></script>
   <script src="/match_archives.js" defer></script>
   <script src="/ai_replay.js" defer></script>
   <script src="/ai_baseline.js" defer></script>
+  <script src="/navigation.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
   <div class="app">
     <header class="topbar">
-      <div class="brand"><span class="brand-mark">麻</span><span><strong>MahTrain</strong><small>四川麻将 · 牌效训练原型</small></span></div>
-      <div class="top-actions"><button id="sound-toggle" class="toolbar-button" type="button" aria-pressed="true">🔊 音效开启</button><span class="mode-label">单人摸切 · 14轮</span></div>
+      <div class="brand"><span class="brand-mark">麻</span><span><strong>MahTrain</strong><small>四川麻将 · 训练与人机对战</small></span></div>
+      <div class="top-actions"><button id="sound-toggle" class="toolbar-button" type="button" aria-pressed="true">🔊 音效开启</button><span class="mode-label">训练 · 对战 · 历史复盘</span></div>
     </header>
     <main>
-      <section class="intro">
+      <section id="module-home" class="module-home" aria-labelledby="home-heading">
+        <div class="home-hero">
+          <span class="home-kicker">MAHTRAIN / TRAIN · PLAY · REVIEW</span>
+          <h1 id="home-heading">练习牌效，<br>在真实牌局中检验判断。</h1>
+          <p>从一个入口开始。不再把单题训练、血战对战、战绩复盘和算法实验混在同一页。</p>
+        </div>
+        <div class="home-module-grid" role="group" aria-label="选择功能模块">
+          <button type="button" id="home-open-solo" class="home-module-card" data-module="solo">
+            <span class="home-module-icon" aria-hidden="true">01</span>
+            <strong>连续摸切训练</strong>
+            <span>14 轮一局 · 看牌定缺 · 每轮牌效分析与错题重练</span>
+            <em>开始训练 ↗</em>
+          </button>
+          <button type="button" id="home-open-quiz" class="home-module-card" data-module="quiz">
+            <span class="home-module-icon" aria-hidden="true">02</span>
+            <strong>单题专项训练</strong>
+            <span>一向听何切 · 听牌何切 · 清一色训练 · 成绩复盘</span>
+            <em>进入题库 ↗</em>
+          </button>
+          <button type="button" id="home-open-match" class="home-module-card home-module-card--primary" data-module="match">
+            <span class="home-module-icon" aria-hidden="true">03</span>
+            <strong>四人血战 · 人机对战</strong>
+            <span>四边牌桌 · 真实碰杠胡 · 三档 AI · 公开动作回放</span>
+            <em>进入牌桌 ↗</em>
+          </button>
+          <button type="button" id="home-open-records" class="home-module-card" data-module="records">
+            <span class="home-module-icon" aria-hidden="true">04</span>
+            <strong>历史战绩 · 数据看板</strong>
+            <span>累计积分曲线 · 正负收益分布 · 已完成对局记录</span>
+            <em>查看战绩 ↗</em>
+          </button>
+          <button type="button" id="home-open-lab" class="home-module-card" data-module="lab">
+            <span class="home-module-icon" aria-hidden="true">05</span>
+            <strong>策略与规则实验室</strong>
+            <span>AI 公开决策研究 · 受控对照 · 开局规则演示</span>
+            <em>进入实验室 ↗</em>
+          </button>
+        </div>
+        <p class="home-note">战绩来自本机已完成、可核验的对局档案；未结束的对局不会计入正式战绩。</p>
+      </section>
+      <nav id="module-navigation" class="module-navigation" aria-label="功能模块导航" hidden>
+        <button id="module-back-home" class="module-back" type="button">← 功能首页</button>
+        <span id="module-current-label" class="module-current-label"></span>
+        <div class="module-shortcuts">
+          <button id="module-go-solo" type="button">连续训练</button>
+          <button id="module-go-quiz" type="button">单题训练</button>
+          <button id="module-go-match" type="button">人机对战</button>
+          <button id="module-go-records" type="button">历史战绩</button>
+          <button id="module-go-lab" type="button">实验室</button>
+        </div>
+      </nav>
+      <section id="solo-intro" class="intro">
         <div>
           <p class="eyebrow">STRUCTURED PRACTICE</p>
           <h1>每一张切牌，都有依据。</h1>
@@ -443,6 +496,20 @@
         <section class="match-scorecard" aria-labelledby="match-scorecard-title">
           <h4 id="match-scorecard-title">多局正式积分总览 · 四家座位统计</h4>
           <p id="match-scorecard-status" class="review-footnote"></p>
+          <div id="match-stats-dashboard" class="match-stats-dashboard" aria-label="人机对战历史战绩可视化">
+            <div id="match-stats-metrics" class="match-stats-metrics" aria-live="polite"></div>
+            <div class="match-stats-charts">
+              <section class="match-stats-chart-card">
+                <div class="match-stats-heading"><h5>累计正式积分走势</h5><span>最近最多 30 局 · 时间从左到右</span></div>
+                <div id="match-stats-cumulative" class="match-stats-cumulative" aria-label="近30局累计正式积分折线图"></div>
+              </section>
+              <section class="match-stats-chart-card">
+                <div class="match-stats-heading"><h5>单局正负收益分布</h5><span>全部可核验对局 · 不是胡牌率</span></div>
+                <div id="match-stats-outcomes" class="match-stats-outcomes"></div>
+              </section>
+            </div>
+            <p class="match-stats-footnote">正式净额＝胡牌积分＋已正式入账的方案 A 流局赔付；不含试验杠钱。不同房间底分的数值不可直接代表牌技高低。折线起点是所显示首局当时的历史累计，并非截取区间从零开始。</p>
+          </div>
           <div id="match-scorecard-seats" class="match-scorecard-seats"></div>
           <div class="match-scorecard-trend-head">
             <strong>0号玩家 · 近30局正式净额走势</strong>

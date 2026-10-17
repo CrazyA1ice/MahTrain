@@ -1219,6 +1219,36 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("_hands",view)
         self.assertNotIn("_wall",view)
 
+    def test_m346_home_navigation_and_verified_match_statistics_assets(self):
+        page,_=self.get("/")
+        nav,_=self.get("/navigation.js")
+        chart,_=self.get("/match_stats.js")
+        archive,_=self.get("/match_archives.js")
+        css,_=self.get("/app.css")
+        app,_=self.get("/app.js")
+        for ident in ("module-home","module-navigation","module-back-home",
+                      "module-current-label","solo-intro",
+                      "match-stats-dashboard","match-stats-metrics",
+                      "match-stats-cumulative","match-stats-outcomes"):
+            self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
+        for kind in ("solo","quiz","match","records","lab"):
+            self.assertEqual(page.count(
+                ('id="home-open-%s"' % kind).encode()),1)
+            self.assertEqual(page.count(
+                ('id="module-go-%s"' % kind).encode()),1)
+        for route in (b"/navigation.js",b"/match_stats.js"):
+            self.assertIn(route,page)
+        self.assertIn(b"window.MahTrainNavigation?.init()",app)
+        self.assertIn(b"module-inactive",nav)
+        self.assertIn(b"match-archives-panel",nav)
+        self.assertIn(b"match-panel",nav)
+        self.assertIn(b"MahTrainMatchStats?.render(response.scorecard,document)",archive)
+        self.assertIn(b"makeLinePoints",chart)
+        self.assertIn(b"match-stats-cumulative",chart)
+        self.assertIn(b"match-stats-outcomes",chart)
+        self.assertIn(b".home-module-grid",css)
+        self.assertIn(b".match-stats-line",css)
+
     def test_m345_fluid_board_no_horizontal_pan_and_contextual_dialog(self):
         page,_=self.get("/")
         script,_=self.get("/match.js")
