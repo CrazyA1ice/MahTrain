@@ -60,6 +60,39 @@ class FourAgentTrialTests(unittest.TestCase):
             else:
                 self.assertEqual(match["wall_remaining"],0)
 
+    def test_m330_official_balances_and_server_summary_are_rule_a_verified(self):
+        scores=self.result["official_score_analysis"]
+        self.assertEqual(scores["requested_seeds"],1)
+        self.assertEqual(scores["room_coefficient"],100)
+        self.assertEqual(scores["fan_cap"],3)
+        self.assertTrue(scores["zero_sum"])
+        self.assertEqual(scores["kong_included"],False)
+        self.assertEqual(scores["valid_seeds"]+
+                         scores["excluded_seed_count"],1)
+        self.assertEqual(scores["complete_games"],scores["valid_seeds"]*3)
+        for match in self.result["matches"]:
+            self.assertEqual(sum(match["official_settled_balances"]),0)
+            self.assertEqual(match["scoring_rules"],{
+                "room_coefficient":100,"fan_cap":3,"kong_base":None})
+            if match["terminal_phase"]=="finished":
+                self.assertFalse(match["official_exhaustive_posted"])
+                self.assertEqual(match["partial_win_balances"],
+                                 match["official_settled_balances"])
+            if match["terminal_phase"]=="wall_exhausted":
+                self.assertTrue(match["official_exhaustive_posted"] or
+                                match["partial_win_balances"]==
+                                match["official_settled_balances"])
+        from web_server import _replay_summary
+        response=_replay_summary({
+            "mode":"replay","status":"done","completed_games":3,
+            "seed_start":11,"seeds":1,"result":self.result,
+        })
+        self.assertEqual(
+            response["overview"]["official_score_analysis"],scores)
+        self.assertNotIn("trace",str(scores))
+        self.assertNotIn("private_hand",str(scores))
+        self.assertNotIn("future_wall",str(scores))
+
     def test_level_summary_matches_explicit_per_match_counts(self):
         for level,stat in self.result["levels"].items():
             self.assertEqual(stat["win_events"],sum(

@@ -112,7 +112,7 @@
       </section>
       <section id="ai-replay-panel" class="panel ai-replay-panel">
         <div class="panel-title"><h3>M3.8 · AI决策公开解释与种子对照统计</h3><small>三次座位轮换合并为一个种子 · 脱敏逐动作讲解</small></div>
-        <p class="review-intro">运行三档AI的完整自动对局，完成后逐步查看出牌、碰杠胡、公开副露及每家的牌河。不同档位可比较胡牌事件、放铳责任、最低向听选择率与局部最优率；<strong>公开回放不会显示其他家的暗牌、未来牌墙或隐藏牌效。</strong> 当前积分仅含已确认的胡牌部分，非正式血战胜率。</p>
+        <p class="review-intro">运行三档AI的完整自动对局，完成后逐步查看出牌、碰杠胡、公开副露及每家的牌河。不同档位可比较胡牌事件、放铳责任、最低向听选择率与局部最优率；<strong>公开回放不会显示其他家的暗牌、未来牌墙或隐藏牌效。</strong> 新增 M3.30 可统计胡牌加方案A真实流局赔付的正式积分，但仅针对三档启发式 AI 的受控实验，不代表真人胜率。</p>
         <div class="ai-replay-toolbar">
           <label>起始种子 <input id="ai-replay-seed" type="number" min="0" max="4294967295" value="11"/></label>
           <label>独立洗牌种子数 <select id="ai-replay-seeds"><option value="1" selected>1（3局）</option><option value="2">2（6局）</option><option value="5">5（15局，耗时较长）</option></select></label>
@@ -124,6 +124,16 @@
           <h4>三档策略表现（实际对局事件，非正式胜率）</h4>
           <div id="ai-replay-summary" class="ai-replay-summary"></div>
           <p id="ai-replay-terminations" class="review-footnote"></p>
+          <section id="ai-replay-official-scores" class="ai-controlled-scores" hidden>
+            <div class="ai-replay-cluster-heading">
+              <h4>M3.30 · 受控正式积分对照（方案A）</h4>
+              <button id="ai-replay-official-download" type="button" class="review-control">导出正式积分种子对照 CSV</button>
+            </div>
+            <p id="ai-replay-official-caveat" class="review-footnote"></p>
+            <div id="ai-replay-official-levels" class="ai-replay-summary"></div>
+            <div id="ai-replay-official-differences" class="ai-replay-cluster-differences"></div>
+            <p class="review-footnote">同种子三轮座位轮换属于一个相关样本；由于策略不同，各局中后续摸牌、碰杠决策并非同一轨迹。仅用于评估本地启发式 AI，非真人对战胜率。</p>
+          </section>
           <section id="ai-replay-clusters" class="ai-replay-clusters" hidden>
             <div class="ai-replay-cluster-heading"><h4>以洗牌种子为单位的配对统计</h4>
               <button id="ai-replay-cluster-download" type="button" class="review-control">导出种子分组 CSV</button>

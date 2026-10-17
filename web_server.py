@@ -368,6 +368,7 @@ def _replay_summary(job: dict) -> dict:
             "terminal_phase_counts":result["terminal_phase_counts"],
             "levels":result["levels"],
             "seed_analysis":result.get("seed_analysis"),
+            "official_score_analysis":result.get("official_score_analysis"),
             "limitations":result["limitations"],
             "matches":[{
                 "index":i,"seed":m["seed"],"rotation":m["rotation"],

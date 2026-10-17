@@ -18,6 +18,7 @@ from .ai_baseline import ShapeBaselineAgent
 from .efficiency import analyze_discards
 from .four_player import FourPlayerOpening
 from .ai_seed_stats import analyze_seed_clusters
+from .ai_controlled_scores import controlled_official_scores
 from .ai_pressure_diagnostics import diagnose_pressure_tiebreak
 
 
@@ -331,6 +332,17 @@ def simulate_match(seed: int, rotation: int = 0,
             for w in board["winners"]
         ],
         "partial_win_balances":board["win_ledger"]["balances"],
+        # This is an AUTHORITATIVE one-shot rule-A score, not the preview.
+        # Keep HU-only results separate for legacy statistics.
+        "official_settled_balances":board["settled_balances"],
+        "official_exhaustive_posted":bool(
+            board["exhaustive_settlement"] is not None and
+            board["exhaustive_settlement"]["posted"]),
+        "scoring_rules":{
+            "room_coefficient":game.ledger.room_coefficient,
+            "fan_cap":game.ledger.fan_cap,
+            "kong_base":game.kong_ledger.base,
+        },
         "unpriced_kong_events":len(board["kong_ledger"]["events"]),
         "exhaustive_preview_not_posted":(
             bool(board["exhaustive_review"] is not None)
@@ -425,6 +437,7 @@ def tournament(seed_start: int = 0, seeds: int = 2,
         ],
         "levels":by_level,
         "seed_analysis":analyze_seed_clusters(games),
+        "official_score_analysis":controlled_official_scores(games),
         "matches":games if include_traces else [
             {k:v for k,v in g.items()
              if k not in ("trace","public_events","public_replay")}
