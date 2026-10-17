@@ -33,6 +33,9 @@ def fake_match(seed: int, rotation: int, lineup: list[str]) -> dict:
         "winners":wins,"trace":trace,
         "public_events":[],"public_replay":[],
         "partial_win_balances":[0,0,0,0],
+        "official_settled_balances":[0,0,0,0],
+        "official_exhaustive_posted":False,
+        "scoring_rules":{"room_coefficient":100,"fan_cap":3,"kong_base":None},
         "physical_count":108,"actions":100,"wall_remaining":0,
     }
 
@@ -125,6 +128,16 @@ class IndependentBaselineTests(unittest.TestCase):
         self.assertEqual(result["levels"]["challenge"]["local_optimal_fraction"],1)
         self.assertEqual(result["levels"]["baseline"]["local_optimal_fraction"],0)
         self.assertEqual(result["intervals"]["replications"],200)
+        official=result["official_score_analysis"]
+        self.assertEqual(official["valid_seeds"],5)
+        self.assertEqual(official["excluded_seed_count"],0)
+        self.assertEqual(official["complete_games"],20)
+        self.assertTrue(official["zero_sum"])
+        self.assertEqual(official["room_coefficient"],100)
+        self.assertEqual(official["interval_status"],"exploratory_only")
+        self.assertIsNotNone(official["intervals"])
+        self.assertEqual(official["intervals"]["replications"],200)
+        self.assertEqual(official["levels"]["baseline"]["seat_exposures"],20)
         self.assertEqual(
             result["intervals"]["paired_differences_vs_baseline"][
                 "challenge"]["local_optimal_fraction"],[1.0,1.0])
@@ -142,6 +155,8 @@ class IndependentBaselineTests(unittest.TestCase):
             compact=independent_benchmark(11,1,on_match=lambda a,b:called.append((a,b)))
             self.assertEqual(called,[(1,4),(2,4),(3,4),(4,4)])
             self.assertIsNone(compact["intervals"])
+            self.assertIsNone(compact["official_score_analysis"]["intervals"])
+            self.assertEqual(compact["official_score_analysis"]["valid_seeds"],1)
             self.assertNotIn("trace",compact["matches"][0])
             self.assertNotIn("public_replay",compact["matches"][0])
             self.assertNotIn("public_events",compact["matches"][0])
@@ -158,6 +173,13 @@ class IndependentBaselineTests(unittest.TestCase):
         self.assertEqual(len(match["assignment"]),4)
         self.assertIn(match["terminal_phase"],("finished","wall_exhausted"))
         self.assertEqual(sum(match["partial_win_balances"]),0)
+        self.assertEqual(sum(match["official_settled_balances"]),0)
+        self.assertEqual(match["scoring_rules"],{
+            "room_coefficient":100,"fan_cap":3,"kong_base":None,
+        })
+        if match["terminal_phase"]=="finished":
+            self.assertEqual(match["partial_win_balances"],
+                             match["official_settled_balances"])
         self.assertTrue(any(
             frame["action"].get("level")=="baseline" and
             frame["explanation"]["code"] in ("baseline_shape_policy","discard_missing")

@@ -12,6 +12,7 @@ from typing import Any
 
 from .ai import AI_LEVELS
 from .ai_tournament import simulate_match
+from .ai_independent_scores import controlled_four_policy_scores
 
 LEVELS=("baseline",*AI_LEVELS)
 EXPLORATORY_MIN_SEEDS=5
@@ -109,6 +110,8 @@ def independent_benchmark(seed_start: int=11, seeds: int=1, *,
             "seed":seed,"rotations":4,
             "levels":totals,
         })
+    official_score_analysis=controlled_four_policy_scores(
+        all_games,bootstrap_replicates=bootstrap_replicates)
     totals=_totals(all_games)
     results=_measure(all_games)
     metrics=("win_event_fraction","min_shanten_fraction",
@@ -168,6 +171,7 @@ def independent_benchmark(seed_start: int=11, seeds: int=1, *,
             **results[level],
         } for level in LEVELS},
         "paired_differences_vs_baseline":comparisons,
+        "official_score_analysis":official_score_analysis,
         "per_seed":by_seed,
         "interval_status":(
             "exploratory_only" if intervals is not None
@@ -184,6 +188,7 @@ def independent_benchmark(seed_start: int=11, seeds: int=1, *,
             "independent baseline is a specified simple policy, not external trained AI",
             "diagnostic shanten metrics still use project's internal evaluation oracle",
             "win events are not fully settled official win rates",
-            "unconfirmed kong and exhaustive-draw money not posted",
+            "kong amounts remain unpriced; verified active-only exhaustive-draw amounts are included only in official_score_analysis",
+            "unresolved wall settlements are excluded by whole shuffle-seed cluster from official score comparison",
         ],
     }

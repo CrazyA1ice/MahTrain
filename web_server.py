@@ -356,6 +356,7 @@ def _replay_summary(job: dict) -> dict:
             "levels":result["levels"],
             "paired_differences_vs_baseline":result[
                 "paired_differences_vs_baseline"],
+            "official_score_analysis":result["official_score_analysis"],
             "interval_status":result["interval_status"],
             "intervals":result["intervals"],
             "per_seed":result["per_seed"],

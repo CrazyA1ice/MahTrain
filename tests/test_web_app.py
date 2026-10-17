@@ -1306,6 +1306,20 @@ class WebUI(unittest.TestCase):
             "interval_status":"insufficient_independent_seeds_need_5",
             "intervals":None,
             "per_seed":[{"seed":11,"rotations":4,"levels":lv}],
+            "official_score_analysis":{
+                "protocol":"paired_initial_shuffle_4_rotation_official_a_v1",
+                "room_coefficient":100,"fan_cap":3,
+                "requested_seeds":1,"valid_seeds":0,
+                "excluded_seed_count":1,"excluded_seed_ids":[11],
+                "complete_games":0,"games_per_seed":4,"kong_included":False,
+                "levels":{level:{
+                    "seat_exposures":0,"official_total":0,
+                    "official_mean_per_exposure":None,
+                } for level in ("baseline","basic","advanced","challenge")},
+                "per_seed":[],"intervals":None,
+                "paired_differences_vs_baseline":{
+                    level:None for level in ("basic","advanced","challenge")},
+            },
             "limitations":["not full settlement"],
             "matches":[{
                 "assignment":["baseline","basic","advanced","challenge"],
@@ -1334,6 +1348,11 @@ class WebUI(unittest.TestCase):
         self.assertEqual(overview["games"],4)
         self.assertEqual(overview["opponents"][0],"baseline")
         self.assertEqual(overview["intervals"],None)
+        official=overview["official_score_analysis"]
+        self.assertEqual(official["requested_seeds"],1)
+        self.assertEqual(official["valid_seeds"],0)
+        self.assertEqual(official["excluded_seed_ids"],[11])
+        self.assertEqual(official["levels"]["baseline"]["official_total"],0)
         for private in ("secret","opponent_hand","future_wall","trace",
                         "public_replay","matches"):
             self.assertNotIn(private,str(overview))
@@ -1352,6 +1371,13 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"ai_baseline_start",js)
         self.assertIn(b"paired_differences_vs_baseline",js)
         self.assertIn(b".ai-baseline-summary",css)
+        for ident in ("ai-baseline-official","ai-baseline-official-export",
+                      "ai-baseline-official-caveat",
+                      "ai-baseline-official-levels",
+                      "ai-baseline-official-differences"):
+            self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
+        self.assertIn(b"renderOfficialScores",js)
+        self.assertIn(b"exportOfficialScores",js)
         self.assertIn("javascript",mime)
 
     def test_m39_rejects_invalid_baseline_requests_without_starting(self):

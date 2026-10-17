@@ -166,7 +166,7 @@
         <div class="panel-title"><h3>M3.9 · 独立规则基线与三档AI对照</h3>
           <small>不使用向听/有效进张的独立牌形对手 · 每种子四轮座位轮换</small>
         </div>
-        <p class="review-intro">新增<strong>独立牌形基线</strong>（不是第四档难度）：只按自己手牌的对子、邻张、孤张及定缺规则切牌，不调用三档AI使用的向听/进张评估器。每种子四局，让四种策略各坐四个座位一次。这里的胡牌数仅为草案规则下的实验事件，不是正式血战胜率。</p>
+        <p class="review-intro">新增<strong>独立牌形基线</strong>（不是第四档难度）：只按自己手牌的对子、邻张、孤张及定缺规则切牌，不调用三档AI使用的向听/进张评估器。每种子四局，让四种策略各坐四个座位一次。这里的胡牌数属于实验事件，并非真人胜率；M3.31 另外提供经核验的规则方案A正式净积分对照，不包含模拟杠钱。</p>
         <div class="ai-replay-toolbar">
           <label>起始种子 <input id="ai-baseline-seed" type="number" min="0" max="4294967295" value="11"/></label>
           <label>独立种子数 <select id="ai-baseline-seeds"><option value="1" selected>1（4局）</option><option value="2">2（8局）</option></select></label>
@@ -179,6 +179,16 @@
           <div id="ai-baseline-summary" class="ai-replay-summary ai-baseline-summary"></div>
           <p id="ai-baseline-caveat" class="review-footnote"></p>
           <div id="ai-baseline-differences" class="ai-replay-cluster-differences"></div>
+          <section id="ai-baseline-official" class="ai-controlled-scores" hidden>
+            <div class="ai-replay-cluster-heading">
+              <h4>M3.31 · 四策略方案A正式积分对照</h4>
+              <button id="ai-baseline-official-export" type="button" class="review-control">导出四策略正式积分种子CSV</button>
+            </div>
+            <p id="ai-baseline-official-caveat" class="review-footnote"></p>
+            <div id="ai-baseline-official-levels" class="ai-replay-summary"></div>
+            <div id="ai-baseline-official-differences" class="ai-replay-cluster-differences"></div>
+            <p class="review-footnote">每种子四轮座位轮换只算一个相关样本；规则固定，策略不同会改变后续牌局轨迹。独立牌形基线不是外部训练模型，积分并非真人胜率。</p>
+          </section>
           <div class="ai-replay-picker">
             <button id="ai-baseline-export" type="button" class="review-control">导出独立种子分组 CSV</button>
           </div>
