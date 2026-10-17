@@ -185,6 +185,14 @@ _MATCH_PUBLIC_BOARD_FIELDS = (
     "discards", "won",
 )
 _MAX_MATCH_PUBLIC_STEPS = 96
+# These public moves are visible or narrated; cross at most one per HTTP
+# continuation. Silent draws, claim passes and arbitration may be combined
+# without allowing the next player to act before the visible move is spoken.
+_MATCH_TURN_BEATS = frozenset((
+    "discard", "peng", "ming_gang", "an_gang", "bu_gang_declared",
+    "bu_gang", "ron", "multi_ron", "rob_kong", "self_draw_win",
+))
+_MAX_SILENT_CONTINUATIONS = 8
 
 
 def _match_public_board(game: FourPlayerOpening) -> dict:
@@ -569,7 +577,20 @@ def _process(action: str, payload: dict) -> dict:
             if action=="match_continue":
                 if not _match_requires_continue(game):
                     raise ValueError("当前需等待玩家操作，无法自动推进")
-                _match_script_until_human(game,agents,steps,max_actions=1)
+                # Each rules transition is still recorded separately in the
+                # public history. Aggregate only unspoken intermediate work:
+                # concealed draws, pending PASS responses and bookkeeping.
+                # Stop after the FIRST visible/audible move, or at the
+                # human decision boundary; do not speculate past either.
+                for _ in range(_MAX_SILENT_CONTINUATIONS):
+                    if not _match_requires_continue(game):
+                        break
+                    before=len(game._events)
+                    _match_script_until_human(game,agents,steps,max_actions=1)
+                    latest=game._events[before:]
+                    if any(event["type"] in _MATCH_TURN_BEATS
+                           for event in latest):
+                        break
             elif action=="match_exchange":
                 _match_record(game,steps,lambda: game.select_exchange(
                     0,payload.get("tiles")))
