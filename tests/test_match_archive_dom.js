@@ -25,6 +25,7 @@ const ids=[
   "match-archives-balances","match-archives-wins",
   "match-archives-count","match-archives-actions",
   "match-scorecard-status","match-scorecard-seats","match-scorecard-trend",
+  "match-stats-dashboard",
   "match-history-groups-mode","match-history-groups-status",
   "match-history-groups-rows",
 ];
@@ -133,6 +134,14 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-scorecard-seats"].children[0].children[1].textContent.includes("+10"));
   assert.ok(dom["match-scorecard-seats"].children[0].children[2].textContent.includes("胡牌 -8"));
   assert.equal(dom["match-scorecard-trend"].children.length,2);
+  assert.equal(dom["match-stats-dashboard"].children.length,2,
+    "show genuine outcome mix and four-seat scoring composition");
+  const stack=dom["match-stats-dashboard"].children[0].children[1];
+  assert.equal(stack.children.length,3);
+  assert.ok(stack.attributes?.["aria-label"]?.includes("正净额")||
+    stack.children[0].style.width.endsWith("%"));
+  assert.equal(dom["match-stats-dashboard"].children[1].children.length,6);
+
   assert.equal(dom["match-scorecard-trend"].children[0].children[3].textContent,"-8");
   assert.equal(dom["match-scorecard-trend"].children[1].children[4].textContent,"累计 +10");
   assert.ok(dom["match-scorecard-trend"].children[0].children[1].children[0].style.width.endsWith("%"));
