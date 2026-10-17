@@ -32,6 +32,8 @@ def main() -> None:
                         help="按独立种子输出每个策略差值（单位：百分点）")
     parser.add_argument("--pressure-csv-out", type=Path,
                         help="按种子汇总启停弱风险规则实际是否改变切牌，不输出暗手")
+    parser.add_argument("--official-csv-out", type=Path,
+                        help="M3.33 只导出方案A已核验整种子五策略正式积分，无暗牌")
     parser.add_argument("--html-out", type=Path,
                         help="单文件离线图表，无脚本、无暗手或未来牌墙")
     args = parser.parse_args()
@@ -62,6 +64,19 @@ def main() -> None:
                   "切牌可能不同",row["would_change"],
                   "当前策略实际不同",row["actual_changed"])
         print("说明：同局面比较不会改变真实牌墙或给出替代切牌带来的胜负。")
+    official=report["official_score_analysis"]
+    print("M3.33 五策略规则A正式积分：",official["valid_seeds"],
+          "/",official["requested_seeds"],"个完整洗牌种子核验；",
+          "排除",official["excluded_seed_count"],"个整种子。")
+    print("正式积分口径：胡牌 + 已核验流局赔付，不含模拟杠钱；"
+          "未核验整种子不进入积分/切牌联动统计。")
+    for level in report["opponents"]:
+        item=official["levels"][level]
+        print(NAMES[level],"出场",item["seat_exposures"],
+              "净积分/出场",item["official_mean_per_exposure"],
+              "最低向听率",item["min_shanten_fraction"],
+              "有效张均值",item["mean_effective_copies"],
+              "实际放铳/百次切牌",item["deal_in_events_per_100_discards"])
     analysis = report["seed_analysis"]
     print("独立种子：", analysis["distinct_seed_count"],
           "；统计单位：", analysis["unit"])
@@ -119,6 +134,20 @@ def main() -> None:
                         "seed":group["seed"],"policy":policy,**row,
                     })
         print("弱风险规则触发 CSV：",args.pressure_csv_out)
+    if args.official_csv_out:
+        args.official_csv_out.parent.mkdir(parents=True, exist_ok=True)
+        columns=["seed","policy","seat_exposures","official_total",
+                 "official_mean_per_exposure","discards","min_shanten_cuts",
+                 "local_optimal_cuts","effective_copies_total","deal_in_events"]
+        with args.official_csv_out.open(
+                "w",newline="",encoding="utf-8-sig") as fh:
+            writer=csv.DictWriter(fh,fieldnames=columns)
+            writer.writeheader()
+            for cluster in official["per_seed"]:
+                for level in report["opponents"]:
+                    writer.writerow({"seed":cluster["seed"],"policy":level,
+                                     **cluster["levels"][level]})
+        print("方案A正式积分逐种子CSV：",args.official_csv_out)
     if args.html_out:
         args.html_out.parent.mkdir(parents=True, exist_ok=True)
         args.html_out.write_text(render_ablation_html(report), encoding="utf-8")
