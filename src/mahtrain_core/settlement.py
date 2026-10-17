@@ -41,6 +41,41 @@ class WinLedger:
         self._entries: list[dict[str, Any]] = []
         self._settlements: list[dict[str, Any]] = []
 
+    def payment_per_payer(self, kind: str, multiplier: int) -> int:
+        """One verified payout unit, shared by preview and booking."""
+        return self.room_coefficient * payer_multiplier(
+            kind, multiplier, self.self_draw_mode
+        )
+
+    def preview_self_draw(self, *, payers: list[int],
+                          score: Mapping[str, Any]) -> dict[str, Any]:
+        """Read-only quote for the current authorized winner's turn.
+
+        Does not post payments or publish a concealed tile. The rule engine
+        decides legal wins and which opponent seats are still active.
+        """
+        if not score.get("legal") or not payers or len(set(payers)) != len(payers):
+            raise ValueError("invalid self-draw preview")
+        if (score["effective_fan"] != min(score["raw_fan"], self.fan_cap) or
+                score["multiplier"] != 2 ** score["effective_fan"]):
+            raise ValueError("invalid capped self-draw preview")
+        unit = self.payment_per_payer("self_draw", score["multiplier"])
+        return {
+            "raw_fan": score["raw_fan"],
+            "effective_fan": score["effective_fan"],
+            "base_multiplier": score["multiplier"],
+            "payment_multiplier": payer_multiplier(
+                "self_draw", score["multiplier"], self.self_draw_mode
+            ),
+            "self_draw_mode": self.self_draw_mode,
+            "room_coefficient": self.room_coefficient,
+            "payers": list(payers),
+            "amount_per_payer": unit,
+            "total_received": unit * len(payers),
+            "main_pattern": score["main_pattern"],
+            "posted": False,
+        }
+
     def pay_win(
         self,
         *, winner: int, payers: list[int], score: Mapping[str, Any],
@@ -69,9 +104,7 @@ class WinLedger:
             cap != min(raw, self.fan_cap)
         ) or score["multiplier"] != 2**cap:
             raise ValueError("score does not match capped scoring rules")
-        unit = self.room_coefficient * payer_multiplier(
-            kind, score["multiplier"], self.self_draw_mode
-        )
+        unit = self.payment_per_payer(kind, score["multiplier"])
         record = {
             "kind": kind, "winner": winner, "source": source, "tile": tile,
             "main_pattern": score["main_pattern"],

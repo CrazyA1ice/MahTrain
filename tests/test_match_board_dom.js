@@ -850,6 +850,41 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(spoken.some(x=>x.includes("打")||x.includes("暗杠")||x.includes("自摸")),
     "public live actions should be spoken");
   assert.ok(spoken.every(x=>!x.includes("hidden-")&&!x.includes("secret-")));
+  // M3.39: preview comes ONLY from the authorized server-supplied quote;
+  // neither the room selector nor a guessed future tile can price a win.
+  startMatch={...base,can_self_draw_win:true,
+    self_draw_preview:{
+      posted:false,main_pattern:"heaven_win",raw_fan:4,effective_fan:3,
+      base_multiplier:8,payment_multiplier:9,self_draw_mode:"add_base",
+      payers:[1,2,3],amount_per_payer:900,total_received:2700,
+      room_coefficient:100
+    }};
+  dom["match-new"].handlers.click();
+  await settle();
+  const quoteNode=dom["match-controls"].children.find(x=>
+    x.className==="match-self-win-preview");
+  assert.ok(quoteNode,"eligible HU must show a real server-authored quote");
+  assert.ok(quoteNode.children.some(x=>x.textContent.includes("尚未入账")));
+  assert.ok(quoteNode.children.some(x=>x.textContent.includes("自摸加底")));
+  assert.ok(quoteNode.children.some(x=>x.textContent.includes("原始4番")));
+  assert.ok(quoteNode.children.some(x=>x.textContent.includes("每家付900")));
+  assert.ok(quoteNode.children.some(x=>x.textContent.includes("2700")));
+  const beforeConfirm=requests.length;
+  assert.equal(requests.length,beforeConfirm,
+    "showing a preview does not commit or query a settlement");
+  dom["match-controls"].children.find(x=>
+    x.className.includes("match-self-win-action")).handlers.click();
+  await settle();
+  assert.equal(requests.length,beforeConfirm+1);
+  assert.equal(requests.at(-1).action,"match_win");
+  startMatch={...base,can_self_draw_win:false,self_draw_preview:null};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-controls"].children.some(x=>
+    x.className==="match-self-win-preview"),false,
+    "a nonwinning/old round must not retain the prior quote");
+
+  console.log("M3.39 server-only HU quote and no booking before confirmation: PASS");
   console.log("M3.24 random rematch, lab seed, speech and privacy DOM smoke: PASS");
   console.log("M3.21 cross-turn public history, seat/filter navigation and reset DOM smoke: PASS");
   console.log("M3.20 grouped settlement animation and round report DOM smoke: PASS");

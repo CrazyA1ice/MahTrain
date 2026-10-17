@@ -927,6 +927,32 @@
       controls.append(reactions);
     }else if(phase==="dealer_discard"||phase==="await_discard"){
       if(state.can_self_draw_win){
+        // Server-confirmed, seat-0-only quote. Never calculate payouts from
+        // a guessed concealed hand, future tile or stale room selector.
+        const quote=state.self_draw_preview;
+        if(quote && quote.posted===false &&
+           Array.isArray(quote.payers) && quote.payers.length &&
+           Number.isSafeInteger(quote.amount_per_payer) &&
+           Number.isSafeInteger(quote.total_received)){
+          const preview=el("section","match-self-win-preview");
+          preview.setAttribute("aria-label","本次自摸结算预览，尚未入账");
+          preview.append(el("strong","","可自摸 · 结算预览（尚未入账）"));
+          const mode={add_base:"自摸加底",add_fan:"自摸加番",
+            legacy:"旧版规则"}[quote.self_draw_mode]||"自摸规则";
+          preview.append(el("span","",
+            (quote.main_pattern||"合法胡牌")+" · "+mode+
+            " · 原始"+quote.raw_fan+"番 → 有效"+quote.effective_fan+
+            "番 · 牌型×"+quote.base_multiplier+
+            " → 每家支付×"+quote.payment_multiplier));
+          preview.append(el("span","",
+            "付款："+quote.payers.map(s=>s+"号").join("、")+
+            "（"+quote.payers.length+"家），每家付"+
+            quote.amount_per_payer+"，确认后预计共收"+
+            quote.total_received));
+          preview.append(el("small","",
+            "按服务器当前已确认牌型和仍未胡的玩家计算；点击胡牌后正式结算，不含杠钱及流局赔付。"));
+          controls.append(preview);
+        }
         controls.append(button("胡！确认自摸入账",
           "primary match-self-win-action",
           ()=>action("match_win")));

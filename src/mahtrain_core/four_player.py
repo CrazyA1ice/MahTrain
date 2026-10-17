@@ -205,9 +205,21 @@ class FourPlayerOpening:
             raise ValueError("illegal win cannot be posted")
         return result
 
+    def _self_draw_score(self, seat: int) -> dict[str, Any]:
+        """Same authoritative winning calculation for preview and booking."""
+        return self._win_score(
+            seat, list(self._hands[seat]),
+            heaven=(seat == self.dealer and len(self._discards) == 0
+                    and not self._melds[seat]),
+            kong_bloom=self._kong_draw[seat],
+        )
+
+    def _self_draw_payers(self, seat: int) -> list[int]:
+        return [s for s in range(4) if s != seat and not self._won[s]]
+
     def _post_win(self, seat: int, *, source: int, tile: str,
                   kind: str, score: dict[str, Any]) -> dict[str, Any]:
-        payers=([s for s in range(4) if s!=seat and not self._won[s]]
+        payers=(self._self_draw_payers(seat)
                 if kind=="self_draw" else [source])
         posted=self.ledger.pay_win(winner=seat,payers=payers,score=score,
                                    kind=kind,source=source,tile=tile)
@@ -559,12 +571,7 @@ class FourPlayerOpening:
         if not self._self_win(seat):
             raise ValueError("not a legal win or missing suit not cleared")
         tile=self._hands[seat][-1]
-        points=self._win_score(
-            seat,list(self._hands[seat]),
-            heaven=(seat==self.dealer and len(self._discards)==0
-                    and not self._melds[seat]),
-            kong_bloom=self._kong_draw[seat],
-        )
+        points=self._self_draw_score(seat)
         payment=self._post_win(
             seat,source=seat,tile=tile,kind="self_draw",score=points,
         )
@@ -679,7 +686,17 @@ class FourPlayerOpening:
         """Trusted-in-process view ONLY: never allow unverified seat queries."""
         self._seat(seat)
         view=self.public_state()
+        can_self_win=bool(
+            self.phase in ("dealer_discard","await_discard")
+            and self.turn==seat and not self._won[seat]
+            and self._self_win(seat)
+        )
+        quote=(self.ledger.preview_self_draw(
+            payers=self._self_draw_payers(seat),
+            score=self._self_draw_score(seat),
+        ) if can_self_win else None)
         view.update({
+            "self_draw_preview":quote,
             "seat":seat,
             "hand":sort_hand(self._hands[seat]),
             "own_melds":[dict(m) for m in self._melds[seat]],
@@ -693,10 +710,7 @@ class FourPlayerOpening:
             "sealed_missing":self._missing_offers.get(seat),
             "tianque":self._tianque[seat]
                 if self.phase!="exchange_select" else None,
-            "can_self_draw_win":bool(
-                self.phase in ("dealer_discard","await_discard")
-                and self.turn==seat and not self._won[seat]
-                and self._self_win(seat)),
+            "can_self_draw_win":can_self_win,
             "kong_options":self.kong_options(seat),
             "claim_options":self.claim_options(seat)
                 if self.phase=="claim_window" else [],

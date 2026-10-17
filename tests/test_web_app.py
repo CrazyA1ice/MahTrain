@@ -1112,6 +1112,26 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"raw_fan",js)
         self.assertIn("javascript",mime)
 
+    def test_m339_self_draw_quote_is_private_readonly_and_served(self):
+        client,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        for marker in (b"self_draw_preview",b"match-self-win-preview",
+                       b"quote.payers",b"quote.total_received",
+                       b"quote.amount_per_payer",b"quote.posted"):
+            self.assertIn(marker,client)
+        self.assertIn(b".match-self-win-preview",css)
+        for mode in ("add_base","add_fan"):
+            state=self.post({
+                "action":"match_new","seed":901,
+                "self_draw_mode":mode,
+            })["match"]
+            self.assertIn("self_draw_preview",state)
+            self.assertIsNone(state["self_draw_preview"],
+                "opening sealed hands must never show a win quotation")
+            self.assertNotIn("opponent_self_draw_preview",state)
+            self.assertNotIn("_hands",state)
+            self.assertNotIn("_wall",state)
+
     def test_m338_self_draw_mode_is_validated_and_published(self):
         page, _ = self.get("/")
         client, _ = self.get("/match.js")
