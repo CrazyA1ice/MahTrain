@@ -119,6 +119,78 @@
     }
     table.append(tbody);container.append(table);
   }
+  function renderOfficialScores(){
+    const analysis=overview?.official_score_analysis;
+    const area=$("ai-replay-official-scores");
+    area.hidden=!analysis;
+    if(!analysis)return;
+    const caveat=$("ai-replay-official-caveat");
+    caveat.textContent="固定房间系数 "+analysis.room_coefficient+
+      "、封顶 "+analysis.fan_cap+" 番，杠钱不入账。请求"+
+      analysis.requested_seeds+"个独立洗牌种子，已核验"+
+      analysis.valid_seeds+"个，因流局未完成核验排除"+
+      analysis.excluded_seed_count+"个整种子（三轮同时排除）。"+
+      (analysis.intervals?
+        "展示的是种子成组重抽样的探索性区间，非真人胜率区间。":
+        "有效独立种子少于5个，不生成区间；请增加实验种子。");
+    const cards=$("ai-replay-official-levels");
+    cards.replaceChildren();
+    const total=analysis.levels;
+    for(const level of ["basic","advanced","challenge"]){
+      const row=total[level];
+      const card=el("section","ai-replay-score");
+      card.append(el("h5","",LABEL[level]+" · 正式积分"));
+      const stats=el("div","ai-replay-stats");
+      const avg=row.official_mean_per_exposure;
+      stats.append(makeStat("已核验参局",row.seat_exposures));
+      stats.append(makeStat("零和净积分总额",row.official_total));
+      stats.append(makeStat("每次座位出场平均积分",
+        avg===null?"样本不足":(avg>=0?"+":"")+avg));
+      if(analysis.intervals){
+        const range=analysis.intervals.levels[level];
+        stats.append(makeStat("探索性种子区间",
+          range.map(n=>(n>=0?"+":"")+n).join(" ～ ")));
+      }
+      card.append(stats);
+      cards.append(card);
+    }
+    const diffs=$("ai-replay-official-differences");
+    diffs.replaceChildren();
+    for(const other of ["basic","advanced"]){
+      const name="challenge_minus_"+other;
+      const delta=analysis.paired_differences[name];
+      const row=el("p","review-footnote",
+        "挑战－"+LABEL[other]+"："+
+        (delta===null?"有效样本不足":
+          (delta>=0?"+":"")+delta+" 分/次座位出场")+
+        (analysis.intervals?
+          " · 探索性种子区间 ["+
+          analysis.intervals.differences[name].join("，")+"]":""));
+      diffs.append(row);
+    }
+  }
+  function downloadOfficialScores(){
+    const analysis=overview?.official_score_analysis;
+    if(!analysis)return;
+    const rows=[
+      "seed,ai_level,seat_exposures,official_total,mean_per_exposure",
+    ];
+    for(const cluster of analysis.per_seed){
+      for(const level of ["basic","advanced","challenge"]){
+        const item=cluster.levels[level];
+        rows.push([cluster.seed,level,item.seat_exposures,
+          item.official_total,item.official_mean_per_exposure].join(","));
+      }
+    }
+    const blob=new Blob([String.fromCharCode(0xFEFF)+
+      rows.join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download="mahtrain-controlled-official-seed-scores.csv";
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
   function renderSummary(){
     const panel=$("ai-replay-summary");
     panel.replaceChildren();
@@ -152,6 +224,7 @@
       selection.append(option);
     }
     renderClusterStatistics();
+    renderOfficialScores();
     $("ai-replay-results").hidden=false;
   }
   function stepTitle(frame,n,total){
@@ -347,6 +420,7 @@
     });
     $("ai-replay-download").addEventListener("click",download);
     $("ai-replay-cluster-download").addEventListener("click",downloadSeedCSV);
+    $("ai-replay-official-download").addEventListener("click",downloadOfficialScores);
   }
   window.MahTrainAIReplay={init};
 })();
