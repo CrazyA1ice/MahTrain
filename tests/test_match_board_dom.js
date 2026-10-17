@@ -30,6 +30,9 @@ const ids=[
   "match-voice-status","match-enable-kong","match-kong-base","match-seed",
   "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
+  "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
+  "match-focus-toggle","match-large-tiles-toggle","match-confirm-discard",
+  "match-board",
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
   "match-own-score","match-table-settlement","match-table-settlement-title",
   "match-table-round-phase","match-table-scores","match-table-wins",
@@ -170,6 +173,20 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-stage"].hidden,false);
   assert.equal(dom["match-wall-count"].textContent,"54");
   assert.equal(dom["match-hand"].children.length,14);
+  assert.equal(dom["match-hud-turn"].textContent,"轮到你出牌");
+  assert.equal(dom["match-hud-wall"].textContent,"54 张");
+  assert.equal(dom["match-hud-missing"].textContent,"缺筒");
+  assert.ok(dom["match-hud-tip"].textContent.includes("点击手牌"));
+  dom["match-focus-toggle"].handlers.click();
+  assert.equal(dom["match-stage"].classList.contains("is-immersive"),true);
+  assert.equal(dom["match-focus-toggle"].attributes["aria-pressed"],"true");
+  dom["match-focus-toggle"].handlers.click();
+  assert.equal(dom["match-stage"].classList.contains("is-immersive"),false);
+  dom["match-large-tiles-toggle"].handlers.click();
+  assert.equal(dom["match-board"].classList.contains("is-large-tiles"),true);
+  assert.equal(dom["match-large-tiles-toggle"].attributes["aria-pressed"],"true");
+  dom["match-large-tiles-toggle"].handlers.click();
+  assert.equal(dom["match-board"].classList.contains("is-large-tiles"),false);
 
   for(const n of [0,1,2,3]){
     assert.ok(dom["match-seat-"+n]);
@@ -225,9 +242,36 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(newCopy.classList.contains("match-new-draw"),true);
   assert.equal(oldCopy.classList.contains("match-new-draw"),false);
   assert.ok(descendants(dom["match-ready-hint"],x=>x.tile==="m3").length);
-  // Hand cut of an identical tile differs from a draw cut.
-  oldCopy.handlers.click();
+  // Optional tap-confirm: selecting a hand copy must NOT submit a discard.
+  // Even when the same tile is the new draw, hand-cut must stay explicit.
+  dom["match-confirm-discard"].checked=true;
+  dom["match-confirm-discard"].handlers.change();
+  const priorCount=requests.length;
+  dom["match-hand"].children.find(x=>x.tile==="m1"&&
+    !x.classList.contains("match-new-draw")).handlers.click();
   await settle();
+  assert.equal(requests.length,priorCount);
+  assert.ok(dom["match-hud-tip"].textContent.includes("已选"));
+  assert.ok(dom["match-hand"].children.some(x=>
+    x.classList.contains("match-pending-discard")));
+  const confirmCut=dom["match-controls"].children.find(x=>
+    x.textContent.includes("确认打出"));
+  assert.ok(confirmCut);
+  assert.ok(confirmCut.textContent.includes("手切"));
+  const cancel=dom["match-controls"].children.find(x=>
+    x.textContent==="取消选牌");
+  cancel.handlers.click();
+  assert.equal(requests.length,priorCount);
+  assert.equal(dom["match-hand"].children.some(x=>
+    x.classList.contains("match-pending-discard")),false);
+  dom["match-hand"].children.find(x=>x.tile==="m1"&&
+    !x.classList.contains("match-new-draw")).handlers.click();
+  dom["match-controls"].children.find(x=>
+    x.textContent.includes("确认打出")).handlers.click();
+  await settle();
+  assert.equal(requests.length,priorCount+1);
+  dom["match-confirm-discard"].checked=false;
+  dom["match-confirm-discard"].handlers.change();
   assert.equal(requests.at(-1).from_draw,false);
   assert.equal(dom["match-win-alert"].hidden,false);
   assert.ok(descendants(dom["match-win-alert"],
