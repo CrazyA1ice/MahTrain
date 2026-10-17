@@ -218,6 +218,11 @@ class MatchArchiveTests(unittest.TestCase):
         report = self.store.detail(archive_id)["report"]
         self.assertEqual(report["exhaustive_settlement"]["balances"],[-800,800,0,0])
         self.assertEqual(report["settled_balances"],[-800,800,0,0])
+        listing=self.store.list_completed()
+        self.assertEqual(listing["matches"][0]["win_b0"],0)
+        self.assertEqual(listing["matches"][0]["settled_b0"],-800)
+        self.assertEqual(listing["summary"]["average_player0_win_balance"],0)
+        self.assertEqual(listing["summary"]["average_player0_settled_balance"],-800)
         self.assertEqual(report["exhaustive_settlement"]["entries"],[{
             "index":1,"stage":"flower_pig","payer":0,"recipient":1,
             "amount":800,
@@ -246,6 +251,43 @@ class MatchArchiveTests(unittest.TestCase):
             self.store.save_completed(
                 {**completed,"won":[False,True,False,False]},
                 [],before,["basic"]*3)
+
+    def test_legacy_schema_migrates_additive_settled_index_and_falls_back(self):
+        old_db=Path(self.temp.name)/"old_matches.sqlite3"
+        with sqlite3.connect(old_db) as db:
+            db.execute("""
+                CREATE TABLE completed_matches (
+                    archive_id TEXT PRIMARY KEY,
+                    created_at TEXT NOT NULL,
+                    phase TEXT NOT NULL,
+                    dealer INTEGER NOT NULL,
+                    win_count INTEGER NOT NULL,
+                    steps_count INTEGER NOT NULL,
+                    win_b0 INTEGER NOT NULL,
+                    record_json TEXT NOT NULL
+                )
+            """)
+            db.execute("""INSERT INTO completed_matches(
+                archive_id,created_at,phase,dealer,win_count,steps_count,
+                win_b0,record_json) VALUES(?,?,?,?,?,?,?,?)""",
+                ("old","2026-10-01T00:00:00Z","finished",0,1,1,-35,"{}"))
+        history=MatchArchive(old_db)
+        first=history.list_completed()
+        self.assertEqual(first["matches"][0]["win_b0"],-35)
+        self.assertEqual(first["matches"][0]["settled_b0"],-35)
+        self.assertEqual(first["summary"]["average_player0_settled_balance"],-35)
+        self.assertEqual(first["summary"]["average_player0_win_balance"],-35)
+        # Repeating constructor is an idempotent migration, not a rewrite.
+        second=MatchArchive(old_db).list_completed()
+        self.assertEqual(first,second)
+        with sqlite3.connect(old_db) as db:
+            cols=[row[1] for row in db.execute(
+                "PRAGMA table_info(completed_matches)")]
+            self.assertIn("settled_b0",cols)
+            self.assertEqual(db.execute(
+                "SELECT settled_b0 FROM completed_matches WHERE archive_id='old'"
+            ).fetchone()[0],None)
+            self.assertEqual(db.execute("PRAGMA user_version").fetchone()[0],0)
 
     def test_does_not_change_legacy_history_schema_version(self):
         from mahtrain_core.history import HistoryStore

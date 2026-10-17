@@ -32,17 +32,20 @@
     $("match-archives-compare").disabled=compared.length!==2;
     if(compared.length!==2)return;
     const a=compared[0],b=compared[1];
-    const title=el("strong","","已完成对局比较 · 0号胡牌已入账净额");
+    const title=el("strong","","已完成对局比较 · 0号正式净额（胡牌 + 已入账流局）");
     panel.append(title);
     for(const match of compared){
       panel.append(el("p","",
         match.created_at+" · "+(match.phase==="finished"?"三家胡牌":"牌山耗尽")+
-        " · 0号净额 "+sign(match.win_b0)+
+        " · 0号正式净额 "+sign(match.settled_b0??match.win_b0)+
+        "（胡牌 "+sign(match.win_b0)+"）"+
         " · "+match.win_count+"笔胡牌"));
     }
     panel.append(el("p","",
-      "两局差额："+sign(a.win_b0-b.win_b0)+
-      "（列表第一局减第二局；本列表是胡牌净额比较，不含可能已单独入账的方案A流局赔付及实验杠钱，详情中展示完整账目）"));
+      "两局正式积分差额："+sign(
+        (a.settled_b0??a.win_b0)-(b.settled_b0??b.win_b0))+
+      " · 胡牌部分差额："+sign(a.win_b0-b.win_b0)+
+      "（第一局减第二局；正式积分=胡牌+已入账方案A流局赔付，不含模拟杠钱）"));
   }
   function renderList(){
     const root=$("match-archives-list");
@@ -66,7 +69,9 @@
       row.append(check);
       row.append(el("span","",
         match.created_at+" · "+(match.phase==="finished"?"三家已胡":"牌山耗尽")+
-        " · "+match.win_count+"笔胡牌 · 0号净额 "+sign(match.win_b0)));
+        " · "+match.win_count+"笔胡牌 · 0号正式净额 "+
+        sign(match.settled_b0??match.win_b0)+
+        "（胡牌 "+sign(match.win_b0)+"）"));
       row.append(makeButton("查看公开复盘",()=>openMatch(match.archive_id)));
       root.append(row);
     }
@@ -80,8 +85,11 @@
       selected=new Set([...selected].filter(id=>
         listed.some(x=>x.archive_id===id)));
       $("match-archives-summary").textContent=
-        "已保存 "+response.summary.games+" 局 · 0号平均胡牌已入账净额 "+
-        Number(response.summary.average_player0_win_balance).toFixed(1)+
+        "已保存 "+response.summary.games+" 局 · 0号平均正式净额 "+
+        Number(response.summary.average_player0_settled_balance??
+          response.summary.average_player0_win_balance).toFixed(1)+
+        "（平均胡牌 "+Number(
+          response.summary.average_player0_win_balance).toFixed(1)+"）"+
         " · 累计 "+response.summary.paid_wins+"笔胡牌";
       renderList();
     }catch(err){fail(err)}
