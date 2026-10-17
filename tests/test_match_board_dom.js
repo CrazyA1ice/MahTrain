@@ -916,9 +916,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(descendants(newKong,x=>
     x.className==="match-tile-back").length,13);
   assert.equal(descendants(newKong,x=>
-    x.className.includes("match-kong-revealed")).length,1);
-  const visibleMeld=descendants(newKong,x=>
-    x.className==="match-seat-meld--an_gang");
+    x.classList.contains("match-kong-revealed")).length,1);
   // The full rack has one authorized visible face and 3 backs.
   assert.ok(descendants(newKong,x=>x.attributes["aria-label"]?.includes(
     "一张翻开")).length===1);
