@@ -12,6 +12,66 @@ from typing import Any, Mapping, Sequence
 from .rules import score_win, winning_tiles
 
 
+
+def compare_exhaustive_scopes(
+    preview: Mapping[str, Any],
+    *, won: Sequence[bool], coefficient: int,
+) -> dict[str, Any]:
+    """Compare two *unposted* scopes for flower-pig payments.
+
+    Variant A: existing active-only preview.
+    Variant B: a flower pig also pays to seats that have already legally won,
+    treating them as non-flower-pigs. The da-jiao stage is unchanged because
+    already-won players are no longer in the ready/unready comparison.
+    Neither variant is an official rule or a mutation of any score ledger.
+    """
+    if len(won) != 4 or any(type(flag) is not bool for flag in won):
+        raise ValueError("scope comparison needs four verified winner flags")
+    if type(coefficient) is not int or coefficient <= 0:
+        raise ValueError("scope comparison requires a positive room coefficient")
+    if not preview.get("triggered") or preview.get("posted") is not False:
+        return {"available": False, "posted": False, "scenarios": [],
+                "reason": "not_an_unposted_exhaustive_draw"}
+    if preview.get("reason") == "unresolved_missing_meld_or_nonstable_hand":
+        return {"available": False, "posted": False, "scenarios": [],
+                "reason": "unresolved_hand_classification"}
+    entries = preview.get("proposed_transfers")
+    seats = preview.get("seats")
+    active = preview.get("participating_active_seats")
+    if not (isinstance(entries, list) and isinstance(seats, list) and
+            isinstance(active, list)):
+        raise ValueError("malformed exhaustive preview")
+    # Only validated, already-known flower pigs may pay in this scenario.
+    pigs = [x["seat"] for x in seats
+            if x.get("classification") == "flower_pig"]
+    winners = [seat for seat in range(4) if won[seat]]
+    baseline = [dict(item) for item in entries]
+    inclusive = [*baseline]
+    for pig in pigs:
+        for recipient in winners:
+            inclusive.append({
+                "stage": "flower_pig", "payer": pig,
+                "recipient": recipient, "amount": 8 * coefficient,
+            })
+    def variant(policy: str, transfers: list[dict]) -> dict:
+        balances = [0, 0, 0, 0]
+        for payment in transfers:
+            amount = payment["amount"]
+            balances[payment["payer"]] -= amount
+            balances[payment["recipient"]] += amount
+        if sum(balances) != 0:
+            raise ValueError("exhaustive scope settlement is not zero-sum")
+        return {"policy": policy, "transfers": transfers,
+                "balances": balances, "zero_sum": True, "posted": False}
+    return {
+        "available": True, "posted": False,
+        "difference": "whether already-won seats also receive flower-pig compensation",
+        "scenarios": [
+            variant("active_only_preview", baseline),
+            variant("won_players_collect_flower_pig_preview", inclusive),
+        ],
+    }
+
 def review_exhaustive_draw(
     *, hands: Sequence[Sequence[str]],
     melds: Sequence[Sequence[Mapping[str, str]]],
@@ -92,7 +152,7 @@ def review_exhaustive_draw(
                         "amount":coefficient * 2**listener["max_effective_fan"],
                         "effective_fan":listener["max_effective_fan"],
                     })
-    return {
+    result = {
         "triggered":True,"posted":False,
         "policy":"active_only_preview",
         "participating_active_seats":active,
@@ -112,3 +172,7 @@ def review_exhaustive_draw(
             "no_money_posted",
         ],
     }
+    result["scope_comparison"] = compare_exhaustive_scopes(
+        result, won=won, coefficient=coefficient,
+    )
+    return result

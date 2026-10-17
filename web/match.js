@@ -877,6 +877,27 @@
           "（仅试算）："+entry.payer+"号向"+entry.recipient+
           "号付"+entry.amount));
       }
+      // Compare TWO audited assumptions. Neither touches the authoritative
+      // HU ledger or makes a second terminal settlement.
+      const scope=review.scope_comparison;
+      if(scope?.available && Array.isArray(scope.scenarios)){
+        const options=el("details","match-transfers");
+        options.append(el("summary","",
+          "查看已胡玩家是否收取花猪赔付的两种假设（零和试算）"));
+        for(const scenario of scope.scenarios){
+          const label=scenario.policy==="active_only_preview"
+            ?"方案A：仅未胡玩家之间":"方案B：已胡玩家也收取花猪赔付";
+          options.append(el("p","review-footnote",label+" · 四家差额 "+
+            scenario.balances.map((n,i)=>i+"号"+signedScore(n)).join(" · ")+
+            " · 零和"+(scenario.zero_sum?"通过":"异常")));
+        }
+        options.append(el("p","match-unpriced",
+          "两种假设均未入账；已胡玩家在方案B仅参与花猪收款，不参与查大叫。"));
+        sec.append(options);
+      }else if(scope){
+        sec.append(el("p","match-unpriced",
+          "当前存在未核验缺门副露或手牌张数，暂不展示假设金额。"));
+      }
       sec.append(el("p","match-unpriced",
         "流局付款状态：未入账。赔付参与人及缺门副露归属确认后才能正式结算。"));
       publicInfo.append(sec);
