@@ -578,7 +578,7 @@
       (wallEnd?(state.exhaustive_settlement?.posted?
         " 方案A（仅未胡玩家参与）已完成流局零和结算。":
         " 流局存在待核验事项或旧局记录，流局赔付未入账。"):
-        " 本局没有发生流局查花猪、查大叫结算。")+
+        " 本局未发生流局，流局赔付未入账。")+
       " 独立杠钱仅为可选试验积分，绝不计入胡牌余额。";
   }
   function renderTableSettlement(){
