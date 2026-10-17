@@ -1198,7 +1198,7 @@ class WebUI(unittest.TestCase):
 
     def test_m342_revealed_concealed_kong_public_board_without_other_hands(self):
         from test_four_player_claims import staged_game
-        from mahtrain_core.tiles import TILES
+        from mahtrain_core.rules import TILES
         from collections import Counter
         from mahtrain_core.four_player import FourPlayerOpening
         dealer=FourPlayerOpening(19).dealer
