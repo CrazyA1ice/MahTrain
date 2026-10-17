@@ -871,7 +871,8 @@
     }else if(["claim_window","rob_kong_window"].includes(state.phase)){
       const opts=state.phase==="claim_window"?
         state.claim_options:state.rob_options;
-      tip=opts?.some(option=>option!=="pass")?
+      tip=!state.claim_submitted?.includes(0)&&
+        opts?.some(option=>option!=="pass")?
         "可响应 · 请在牌桌中央选择碰、杠、胡或过":
         "暂无可响应动作 · 正在继续对局";
     }else if(["finished","wall_exhausted"].includes(state.phase)){
@@ -988,7 +989,11 @@
       const target=phase==="claim_window"?state.pending_discard:state.pending_rob_kong;
       // If PASS is the only legal response, the server automatically
       // advances it. A blocking popup with only "过" is not an opportunity.
-      if(options?.some(option=>option!=="pass")){
+      // A real opportunity exists only BEFORE seat zero has submitted a
+      // response. Waiting for other AI players must not reopen the popup.
+      const humanCanRespond=!state.claim_submitted?.includes(0)&&
+        target?.seat!==0&&options?.some(option=>option!=="pass");
+      if(humanCanRespond){
       decision.append(el("strong","match-decision-title",
         phase==="claim_window"?"请选择碰、杠、胡或过":"请选择抢杠胡或过"));
       decision.append(el("p","match-decision-hint",
