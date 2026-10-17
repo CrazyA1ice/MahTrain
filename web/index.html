@@ -272,6 +272,14 @@
               <button id="match-focus-toggle" type="button" class="review-control" aria-pressed="false">沉浸牌桌</button>
               <button id="match-large-tiles-toggle" type="button" class="review-control" aria-pressed="false">放大手牌</button>
               <button id="match-skin-toggle" type="button" class="review-control" aria-pressed="false">深蓝桌布</button>
+              <label class="match-back-picker">牌背颜色
+                <select id="match-back-color" aria-label="其他玩家及牌墙牌背颜色">
+                  <option value="jade" selected>翡翠绿</option>
+                  <option value="indigo">宝石蓝</option>
+                  <option value="red">朱砂红</option>
+                  <option value="gold">琥珀金</option>
+                </select>
+              </label>
               <label class="match-confirm-option"><input id="match-confirm-discard" type="checkbox"> 出牌二次确认</label>
             </div>
           </div>
@@ -339,7 +347,7 @@
               <section id="match-seat-1" class="match-seat match-seat--right" aria-label="1号下家"></section>
               <div id="match-score-bursts" class="match-score-bursts" aria-label="真实胡牌积分变动" aria-live="polite" hidden></div>
               <section id="match-seat-0" class="match-seat match-seat--bottom" aria-label="0号自己">
-                <div class="match-self-header"><span class="match-seat-avatar match-seat-avatar--self" aria-hidden="true">我</span><strong>0号 · 自己</strong></div>
+                <div class="match-self-header"><span class="match-seat-avatar match-seat-avatar--self" aria-hidden="true">我</span><strong>0号 · 自己</strong><strong id="match-self-missing-flag" class="match-missing-flag" hidden></strong></div>
                 <div id="match-self-status" class="match-seat-status"></div>
                 <div class="match-hand-navigation" aria-label="手机手牌导航">
                   <button id="match-hand-prev" type="button" class="review-control" aria-label="查看左侧手牌">◀ 左侧</button>
