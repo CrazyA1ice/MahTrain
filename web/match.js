@@ -707,7 +707,7 @@
     const myPosted=state.settled_balances?.[0]??ledger.balances[0];
     $("match-table-self-summary").textContent=
       "我的已入账积分 "+signedScore(myPosted)+" · "+
-      (wallPending?"牌山耗尽但流局赔付尚未核验，不代表最终净积分":
+      (wallPending?"牌山耗尽 · 流局赔付待核验，不代表最终净积分":
         state.exhaustive_settlement?.posted?
           "包含方案A已确认的流局赔付":"仅含已确认胡牌积分");
     const scores=$("match-table-scores");
