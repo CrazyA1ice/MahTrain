@@ -27,7 +27,8 @@ class Node {
 }
 const ids=[
   "match-new","match-again","match-lab-enabled","match-voice-enabled",
-  "match-voice-status","match-enable-kong","match-kong-base","match-seed",
+  "match-voice-status","match-voice-speed","match-voice-repeat",
+  "match-enable-kong","match-kong-base","match-seed",
   "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
@@ -65,6 +66,7 @@ dom["match-seed"].value="42";
 dom["match-coefficient"].value="100";
 dom["match-fan-cap"].value="3";
 dom["match-playback-speed"].value="450";
+dom["match-voice-speed"].value="normal";
 for(const n of [1,2,3])dom["match-ai-"+n].value="advanced";
 const hand=["m1","m2","m3","m4","m5","m6","m7","s1","s2","s3","s4","s5","p1","p2"];
 const base={
@@ -174,6 +176,25 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(Object.hasOwn(requests[0],"seed"),false,
     "ordinary match must let the server select an unused random seed");
   assert.equal(dom["match-voice-enabled"].checked,true);
+  assert.equal(dom["match-voice-speed"].disabled,false);
+  assert.equal(dom["match-voice-repeat"].disabled,true,
+    "new round must forget the previous round's spoken actions");
+  const voiceRequests=requests.length;
+  dom["match-voice-speed"].value="slow";
+  dom["match-voice-speed"].handlers.change();
+  assert.equal(dom["match-voice-speed"].value,"slow");
+  dom["match-voice-repeat"].handlers.click();
+  assert.equal(requests.length,voiceRequests,
+    "manual voice replay cannot send a game request");
+  dom["match-voice-enabled"].checked=false;
+  dom["match-voice-enabled"].handlers.change();
+  assert.equal(dom["match-voice-speed"].disabled,true);
+  assert.equal(dom["match-voice-repeat"].disabled,true);
+  dom["match-voice-enabled"].checked=true;
+  dom["match-voice-enabled"].handlers.change();
+  assert.equal(dom["match-voice-speed"].disabled,false);
+  dom["match-voice-speed"].value="normal";
+  dom["match-voice-speed"].handlers.change();
   assert.equal(dom["match-stage"].hidden,false);
   assert.equal(dom["match-wall-count"].textContent,"54");
   assert.equal(dom["match-hand"].children.length,14);
