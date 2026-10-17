@@ -1453,9 +1453,6 @@
   width:60px;height:82px;border-radius:6px;padding:3px;
   border-color:#f3f0e7;box-shadow:0 4px 0 #c1c9bf,0 7px 13px #071f1b8c
 }
-.match-board.is-large-tiles .match-seat--bottom #match-hand .tile{
-  width:69px;height:92px;
-}
 .match-board .match-seat--bottom #match-hand .tile.selectable:hover{
   border-color:#f7bd62;transform:translateY(-7px);
 }
@@ -1498,9 +1495,6 @@
   .match-hud-actions button{flex:1 0 auto}
   .match-board .match-seat--bottom #match-hand .tile{
     width:55px;height:75px
-  }
-  .match-board.is-large-tiles .match-seat--bottom #match-hand .tile{
-    width:65px;height:88px
   }
   .match-controls{bottom:4px;max-height:40vh;overflow-y:auto;padding:10px}
 }
@@ -1641,9 +1635,6 @@
   }
   .match-board .match-seat--bottom #match-hand .tile{
     scroll-snap-align:start;width:51px;height:70px;flex-shrink:0
-  }
-  .match-board.is-large-tiles .match-seat--bottom #match-hand .tile{
-    width:60px;height:82px
   }
   .match-seat--bottom #match-hand .tile.match-new-draw{margin-left:14px}
   .match-seat--bottom .match-seat-melds{max-width:100%;overflow-x:auto}
@@ -1927,3 +1918,125 @@
 .match-seat-meld--an_gang .match-kong-revealed:focus-visible{
   outline:3px solid #f3c357;
 }
+
+/* M3.44: player-perspective RIVER chronology, not merely tile rotation.
+   Left seat: discard #1 at TOP, then down. Right seat: #1 at BOTTOM, then up.
+   Each lane has at most 8 authentic server-ordered discards, the next lane
+   continues the sequence. No reversed data, CSS overflow scrollbars or
+   misleading inversion of the individual tile text. */
+.match-river-lane{display:contents}
+@media(min-width:901px){
+  .match-board{
+    min-width:1510px;
+    grid-template-columns:210px minmax(0,1fr) 210px;
+    grid-template-rows:minmax(168px,auto) minmax(715px,auto)
+      minmax(172px,auto) auto;
+  }
+  .match-board-center{
+    min-height:715px;
+    grid-template-columns:minmax(285px,1fr) minmax(180px,.65fr) minmax(285px,1fr);
+    grid-template-rows:minmax(105px,auto) minmax(580px,auto) minmax(105px,auto);
+  }
+  /* Three AI opponents use one large, consistent back size by default. */
+  .match-seat--top .match-tile-back{
+    flex:0 0 34px;width:34px;height:46px;
+    border-width:2px;border-radius:5px;
+  }
+  .match-seat--left .match-tile-back,
+  .match-seat--right .match-tile-back{
+    flex:0 0 34px;width:37px;min-width:37px;height:34px;
+    border-width:2px;border-radius:5px;
+  }
+  .match-seat--left .match-seat-backs,
+  .match-seat--right .match-seat-backs{max-height:none;overflow:visible;gap:1px}
+  .match-river--left .match-river-tiles,
+  .match-river--right .match-river-tiles{
+    display:flex;direction:ltr;flex-direction:row;
+    align-items:flex-start;justify-content:center;align-content:initial;
+    gap:7px;max-height:none;overflow:visible;
+  }
+  .match-river--right .match-river-tiles{flex-direction:row-reverse}
+  .match-river--left .match-river-lane,
+  .match-river--right .match-river-lane{
+    display:flex;flex-direction:column;align-items:center;gap:7px;
+  }
+  .match-river--right .match-river-lane{flex-direction:column-reverse}
+  .match-river--left .match-river-cell,
+  .match-river--right .match-river-cell,
+  .match-river--left .match-river-cell.is-claimed,
+  .match-river--right .match-river-cell.is-claimed{
+    box-sizing:border-box;min-width:75px;min-height:67px;
+  }
+  .match-board .match-river--left .match-river-cell .tile,
+  .match-board .match-river--right .match-river-cell .tile{
+    width:49px;height:68px;border-radius:6px;
+  }
+  .match-board .match-river--top .match-river-cell .tile,
+  .match-board .match-river--bottom .match-river-cell .tile{
+    width:51px;height:69px;border-radius:6px;
+  }
+  .match-river--top .match-river-cell,
+  .match-river--bottom .match-river-cell{min-width:53px;min-height:71px}
+  .match-river--left .match-river-claimed,
+  .match-river--right .match-river-claimed{font-size:12px}
+  /* Keep side melds just as legible as the side rivers. */
+  .match-board .match-seat--left .match-seat-meld .tile,
+  .match-board .match-seat--right .match-seat-meld .tile{
+    width:36px;height:40px;flex:0 0 40px;
+  }
+  .match-board .match-seat--left .match-seat-meld .match-tile-back,
+  .match-board .match-seat--right .match-seat-meld .match-tile-back{
+    width:34px;height:38px;flex:0 0 38px;
+  }
+}
+/* The active player's own legal reactions are ONE overlay, at the table's
+   actual center. This replaces the below-table peng/kong/ron buttons. */
+.match-decision{
+  position:absolute;z-index:14;left:50%;top:50%;
+  transform:translate(-50%,-50%);pointer-events:auto;
+  width:min(450px,calc(100vw - 52px));max-width:calc(100% + 140px);
+  box-sizing:border-box;padding:16px 17px;
+  background:#0f3f36f5;color:#fff3d0;
+  border:2px solid #f1c87b;border-radius:17px;
+  box-shadow:0 16px 42px #001c19ba,0 0 0 6px #fff5cf28;
+  display:flex;flex-direction:column;align-items:center;gap:9px;
+  backdrop-filter:blur(6px);
+}
+.match-decision[hidden]{display:none!important}
+.match-decision-title{
+  display:block;font-size:21px;line-height:1.3;text-align:center;
+  font-weight:900;letter-spacing:.05em;color:#ffdf8d;
+}
+.match-decision-hint{
+  margin:0;font-size:13px;line-height:1.5;text-align:center;color:#daeedf;
+}
+.match-decision .match-reaction-actions{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  width:100%;margin:2px 0 0;padding:0;gap:9px;
+}
+.match-decision .match-reaction-button{
+  box-sizing:border-box;min-width:0;width:100%;min-height:56px;
+  padding:9px 12px;border-radius:11px;border:2px solid #b2d5be;
+  background:#e1f0da;color:#20593f;
+  font-size:19px;font-weight:900;box-shadow:0 3px 0 #0b2a2255;
+  cursor:pointer;
+}
+.match-decision .match-reaction--hu{
+  border-color:#ffda80;color:#4b2e10;
+  background:linear-gradient(145deg,#ffdfa0,#eab04a);
+}
+.match-decision .match-reaction--pass{
+  border-color:#b9c8c2;color:#455c54;background:#eaf1ed;
+  font-size:15px;font-weight:750;
+}
+.match-decision .match-reaction-button:focus-visible{
+  outline:3px solid #fff0b6;outline-offset:3px;
+}
+@media(max-width:900px){
+  .match-decision{padding:10px 11px;width:min(300px,calc(100vw - 34px));gap:6px}
+  .match-decision-title{font-size:16px}
+  .match-decision-hint{font-size:10px}
+  .match-decision .match-reaction-actions{gap:5px}
+  .match-decision .match-reaction-button{min-height:45px;padding:5px;font-size:13px}
+}
+/* Existing narrow-screen compact table keeps its original grid cells. */
