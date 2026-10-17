@@ -2067,6 +2067,7 @@
   .match-board .match-seat{min-width:0;overflow:hidden;padding:7px 3px}
   .match-board-center{
     min-width:0;min-height:520px;
+    grid-template-areas:"rt rt rt" "rl wall rr" "rb rb rb";
     grid-template-columns:minmax(0,1fr) minmax(88px,.57fr) minmax(0,1fr);
     grid-template-rows:minmax(105px,auto) minmax(425px,auto) minmax(105px,auto);
     gap:clamp(3px,.5vw,8px);
@@ -2127,6 +2128,16 @@
   }
   .match-seat--left .match-seat-backs,
   .match-seat--right .match-seat-backs{max-height:none;overflow:visible;gap:0}
+  .match-seat--left .match-seat-backs,
+  .match-seat--left .match-meld-tiles{flex-direction:column}
+  .match-seat--right .match-seat-backs,
+  .match-seat--right .match-meld-tiles{flex-direction:column-reverse}
+  .match-seat--left .match-seat-melds{flex-direction:column}
+  .match-seat--right .match-seat-melds{flex-direction:column-reverse}
+  .match-seat--left .match-tile-back,
+  .match-seat--left .match-seat-meld .tile{transform:rotate(90deg)}
+  .match-seat--right .match-tile-back,
+  .match-seat--right .match-seat-meld .tile{transform:rotate(-90deg)}
   .match-board .match-seat--bottom #match-hand{
     width:100%;max-width:100%;
     overflow-x:clip;justify-content:center;gap:clamp(1px,.2vw,4px);
