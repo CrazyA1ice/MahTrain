@@ -1219,6 +1219,28 @@ class WebUI(unittest.TestCase):
         self.assertNotIn("_hands",view)
         self.assertNotIn("_wall",view)
 
+    def test_m345_fluid_board_no_horizontal_pan_and_contextual_dialog(self):
+        page,_=self.get("/")
+        script,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b'id="match-decision"',page)
+        self.assertNotIn(b'match-board-scroll" tabindex="0"',page)
+        self.assertIn(b"overflow-x:clip;overflow-y:visible",css)
+        self.assertIn(b".match-board{",css)
+        self.assertIn(b"box-sizing:border-box;width:100%;min-width:0;max-width:100%",css)
+        self.assertIn(b"@media(min-width:701px)",css)
+        self.assertIn(b"grid-template-areas:\"rt rt rt\" \"rl wall rr\" \"rb rb rb\"",css)
+        self.assertIn(b"width:clamp(36px,4.15vw,60px)",css)
+        self.assertIn(b"const kongKey=",script)
+        self.assertIn(b"pending_discard",script)
+        self.assertIn(b"const humanCanRespond=",script)
+        self.assertIn(b"if(humanCanRespond)",script)
+        self.assertIn(b"state.claim_submitted?.includes(0)",script)
+        self.assertIn(b"dismissedKongKey=kongKey",script)
+        self.assertIn(b"kongPromptReopened=true",script)
+        self.assertIn("暂不杠 · 继续出牌".encode(),script)
+        self.assertIn(b"decision.hidden=true;",script)
+
     def test_m344_owner_ordered_river_and_center_controls_assets(self):
         page,_=self.get("/")
         script,_=self.get("/match.js")

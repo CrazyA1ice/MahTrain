@@ -817,6 +817,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     "claim must be selectable from table center");
   assert.equal(dom["match-controls"].hidden,true,
     "unused below-table claim toolbar must be completely hidden");
+  assert.equal(dom["match-decision"].children.filter(x=>
+    x.className==="match-reaction-actions").length,1,
+    "the live server-supplied claim is the only dialog trigger");
   assert.ok(reaction);
   assert.deepEqual(reaction.children.map(x=>x.textContent),[
     "胡 · 优先响应","明杠","碰","过 · 放弃本次响应"
@@ -842,6 +845,37 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(requests.at(-1).action,"match_rob");
   assert.equal(requests.at(-1).choice,"pass");
+  // A human response already submitted must NEVER show an old popup
+  // while the other 2 AI seats finish arbitration.
+  startMatch={...base,phase:"claim_window",turn:2,
+    claim_options:["pass","peng","hu"],
+    claim_submitted:[0],pending_discard:{seat:2,tile:"p2"},
+    needs_continue:false};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-decision"].hidden,true,
+    "already committed response must not reappear during AI arbitration");
+  assert.equal(dom["match-controls"].hidden,true);
+
+  // M3.45: PASS-only claim is already auto-resolved by the server.
+  // Do not flash a modal or make the human click an unnecessary "过".
+  startMatch={...base,phase:"claim_window",turn:2,
+    claim_options:["pass"],pending_discard:{seat:2,tile:"p2"},
+    needs_continue:false};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-decision"].hidden,true,
+    "PASS-only response must never produce a blocking dialog");
+  assert.equal(dom["match-controls"].hidden,true,
+    "PASS-only response should not leave an empty bottom toolbar");
+  startMatch={...base,phase:"rob_kong_window",turn:2,
+    rob_options:["pass"],pending_rob_kong:{seat:2,tile:"s2"},
+    needs_continue:false};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-decision"].hidden,true,
+    "PASS-only rob-kong response should not display a modal");
+
   // Starting a new game resets stale navigation even after scrolling far.
   dom["match-hand"].scrollLeft=600;
   startMatch={...base};
@@ -942,12 +976,33 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     "own legally offered kong should be centered, never below the table");
   const kongGroup=dom["match-decision"].children.find(x=>
     x.className==="match-reaction-actions");
-  assert.equal(kongGroup.children.length,1);
+  assert.equal(kongGroup.children.length,2,
+    "one kong action and one dismiss button, never a persistent modal");
   assert.ok(kongGroup.children[0].textContent.includes("暗杠"));
+  assert.ok(kongGroup.children[1].textContent.includes("暂不杠"));
+  const beforeDismiss=requests.length;
+  kongGroup.children[1].handlers.click();
+  await settle();
+  assert.equal(requests.length,beforeDismiss,
+    "choosing to continue discarding must not send a kong request");
+  assert.equal(dom["match-decision"].hidden,true,
+    "declining one kong opportunity must keep the table unobstructed");
+  // Re-rendering the same turn MUST NOT reopen the optional kong modal.
+  dom["match-focus-toggle"].handlers.click();
+  assert.equal(dom["match-decision"].hidden,true);
+  const reopenKong=dom["match-controls"].children.find(x=>
+    x.className.includes("match-open-kong"));
+  assert.ok(reopenKong,"own kong remains available as a small control");
+  reopenKong.handlers.click();
+  await settle();
+  assert.equal(dom["match-decision"].hidden,false,
+    "manual reopen should work while this legal kong opportunity persists");
+  const reopenedKongGroup=dom["match-decision"].children.find(x=>
+    x.className==="match-reaction-actions");
   assert.equal(dom["match-controls"].children.some(x=>
     x.textContent.includes("暗杠")),false);
   const kongBefore=requests.length;
-  kongGroup.children[0].handlers.click();
+  reopenedKongGroup.children[0].handlers.click();
   await settle();
   assert.equal(requests.length,kongBefore+1);
   assert.equal(requests.at(-1).action,"match_kong");

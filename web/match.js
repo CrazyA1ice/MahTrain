@@ -9,6 +9,9 @@
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
   let pendingDiscard=null,immersive=false,midnightFelt=false;
+  // The owner may decline an optional self-kong without losing the right
+  // to reopen it. Never reopen the same offer on each render or redraw.
+  let dismissedKongKey=null,kongPromptReopened=false;
   let backColor="jade";
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
@@ -135,6 +138,7 @@
         $("match-review-type-filter").value="all";
       }
       token=data.match_token;state=data.match;choice.clear();
+      kongPromptReopened=false;
       needsContinue=data.match.needs_continue===true;
       pendingDiscard=null;
       if(name==="match_new"){
@@ -176,7 +180,7 @@
       }
     }catch(err){
       liveBoard=null;
-      if(state)renderBoard();
+      if(state)render();
       $("match-error").textContent=err.message||String(err);
       $("match-request-status").textContent="操作未完成，请检查错误提示";
     }finally{
@@ -865,7 +869,12 @@
     }else if(state.phase==="missing_select"){
       tip="选择本局定缺花色";
     }else if(["claim_window","rob_kong_window"].includes(state.phase)){
-      tip="请在下方选择碰、杠、胡或过";
+      const opts=state.phase==="claim_window"?
+        state.claim_options:state.rob_options;
+      tip=!state.claim_submitted?.includes(0)&&
+        opts?.some(option=>option!=="pass")?
+        "可响应 · 请在牌桌中央选择碰、杠、胡或过":
+        "暂无可响应动作 · 正在继续对局";
     }else if(["finished","wall_exhausted"].includes(state.phase)){
       tip="本局结束 · 查看结算和复盘";
     }else if(state.won?.[0]){
@@ -978,6 +987,13 @@
     }else if(phase==="claim_window"||phase==="rob_kong_window"){
       const options=phase==="claim_window"?state.claim_options:state.rob_options;
       const target=phase==="claim_window"?state.pending_discard:state.pending_rob_kong;
+      // If PASS is the only legal response, the server automatically
+      // advances it. A blocking popup with only "过" is not an opportunity.
+      // A real opportunity exists only BEFORE seat zero has submitted a
+      // response. Waiting for other AI players must not reopen the popup.
+      const humanCanRespond=!state.claim_submitted?.includes(0)&&
+        target?.seat!==0&&options?.some(option=>option!=="pass");
+      if(humanCanRespond){
       decision.append(el("strong","match-decision-title",
         phase==="claim_window"?"请选择碰、杠、胡或过":"请选择抢杠胡或过"));
       decision.append(el("p","match-decision-hint",
@@ -995,8 +1011,11 @@
         const btn=button(label,
           "match-reaction-button match-reaction--"+option+
           (option==="hu"?" primary":" review-control"),
-          ()=>action(phase==="claim_window"?"match_claim":"match_rob",
-            {choice:option}));
+          ()=>{
+            decision.hidden=true;
+            action(phase==="claim_window"?"match_claim":"match_rob",
+              {choice:option});
+          });
         btn.setAttribute("aria-label",
           (actionNames[option]||option)+
           (option==="pass"?"，跳过本次机会":"，提交本次响应"));
@@ -1004,6 +1023,7 @@
       }
       decision.append(reactions);
       decision.hidden=false;
+      }
     }else if(phase==="dealer_discard"||phase==="await_discard"){
       if(state.can_self_draw_win){
         // Server-confirmed, seat-0-only quote. Never calculate payouts from
@@ -1037,25 +1057,42 @@
           ()=>action("match_win")));
       }
       if(state.kong_options?.length){
-        decision.append(el("strong","match-decision-title","本回合可杠牌"));
-        decision.append(el("p","match-decision-hint",
-          "确认杠牌后将按规则补摸一张"));
-        const kongActions=el("div","match-reaction-actions");
-        kongActions.setAttribute("role","group");
-        kongActions.setAttribute("aria-label","本回合可执行的杠牌操作");
-        for(const kong of state.kong_options){
-          kongActions.append(button(
-            actionNames[kong.type]+" "+tileName(kong.tile),
-            "match-reaction-button match-reaction--ming_gang",
-            ()=>{
-              if(confirm("确认"+actionNames[kong.type]+tileName(kong.tile)+
-                  "？合法杠后从牌墙尾部补牌。")){
-                action("match_kong",{kind:kong.type,tile:kong.tile});
-              }
+        const kongKey=[token,phase,state.events?.length||0,
+          state.drawn_tile||"",
+          state.kong_options.map(k=>k.type+":"+k.tile).join(",")].join("|");
+        controls.append(button("可杠牌 · 查看选项",
+          "review-control match-open-kong",()=>{
+            kongPromptReopened=true;
+            render();
+          }));
+        if(dismissedKongKey!==kongKey||kongPromptReopened){
+          decision.append(el("strong","match-decision-title","本回合可杠牌"));
+          decision.append(el("p","match-decision-hint",
+            "可以选择杠牌，也可以暂不杠，继续出牌"));
+          const kongActions=el("div","match-reaction-actions");
+          kongActions.setAttribute("role","group");
+          kongActions.setAttribute("aria-label","本回合可执行的杠牌操作");
+          for(const kong of state.kong_options){
+            kongActions.append(button(
+              actionNames[kong.type]+" "+tileName(kong.tile),
+              "match-reaction-button match-reaction--ming_gang",
+              ()=>{
+                if(confirm("确认"+actionNames[kong.type]+tileName(kong.tile)+
+                    "？合法杠后从牌墙尾部补牌。")){
+                  decision.hidden=true;
+                  action("match_kong",{kind:kong.type,tile:kong.tile});
+                }
+              }));
+          }
+          kongActions.append(button("暂不杠 · 继续出牌",
+            "match-reaction-button match-reaction--pass",()=>{
+              dismissedKongKey=kongKey;
+              kongPromptReopened=false;
+              render();
             }));
+          decision.append(kongActions);
+          decision.hidden=false;
         }
-        decision.append(kongActions);
-        decision.hidden=false;
       }
       if(pendingDiscard && $("match-confirm-discard").checked){
         const selected=pendingDiscard;

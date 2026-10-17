@@ -2040,3 +2040,126 @@
   .match-decision .match-reaction-button{min-height:45px;padding:5px;font-size:13px}
 }
 /* Existing narrow-screen compact table keeps its original grid cells. */
+
+/* M3.45: FIT the entire desktop/tablet board into the available width.
+   The old M3.44 1510px min-width + auto overflow made the whole table
+   require a bottom scrollbar. Resize the three areas and tile footprints,
+   not just clip a fixed-width board and hide half its content. */
+.match-board-scroll{
+  box-sizing:border-box;width:100%;min-width:0;
+  overflow-x:clip;overflow-y:visible;
+  margin-inline:0;
+}
+.match-board-scroll::after{display:none!important;content:none!important}
+.match-board{
+  box-sizing:border-box;width:100%;min-width:0;max-width:100%;
+}
+@media(min-width:701px){
+  .match-board{
+    grid-template-columns:clamp(78px,9.2vw,146px)
+      minmax(0,1fr) clamp(78px,9.2vw,146px);
+    grid-template-rows:minmax(126px,auto) minmax(520px,auto)
+      minmax(145px,auto) auto;
+    gap:clamp(4px,.6vw,9px);
+    padding:clamp(6px,1vw,14px);
+    border-width:clamp(5px,.7vw,10px);
+  }
+  .match-board .match-seat{min-width:0;overflow:hidden;padding:7px 3px}
+  .match-board-center{
+    min-width:0;min-height:520px;
+    grid-template-areas:"rt rt rt" "rl wall rr" "rb rb rb";
+    grid-template-columns:minmax(0,1fr) minmax(88px,.57fr) minmax(0,1fr);
+    grid-template-rows:minmax(105px,auto) minmax(425px,auto) minmax(105px,auto);
+    gap:clamp(3px,.5vw,8px);
+  }
+  .match-river{box-sizing:border-box;min-width:0;padding:clamp(2px,.35vw,5px)}
+  .match-river--left .match-river-tiles,
+  .match-river--right .match-river-tiles{
+    display:flex;direction:ltr;
+    flex-direction:row;align-items:flex-start;justify-content:center;
+    gap:clamp(2px,.32vw,7px);width:100%;max-width:100%;
+    max-height:none;overflow:visible;
+  }
+  .match-river--right .match-river-tiles{flex-direction:row-reverse}
+  .match-river--left .match-river-lane,
+  .match-river--right .match-river-lane{
+    display:flex;flex-direction:column;
+    align-items:center;gap:clamp(2px,.3vw,6px);min-width:0;
+  }
+  .match-river--right .match-river-lane{flex-direction:column-reverse}
+  .match-river--left .match-river-cell,
+  .match-river--right .match-river-cell,
+  .match-river--left .match-river-cell.is-claimed,
+  .match-river--right .match-river-cell.is-claimed{
+    box-sizing:border-box;min-width:0;
+    width:clamp(39px,4vw,64px);min-height:clamp(46px,4.7vw,65px);
+  }
+  .match-board .match-river--left .match-river-cell .tile,
+  .match-board .match-river--right .match-river-cell .tile{
+    width:clamp(31px,3.4vw,49px);
+    height:clamp(42px,4.2vw,63px);
+  }
+  .match-river--top .match-river-tiles,
+  .match-river--bottom .match-river-tiles{
+    grid-template-columns:repeat(6,minmax(0,max-content));
+    max-height:none;overflow:visible;
+  }
+  .match-river--top .match-river-cell,
+  .match-river--bottom .match-river-cell{
+    min-width:clamp(30px,3.8vw,53px);min-height:clamp(42px,4.7vw,71px);
+  }
+  .match-board .match-river--top .match-river-cell .tile,
+  .match-board .match-river--bottom .match-river-cell .tile{
+    width:clamp(30px,3.6vw,51px);
+    height:clamp(41px,4.7vw,69px);
+  }
+  /* Fit even a 14-tile concealed row and the own 14-tile hand. */
+  .match-seat--top .match-seat-backs{max-width:100%;gap:1px}
+  .match-seat--top .match-tile-back{
+    flex:0 0 clamp(17px,2.35vw,34px);
+    width:clamp(17px,2.35vw,34px);
+    height:clamp(25px,3.2vw,46px);
+  }
+  .match-seat--left .match-tile-back,
+  .match-seat--right .match-tile-back{
+    flex:0 0 clamp(23px,2.6vw,34px);
+    min-width:0;width:clamp(24px,2.9vw,37px);
+    height:clamp(23px,2.6vw,34px);
+  }
+  .match-seat--left .match-seat-backs,
+  .match-seat--right .match-seat-backs{max-height:none;overflow:visible;gap:0}
+  .match-seat--left .match-seat-backs,
+  .match-seat--left .match-meld-tiles{flex-direction:column}
+  .match-seat--right .match-seat-backs,
+  .match-seat--right .match-meld-tiles{flex-direction:column-reverse}
+  .match-seat--left .match-seat-melds{flex-direction:column}
+  .match-seat--right .match-seat-melds{flex-direction:column-reverse}
+  .match-seat--left .match-tile-back,
+  .match-seat--left .match-seat-meld .tile{transform:rotate(90deg)}
+  .match-seat--right .match-tile-back,
+  .match-seat--right .match-seat-meld .tile{transform:rotate(-90deg)}
+  .match-board .match-seat--bottom #match-hand{
+    width:100%;max-width:100%;
+    overflow-x:clip;justify-content:center;gap:clamp(1px,.2vw,4px);
+  }
+  .match-board .match-seat--bottom #match-hand .tile{
+    box-sizing:border-box;
+    width:clamp(36px,4.15vw,60px);
+    height:clamp(51px,5.7vw,82px);
+    flex-shrink:1;
+  }
+  .match-seat--left .match-seat-melds,
+  .match-seat--right .match-seat-melds{max-height:none}
+  .match-river-tiles{scrollbar-width:none}
+}
+/* On phones the whole four-seat table already has a narrow-screen layout.
+   The personal hand can still be swiped, but the table itself never pans. */
+@media(max-width:700px){
+  .match-board-scroll{overflow-x:clip}
+  .match-board{min-width:0;max-width:100%}
+  .match-board .match-seat--bottom #match-hand{overflow-x:auto}
+}
+/* Hovering over a tile is not permission to block the whole table.
+   Inactive claim dialogs are removed by the [hidden] attribute. */
+.match-decision[hidden]{display:none!important}
+.match-open-kong{border-color:#bd9955!important}
