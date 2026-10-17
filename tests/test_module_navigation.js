@@ -20,11 +20,14 @@ const all=[
     ["home-open-"+key,"module-go-"+key]),
   ...Object.values(nav.GROUPS).flat(),
 ];
-const nodes=Object.fromEntries(all.map(id=>[id,new Node()]));
+const nodes=Object.fromEntries([...all,"home-match-state","match-stage"].map(id=>[id,new Node()]));
 nodes["game"].hidden=true; // existing training has not started yet
-const handlers={};
+nodes["match-stage"].hidden=true;
+const handlers={},refreshes={records:0,history:0};
 const win={
   location:{hash:""},scrolls:0,
+  MahTrainMatchArchives:{refresh(){refreshes.records++;}},
+  MahTrainHistory:{refresh(){refreshes.history++;}},
   scrollTo(){this.scrolls++;},
   addEventListener(type,fn){handlers[type]=fn;},
 };
@@ -48,6 +51,28 @@ for(const key of Object.keys(nav.GROUPS)){
   // The game is hidden by game logic itself and must retain that state.
   assert.equal(nodes["game"].hidden,true);
 }
+// The module switch does not fetch or mutate live match game state.
+assert.equal(refreshes.records,1,"first records visit pulls current SQLite data");
+assert.equal(refreshes.history,1,"standalone training archive refreshes on entry");
+nodes["module-go-match"].handlers.click();
+nodes["match-stage"].hidden=false; // an active match stays mounted
+nodes["module-back-home"].handlers.click();
+assert.equal(nodes["home-match-state"].textContent,
+  "已有对局界面，点击继续查看");
+nodes["module-go-records"].handlers.click();
+assert.equal(refreshes.records,2,"return to historical records fetches new games");
+handlers.hashchange(); // the hash write also emits browser hashchange
+assert.equal(refreshes.records,2,"hashchange must not double-load records");
+nodes["module-go-records"].handlers.click();
+assert.equal(refreshes.records,2,"same module does not fetch again");
+nodes["module-go-history"].handlers.click();
+assert.equal(refreshes.history,2,"training history refreshes on re-entry");
+nodes["module-go-match"].handlers.click();
+assert.equal(nodes["match-stage"].hidden,false,
+  "active match stays initialized and mounted after changing views");
+nodes["module-back-home"].handlers.click();
+assert.equal(nodes["home-match-state"].textContent,
+  "已有对局界面，点击继续查看");
 nodes["module-go-solo"].handlers.click();
 nodes["game"].hidden=false; // player starts a 14-step training game
 nodes["module-go-match"].handlers.click();
