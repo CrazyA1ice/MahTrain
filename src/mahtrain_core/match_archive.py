@@ -154,7 +154,7 @@ def sanitize_win_ledger(ledger: dict) -> dict:
             raise ValueError("invalid win settlement seats")
         kind = record.get("kind")
         main = record.get("main_pattern")
-        if kind not in _WIN_KINDS or type(main) is not str or main not in _MAIN_PATTERNS:
+        if type(kind) is not str or kind not in _WIN_KINDS or type(main) is not str or main not in _MAIN_PATTERNS:
             raise ValueError("invalid win settlement kind/pattern")
         fields = ("raw_fan", "effective_fan", "multiplier",
                   "amount_per_payer", "total_received")
