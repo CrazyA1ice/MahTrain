@@ -1,9 +1,8 @@
-"""Read-only exhaustive-draw check and transparent provisional payment preview.
+"""Sichuan exhaustive draw inspection and authoritative active-only settlement.
 
-The *trigger* and flower-pig definition are verified by v0.4. Whether players
-who already won participate in payments remains unconfirmed; this preview
-deliberately considers ACTIVE seats only and NEVER posts a transaction.
-Missing-suit exposed melds remain an explicit unresolved policy edge.
+Only players who have NOT won participate in flower-pig / da-jiao charges.
+Historical two-scope comparison remains informational. Exposed missing-suit
+melds or invalid hand shape block settlement rather than invent a payment.
 """
 from __future__ import annotations
 
@@ -71,6 +70,82 @@ def compare_exhaustive_scopes(
             variant("won_players_collect_flower_pig_preview", inclusive),
         ],
     }
+
+def finalize_active_only(preview: Mapping[str, Any], *, won: Sequence[bool],
+                         coefficient: int, fan_cap: int) -> dict[str, Any]:
+    """Validate a server-calculated exhaustive preview and post a ONE-SHOT result.
+
+    The caller (the trusted game state machine) must invoke this only on
+    transition into wall_exhausted, and store the result. It never posts an
+    unverified missing-suit meld or an unconfirmed 14-tile terminal hand.
+    """
+    if (len(won) != 4 or any(type(x) is not bool for x in won)
+            or type(coefficient) is not int or coefficient <= 0
+            or type(fan_cap) is not int or not 0 <= fan_cap <= 12):
+        raise ValueError("invalid official exhaustive settlement parameters")
+    if preview.get("triggered") is not True or preview.get("posted") is not False:
+        raise ValueError("requires an unposted, triggered exhaustive review")
+    active = [i for i in range(4) if not won[i]]
+    if preview.get("participating_active_seats") != active or len(active) < 2:
+        raise ValueError("exhaustive settlement participants mismatch")
+    base = {
+        "policy": "active_only_final", "posted": False,
+        "balances": [0, 0, 0, 0], "entries": [],
+        "zero_sum": True, "room_coefficient": coefficient,
+        "fan_cap": fan_cap,
+    }
+    classifications = preview.get("seats")
+    if not isinstance(classifications, list) or len(classifications) != len(active):
+        raise ValueError("invalid terminal seat classifications")
+    by_seat = {}
+    for item in classifications:
+        if not isinstance(item, dict) or type(item.get("seat")) is not int:
+            raise ValueError("invalid classified seat")
+        seat = item["seat"]
+        if seat not in active or seat in by_seat:
+            raise ValueError("invalid/duplicate terminal seat")
+        by_seat[seat] = item
+    if len(by_seat) != len(active):
+        raise ValueError("incomplete terminal seat classifications")
+    if any(item.get("classification") in (
+            "unresolved_exposed_missing", "unresolved_nonstable_hand")
+           for item in classifications):
+        return {**base, "reason": "unresolved_terminal_hand"}
+    labels = {"flower_pig", "listening", "unready"}
+    if any(item.get("classification") not in labels for item in classifications):
+        raise ValueError("unknown terminal hand classification")
+    expected = []
+    for payer in active:
+        if by_seat[payer]["classification"] == "flower_pig":
+            for recipient in active:
+                if recipient != payer and by_seat[recipient]["classification"] != "flower_pig":
+                    expected.append({"stage": "flower_pig", "payer": payer,
+                                     "recipient": recipient, "amount": 8*coefficient})
+    for payer in active:
+        if by_seat[payer]["classification"] != "unready":
+            continue
+        for recipient in active:
+            ready = by_seat[recipient]
+            if ready["classification"] != "listening":
+                continue
+            fan = ready.get("max_effective_fan")
+            if type(fan) is not int or not 0 <= fan <= fan_cap:
+                raise ValueError("invalid ready-hand maximum effective fan")
+            expected.append({"stage": "da_jiao", "payer": payer,
+                             "recipient": recipient,
+                             "amount": coefficient * 2**fan, "effective_fan": fan})
+    if preview.get("proposed_transfers") != expected:
+        raise ValueError("preview and authoritative payment rows disagree")
+    balances = [0, 0, 0, 0]
+    for transfer in expected:
+        balances[transfer["payer"]] -= transfer["amount"]
+        balances[transfer["recipient"]] += transfer["amount"]
+    if sum(balances) or preview.get("preview_balances") != balances:
+        raise ValueError("exhaustive payments are not zero-sum / preview mismatch")
+    return {**base, "posted": True, "reason": "settled",
+            "balances": balances,
+            "entries": [{**entry, "index": i+1} for i, entry in enumerate(expected)]}
+
 
 def review_exhaustive_draw(
     *, hands: Sequence[Sequence[str]],

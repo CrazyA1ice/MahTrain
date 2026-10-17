@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 
 from mahtrain_core.kong_ledger import KongLedger
-from mahtrain_core.exhaustive_review import review_exhaustive_draw, compare_exhaustive_scopes
+from mahtrain_core.exhaustive_review import review_exhaustive_draw, compare_exhaustive_scopes, finalize_active_only
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.rules import TILES
 from test_four_player_claims import staged_game
@@ -194,6 +194,24 @@ class ExhaustiveReviewTests(unittest.TestCase):
         preview2=g.public_state()["exhaustive_review"]
         self.assertNotIn((d+3)%4,preview2["participating_active_seats"])
         self.assertEqual(g.ledger.public_state(),before)
+        # Real wall exhaustion, NOT public_state() read, posts the A-only ledger.
+        g._continue_after(d)
+        official=g.public_state()["exhaustive_settlement"]
+        self.assertTrue(official["posted"])
+        self.assertEqual(official["policy"],"active_only_final")
+        self.assertEqual(official["balances"],preview2["preview_balances"])
+        self.assertEqual(sum(official["balances"]),0)
+        self.assertEqual(official["balances"][(d+3)%4],0,
+                         "already-won players never pay or collect at exhaustion")
+        self.assertEqual(g.public_state()["settled_balances"],official["balances"])
+        self.assertEqual(g.ledger.public_state(),before)
+        self.assertEqual(g.public_state()["combined_balances"],official["balances"])
+        event_count=len(g._events)
+        g._settle_exhaustive_once()
+        g._continue_after(d)
+        self.assertEqual(len(g._events),event_count,
+                         "repeat transitions cannot charge a second time")
+        self.assertEqual(g.public_state()["exhaustive_settlement"],official)
 
     def test_won_inclusive_flower_pig_scope_is_auditable_not_posted(self):
         # Completed winner 3 is never charged da-jiao in the alternative.
@@ -250,6 +268,47 @@ class ExhaustiveReviewTests(unittest.TestCase):
             with self.subTest(won=won,coeff=coeff),self.assertRaises(ValueError):
                 compare_exhaustive_scopes(
                     bad,won=won,coefficient=coeff)
+
+    def test_official_a_only_flower_pig_then_dajiao_and_rejects_tampering(self):
+        import copy
+        preview={
+            "triggered":True,"posted":False,
+            "participating_active_seats":[0,1,2],
+            "seats":[
+                {"seat":0,"classification":"flower_pig"},
+                {"seat":1,"classification":"listening","max_effective_fan":2},
+                {"seat":2,"classification":"unready"},
+            ],
+            "proposed_transfers":[
+                {"stage":"flower_pig","payer":0,"recipient":1,"amount":800},
+                {"stage":"flower_pig","payer":0,"recipient":2,"amount":800},
+                {"stage":"da_jiao","payer":2,"recipient":1,
+                 "amount":400,"effective_fan":2},
+            ],
+            "preview_balances":[-1600,1200,400,0],
+        }
+        flags=[False,False,False,True]
+        before=copy.deepcopy(preview)
+        settled=finalize_active_only(preview,won=flags,coefficient=100,fan_cap=3)
+        self.assertEqual(settled["balances"],[-1600,1200,400,0])
+        self.assertTrue(settled["posted"])
+        self.assertTrue(settled["zero_sum"])
+        self.assertEqual([x["index"] for x in settled["entries"]],[1,2,3])
+        self.assertEqual(preview,before,"never mutate historical preview")
+        for tweak in ("recipient","amount","balances","effective_fan"):
+            bad=copy.deepcopy(preview)
+            if tweak=="recipient":bad["proposed_transfers"][0]["recipient"]=3
+            elif tweak=="amount":bad["proposed_transfers"][1]["amount"]=300
+            elif tweak=="balances":bad["preview_balances"][0]=0
+            else:bad["seats"][1]["max_effective_fan"]=True
+            with self.subTest(tweak=tweak),self.assertRaises(ValueError):
+                finalize_active_only(bad,won=flags,coefficient=100,fan_cap=3)
+        bad=copy.deepcopy(preview)
+        bad["seats"][2]["classification"]="unresolved_nonstable_hand"
+        withheld=finalize_active_only(bad,won=flags,coefficient=100,fan_cap=3)
+        self.assertFalse(withheld["posted"])
+        self.assertEqual(withheld["balances"],[0,0,0,0])
+        self.assertEqual(withheld["entries"],[])
 
     def test_no_preview_before_end_and_less_than_two_active(self):
         game=FourPlayerOpening(17)

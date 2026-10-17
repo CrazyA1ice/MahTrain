@@ -18,7 +18,7 @@ from .presentation import sort_hand
 from .rules import SUITS, TILES, is_legal_win, winning_tiles, score_win
 from .settlement import WinLedger
 from .kong_ledger import KongLedger
-from .exhaustive_review import review_exhaustive_draw
+from .exhaustive_review import review_exhaustive_draw, finalize_active_only
 
 EXCHANGE_OFFSETS = {"clockwise": 1, "counterclockwise": 3, "opposite": 2}
 SEAT_COUNT = 4
@@ -68,6 +68,9 @@ class FourPlayerOpening:
         self._responses: dict[int, str] = {}
         self._pending_kong: dict[str, Any] | None = None
         self._events: list[dict[str, Any]] = []
+        # One-shot rule-engine settlement. Never rely on a browser preview
+        # to decide or trigger a payment.
+        self._exhaustive_settlement: dict[str, Any] | None = None
         self._assert_physical_tiles()
 
     @staticmethod
@@ -230,9 +233,33 @@ class FourPlayerOpening:
         elif not self._wall:
             self.phase = "wall_exhausted"
             self.turn = None
+            self._settle_exhaustive_once()
         else:
             self.turn = self._next_active(seat)
             self.phase = "await_draw"
+
+    def _settle_exhaustive_once(self) -> None:
+        """Post at most once on a REAL wall exhaustion, never during reads."""
+        if self.phase != "wall_exhausted" or self._exhaustive_settlement is not None:
+            return
+        preview = review_exhaustive_draw(
+            hands=self._hands, melds=self._melds,
+            missing_suits=self.missing_suits, won=self._won,
+            tian_ting=self._tian_ting,
+            coefficient=self.ledger.room_coefficient,
+            fan_cap=self.ledger.fan_cap,
+        )
+        self._exhaustive_settlement = finalize_active_only(
+            preview, won=self._won,
+            coefficient=self.ledger.room_coefficient,
+            fan_cap=self.ledger.fan_cap,
+        )
+        final = self._exhaustive_settlement
+        self._events.append({
+            "type": "exhaustive_settlement" if final["posted"]
+                    else "exhaustive_settlement_deferred",
+            "count": len(final["entries"]), "reason": final["reason"],
+        })
 
     def _check_turn(self, seat: int) -> None:
         self._seat(seat)
@@ -589,10 +616,23 @@ class FourPlayerOpening:
             "winners":[dict(w) for w in self._winners],
             "win_ledger":self.ledger.public_state(),
             "kong_ledger":self.kong_ledger.public_state(),
+            "exhaustive_settlement": (
+                {**self._exhaustive_settlement,
+                 "balances": list(self._exhaustive_settlement["balances"]),
+                 "entries": [dict(e) for e in self._exhaustive_settlement["entries"]]}
+                if self._exhaustive_settlement is not None else None
+            ),
+            "settled_balances": [
+                a + (self._exhaustive_settlement["balances"][i]
+                     if self._exhaustive_settlement is not None else 0)
+                for i, a in enumerate(self.ledger.public_state()["balances"])
+            ],
             "combined_balances":[
-                a+b for a,b in zip(
+                a+b+(self._exhaustive_settlement["balances"][i]
+                     if self._exhaustive_settlement is not None else 0)
+                for i,(a,b) in enumerate(zip(
                     self.ledger.public_state()["balances"],
-                    self.kong_ledger.public_state()["balances"])
+                    self.kong_ledger.public_state()["balances"]))
             ],
             "exhaustive_review":(
                 review_exhaustive_draw(
@@ -622,9 +662,13 @@ class FourPlayerOpening:
                 "win_payments_only":True,
                 "kong_simulation_optional":True,
                 "kong_payments_pending":self.kong_ledger.base is None,
-                "exhaustive_draw_payments_posted":False,
+                "exhaustive_draw_payments_posted":bool(
+                    self._exhaustive_settlement and
+                    self._exhaustive_settlement["posted"]),
                 "ai":False,"tian_ting_tracking":True,
-                "exhaustive_draw_settlement":False,
+                "exhaustive_draw_settlement":bool(
+                    self._exhaustive_settlement and
+                    self._exhaustive_settlement["posted"]),
             },
         }
 
