@@ -528,8 +528,11 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     x=>x.className==="match-win-record").length,2);
   assert.ok(dom["match-round-report-status"].textContent.includes("2笔胡牌"));
   assert.ok(dom["match-round-report-note"].textContent.includes("未入账"));
+  assert.equal(dom["match-round-report-events"].children.length,2,
+    "opening snapshot and single authoritative multi-ron rule transition");
   assert.equal(descendants(dom["match-round-report-events"],
-    x=>x.textContent.includes("胡牌入账")).length,2);
+    x=>x.textContent.includes("一炮多响")).length,1,
+    "two paid wins must share one authentic post-transition board");
 
   // End-of-wall WITHOUT paid wins must still yield a report, with no
   // fabricated transfer, no fake whole-room settlement.
