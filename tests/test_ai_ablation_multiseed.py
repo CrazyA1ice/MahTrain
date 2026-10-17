@@ -34,15 +34,21 @@ def _fake(seed, rotation=0, *, lineup=None):
         "seed": seed, "rotation": rotation, "assignment": lineup,
         "terminal_phase": "wall_exhausted", "winners": wins,
         "trace": [
-            {"action": "discard", "seat": idx,
+            {"action": "discard", "seat": idx, "level": level,
              "shanten_regret": int(level == "baseline"),
+             "effective_copies": 1 if level == "baseline" else 5,
              "locally_optimal": level != "baseline"}
             for idx, level in enumerate(lineup)
         ],
         "public_events": [{"type": "safe_public_only"}],
         "public_replay": [],
         "physical_count": 108, "actions": 15,
-        "partial_win_balances": [0]*4, "wall_remaining": 0,
+        "partial_win_balances": [0]*4,
+        "official_settled_balances": [0]*4,
+        "official_exhaustive_posted": True,
+        "scoring_rules": {"room_coefficient": 100, "fan_cap": 3,
+                          "kong_base": None},
+        "wall_remaining": 0,
     }
 
 
@@ -61,6 +67,14 @@ class MultiSeedReportTests(unittest.TestCase):
         self.assertEqual(analysis["distinct_seed_count"], 5)
         self.assertEqual(len(analysis["per_seed_differences"]), 5)
         self.assertEqual(report["games"], 25)
+        official=report["official_score_analysis"]
+        self.assertEqual(official["valid_seeds"],5)
+        self.assertEqual(official["excluded_seed_count"],0)
+        self.assertEqual(official["complete_games"],25)
+        self.assertEqual(len(official["per_seed"]),5)
+        self.assertIsNotNone(official["intervals"])
+        self.assertEqual(
+            sum(x["official_total"] for x in official["levels"].values()),0)
         self.assertEqual(
             [r["seed"] for r in analysis["per_seed_differences"]],
             [30,31,32,33,34])
@@ -125,6 +139,10 @@ class MultiSeedReportTests(unittest.TestCase):
         self.assertIn("留一种子",page)
         self.assertIn("公开副露弱风险规则触发诊断",page)
         self.assertIn("M3.11",page)
+        self.assertIn("M3.33",page)
+        self.assertIn("正式积分/出场",page)
+        self.assertIn("未核验流局整组排除",page)
+        self.assertIn("有效张均值",page)
         self.assertNotIn("<script",page)
         self.assertNotIn('src="http',page)
         self.assertNotIn('href="http',page)
@@ -150,6 +168,7 @@ class MultiSeedReportTests(unittest.TestCase):
                     "--csv-out", str(root/"policy.csv"),
                     "--contrast-csv-out", str(root/"contrasts.csv"),
                     "--pressure-csv-out", str(root/"pressure.csv"),
+                    "--official-csv-out", str(root/"official.csv"),
                     "--html-out", str(root/"report.html")]
             with (patch.object(benchmark_ablation_ai, "ablation_benchmark",
                                return_value=self.report),
@@ -170,6 +189,14 @@ class MultiSeedReportTests(unittest.TestCase):
             self.assertIn("win_event_fraction_delta_pp",rows[0])
             self.assertIn("M3.11", (root/"report.html").read_text(
                 encoding="utf-8"))
+            with (root/"official.csv").open(
+                    encoding="utf-8-sig",newline="") as fh:
+                official_rows=list(csv.DictReader(fh))
+            self.assertEqual(len(official_rows),5*5)
+            self.assertEqual(official_rows[0]["seed"],"30")
+            self.assertEqual(official_rows[0]["policy"],"baseline")
+            self.assertIn("official_total",official_rows[0])
+            self.assertIn("effective_copies_total",official_rows[0])
             with (root/"report.json").open(encoding="utf-8") as fh:
                 output = json.load(fh)
             self.assertEqual(

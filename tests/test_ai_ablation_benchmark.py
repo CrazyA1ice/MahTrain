@@ -28,13 +28,18 @@ def fake_game(seed, rotation, lineup):
         "seed": seed, "rotation": rotation, "assignment": lineup,
         "terminal_phase": "wall_exhausted", "winners": wins,
         "trace": [
-            {"action": "discard", "seat": seat,
+            {"action": "discard", "seat": seat, "level": level,
              "shanten_regret": int(level == "baseline"),
+             "effective_copies": 1 if level == "baseline" else 5,
              "locally_optimal": level != "baseline"}
             for seat, level in enumerate(lineup)
         ],
         "public_events": [], "public_replay": [],
         "physical_count": 108, "partial_win_balances": [0]*4,
+        "official_settled_balances": [0]*4,
+        "official_exhaustive_posted": True,
+        "scoring_rules": {"room_coefficient": 100, "fan_cap": 3,
+                          "kong_base": None},
         "actions": 50, "wall_remaining": 0,
     }
 
@@ -130,6 +135,15 @@ class ChallengeAblationTests(unittest.TestCase):
         self.assertEqual(report["levels"]["baseline"]["local_optimal_fraction"],0)
         self.assertEqual(report["levels"]["challenge"]["local_optimal_fraction"],1)
         self.assertEqual(report["intervals"]["replications"], 200)
+        official=report["official_score_analysis"]
+        self.assertEqual(official["valid_seeds"],5)
+        self.assertEqual(official["excluded_seed_count"],0)
+        self.assertEqual(official["complete_games"],25)
+        self.assertTrue(official["zero_sum"])
+        self.assertEqual(official["levels"]["challenge"]["seat_exposures"],20)
+        self.assertEqual(official["levels"]["baseline"]["mean_effective_copies"],1)
+        self.assertEqual(official["levels"]["challenge"]["mean_effective_copies"],5)
+        self.assertEqual(official["intervals"]["replications"],200)
         self.assertEqual(
             report["intervals"]["paired_differences"][
                 "challenge_vs_baseline"]["local_optimal_fraction"], [1.0,1.0])
@@ -144,6 +158,7 @@ class ChallengeAblationTests(unittest.TestCase):
                    fake_game(seed, rotation, lineup)):
             report = ablation_benchmark(11,1)
         self.assertIsNone(report["intervals"])
+        self.assertIsNone(report["official_score_analysis"]["intervals"])
         self.assertEqual(report["games"],5)
         for value in (0,-1,51,True,1.5):
             with self.subTest(seeds=value), self.assertRaises(ValueError):
