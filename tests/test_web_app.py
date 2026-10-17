@@ -763,6 +763,19 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".match-river--left",css)
         self.assertIn(b".match-river--right",css)
         self.assertIn(b".match-board-scroll",css)
+        for ident in ("match-hud-turn","match-hud-wall",
+                      "match-hud-missing","match-hud-tip",
+                      "match-focus-toggle","match-large-tiles-toggle",
+                      "match-confirm-discard"):
+            self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
+        self.assertIn(b"#match-stage.is-immersive #match-public",css)
+        self.assertIn(b".match-seat-avatar",css)
+        self.assertIn(b".match-hud-chip--turn",css)
+        self.assertIn(b".match-pending-discard",css)
+        self.assertIn(b"pendingDiscard",js)
+        self.assertIn(b"chooseDiscard(",js)
+        self.assertIn(b"pointer: coarse",js)
+        self.assertIn(b"renderHUD()",js)
         self.assertIn(b"renderBoard()",js)
         self.assertIn(b"view.discards.map",js)
         self.assertIn(b"view.hand_counts[seat]",js)

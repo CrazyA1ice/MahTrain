@@ -8,6 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
+  let pendingDiscard=null,immersive=false,largeTiles=false;
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   let reviewHistory=[],reviewDropped=0,reviewSelected=null;
@@ -102,6 +103,7 @@
         $("match-review-type-filter").value="all";
       }
       token=data.match_token;state=data.match;choice.clear();
+      pendingDiscard=null;
       if(name==="match_new"){
         const opening=window.MahTrainPlayback.openingFrame(state);
         if(opening)appendReviewFrames([opening]);
@@ -125,6 +127,18 @@
       if(state)renderBoard();
       $("match-error").textContent=err.message||String(err);
     }finally{busy=false;}
+  }
+  function chooseDiscard(tile,fromDraw,index=null){
+    if(busy||!state||state.turn!==0||
+       !["dealer_discard","await_discard"].includes(state.phase))return;
+    if(!$("match-confirm-discard").checked){
+      action("match_discard",{tile,from_draw:fromDraw});
+      return;
+    }
+    // Keep drawn and hand copies of the same tile distinct: a physical
+    // draw-cut must never silently turn into a hand-cut.
+    pendingDiscard={tile,fromDraw,index};
+    render();
   }
   function toggle(i){
     if(busy||state.phase!=="exchange_select")return;
@@ -281,8 +295,12 @@
     root.replaceChildren();
     const ai=state.ai_opponents?.find(x=>x.seat===seat);
     const levels={basic:"入门",advanced:"进阶",challenge:"挑战"};
-    root.append(el("strong","match-seat-name",
+    const identity=el("div","match-seat-identity");
+    identity.append(el("span","match-seat-avatar match-seat-avatar--"+seat,
+      String(seat)));
+    identity.append(el("strong","match-seat-name",
       seat+"号 · "+seats[seat].label+(ai?" · "+(levels[ai.difficulty]||ai.difficulty):"")));
+    root.append(identity);
     const missing=state.missing_suits?.[seat];
     root.append(el("div","match-seat-status",
       (view.won[seat]?"已胡 · ":"")+
@@ -639,7 +657,54 @@
     $("match-wall-count").textContent=String(remaining);
     $("match-wall").classList.toggle("is-exhausted",remaining===0);
   }
+  function renderHUD(){
+    const board=publicBoard();
+    if(!board||!state)return;
+    const phase=liveBoard?"公开动作回放":
+      (["finished","wall_exhausted"].includes(state.phase)?"本局结束":
+        ["exchange_select","missing_select"].includes(state.phase)?"开局准备":
+          ["claim_window","rob_kong_window"].includes(state.phase)?"等待碰杠胡":
+            state.won?.[0]?"已胡等待结算":
+              state.turn===0?"轮到你出牌":board.turn+"号正在行动");
+    $("match-hud-turn").textContent=phase;
+    $("match-hud-wall").textContent=String(
+      board.wall_count??state.wall_count??0)+" 张";
+    const missing=state.missing_suits?.[0];
+    $("match-hud-missing").textContent=missing?"缺"+names[missing]:"待选择";
+    let tip="查看牌桌公开动作";
+    if(liveBoard){
+      tip="回放中 · 暗手不更新";
+    }else if(state.phase==="exchange_select"){
+      tip="请选择3张同花色牌";
+    }else if(state.phase==="missing_select"){
+      tip="选择本局定缺花色";
+    }else if(["claim_window","rob_kong_window"].includes(state.phase)){
+      tip="请在下方选择碰、杠、胡或过";
+    }else if(["finished","wall_exhausted"].includes(state.phase)){
+      tip="本局结束 · 查看结算和复盘";
+    }else if(state.won?.[0]){
+      tip="你已胡牌 · 等待本局结束";
+    }else if(state.can_self_draw_win){
+      tip="可自摸 · 在下方确认胡牌";
+    }else if(state.turn===0 && pendingDiscard){
+      tip="已选"+tileName(pendingDiscard.tile)+" · 请确认出牌";
+    }else if(state.turn===0){
+      tip=$("match-confirm-discard").checked?
+        "点选手牌，再确认打出":"点击手牌即可打出";
+    }else{
+      tip="观察三家行动 · 等待你的回合";
+    }
+    $("match-hud-tip").textContent=tip;
+    const stage=$("match-stage");
+    stage.classList.toggle("is-immersive",immersive);
+    $("match-board").classList.toggle("is-large-tiles",largeTiles);
+    $("match-focus-toggle").setAttribute("aria-pressed",String(immersive));
+    $("match-large-tiles-toggle").setAttribute("aria-pressed",String(largeTiles));
+    $("match-focus-toggle").textContent=immersive?"显示详细信息":"沉浸牌桌";
+    $("match-large-tiles-toggle").textContent=largeTiles?"标准手牌":"放大手牌";
+  }
   function renderBoard(){
+    renderHUD();
     renderWall();
     for(const seat of seats){
       renderSeat(seat.id);
@@ -659,7 +724,7 @@
       claim_window:"别人打出一张牌：请确认碰、明杠或胡牌",
       rob_kong_window:"别人补杠：判断是否抢杠胡",
       finished:"已有三家胡牌，摸切结束（胡牌已入账，其他项目待定）",
-      wall_exhausted:"牌墙耗尽，待实现查花猪与查大叫",
+      wall_exhausted:"牌墙耗尽 · 方案A流局已结算或等待牌形核验",
     };
     const phase=state.phase;
     $("match-title").textContent=phaseLabels[phase]||phase;
@@ -678,13 +743,19 @@
       let onclick=null;
       if(phase==="exchange_select")onclick=()=>toggle(i);
       if((phase==="dealer_discard"||phase==="await_discard")&&state.turn===0)
-        onclick=()=>action("match_discard",{tile,from_draw:false});
-      hand.append(card(tile,onclick,choice.has(i)));
+        onclick=()=>chooseDiscard(tile,false,i);
+      const tileNode=card(tile,onclick,choice.has(i));
+      if(pendingDiscard?.index===i&&!pendingDiscard.fromDraw){
+        // Visually lift only the physical hand copy the player tapped.
+        tileNode.classList.add("match-pending-discard");
+      }
+      hand.append(tileNode);
     });
     if(drawnIndex>=0){
-      const last=card(drawn,()=>action("match_discard",{
-        tile:drawn,from_draw:true,
-      }),false);
+      const last=card(drawn,()=>chooseDiscard(drawn,true,drawnIndex),false);
+      if(pendingDiscard?.fromDraw&&pendingDiscard.tile===drawn){
+        last.classList.add("match-pending-discard");
+      }
       last.classList.add("match-new-draw");
       last.title="刚摸到："+tileName(drawn)+" · 点击摸切";
       last.setAttribute("aria-label","刚摸到"+tileName(drawn)+"，点击摸切");
@@ -738,8 +809,22 @@
             }
           }));
       }
+      if(pendingDiscard && $("match-confirm-discard").checked){
+        const selected=pendingDiscard;
+        const confirmCut=button("确认打出 "+tileName(selected.tile)+
+          "（"+(selected.fromDraw?"摸切":"手切")+"）","primary match-confirm-cut",
+          ()=>action("match_discard",{
+            tile:selected.tile,from_draw:selected.fromDraw,
+          }));
+        controls.append(confirmCut);
+        controls.append(button("取消选牌","review-control",()=>{
+          pendingDiscard=null;render();
+        }));
+      }
       controls.append(el("p","review-intro",
-        "请点击自己的麻将切牌。其他三家由各自策略AI操作，合法胡牌将即时计入部分积分。"));
+        $("match-confirm-discard").checked
+          ?"点选手牌后使用“确认打出”，可减少手机误触；摸到的牌仍位于最右边。"
+          :"点击自己的麻将即可切牌；右侧发光标记是刚摸的牌。"));
     }else{
       controls.append(el("p","review-intro",
         "本局摸切已结束。胡牌已入账；牌山耗尽时按方案A处理流局赔付（如牌形未核验则暂缓），杠钱仍为独立模拟。可以重新开一局。"));
@@ -964,6 +1049,22 @@
     toggleVoice.disabled=!voice?.supported;
     toggleVoice.addEventListener("change",()=>{
       voice?.setEnabled(toggleVoice.checked);
+    });
+    $("match-focus-toggle").addEventListener("click",()=>{
+      immersive=!immersive;
+      if(state)renderHUD();
+    });
+    $("match-large-tiles-toggle").addEventListener("click",()=>{
+      largeTiles=!largeTiles;
+      if(state)renderHUD();
+    });
+    // Prefer safer two-tap confirmation on touch-first phones and tablets.
+    // Desktop mouse keeps the fast existing one-click behavior by default.
+    $("match-confirm-discard").checked=
+      !!window.matchMedia?.("(pointer: coarse)")?.matches;
+    $("match-confirm-discard").addEventListener("change",()=>{
+      pendingDiscard=null;
+      if(state)render();
     });
     $("match-lab-enabled").addEventListener("change",()=>{
       $("match-seed").disabled=!$("match-lab-enabled").checked;
