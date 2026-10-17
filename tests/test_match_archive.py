@@ -198,6 +198,55 @@ class MatchArchiveTests(unittest.TestCase):
         for private in (b"SECRET-NESTED", b"SECRET-ROOT", b"SECRET-PATTERN"):
             self.assertNotIn(private, assert_bytes)
 
+    def test_official_exhaustive_entries_archived_privately_and_audited(self):
+        import copy
+        before, finished = self.fixture()
+        record = {
+            "policy": "active_only_final", "posted": True, "reason": "settled",
+            "balances": [-800, 800, 0, 0], "zero_sum": True,
+            "room_coefficient": 100, "fan_cap": 3,
+            "entries": [{
+                "index": 1, "stage": "flower_pig", "payer": 0,
+                "recipient": 1, "amount": 800,
+                "future_wall": "SECRET-FUTURE-WALL",
+            }],
+            "hidden_seat_hand": "SECRET-CONCEALED",
+        }
+        completed = {**finished, "exhaustive_settlement": record}
+        archive_id = self.store.save_completed(
+            completed, [], before, ["basic", "advanced", "challenge"])
+        report = self.store.detail(archive_id)["report"]
+        self.assertEqual(report["exhaustive_settlement"]["balances"],[-800,800,0,0])
+        self.assertEqual(report["settled_balances"],[-800,800,0,0])
+        self.assertEqual(report["exhaustive_settlement"]["entries"],[{
+            "index":1,"stage":"flower_pig","payer":0,"recipient":1,
+            "amount":800,
+        }])
+        self.assertNotIn("SECRET-FUTURE-WALL",self.db.read_bytes().decode("utf8",errors="ignore"))
+        self.assertNotIn("SECRET-CONCEALED",json.dumps(report))
+        wrong = []
+        for field in ("amount", "recipient", "balances", "index", "stage"):
+            bad=copy.deepcopy(record)
+            if field=="amount":bad["entries"][0]["amount"]=801
+            elif field=="recipient":bad["entries"][0]["recipient"]=3
+            elif field=="balances":bad["balances"][0]=-801
+            elif field=="index":bad["entries"][0]["index"]=2
+            else:bad["entries"][0]["stage"]="SECRET-PRIVATE"
+            wrong.append(bad)
+        bad=copy.deepcopy(record)
+        bad["entries"].append(copy.deepcopy(bad["entries"][0]))
+        bad["entries"][1]["index"]=2
+        wrong.append(bad)
+        for bad in wrong:
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                self.store.save_completed({**completed,"exhaustive_settlement":bad},
+                                          [],before,["basic"]*3)
+        # A previously won seat cannot appear in a new exhaustive transfer.
+        with self.assertRaises(ValueError):
+            self.store.save_completed(
+                {**completed,"won":[False,True,False,False]},
+                [],before,["basic"]*3)
+
     def test_does_not_change_legacy_history_schema_version(self):
         from mahtrain_core.history import HistoryStore
         old=HistoryStore(self.db)
