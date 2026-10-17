@@ -712,3 +712,53 @@
 }
 .match-river-cell.is-tedashi .match-discard-kind{color:#9decc9}
 .match-river-tiles{row-gap:11px}
+
+
+/* M3.16 public action playback: final authoritative board is updated only
+   after replay. Transient tile and seat pulse show event progression. */
+.match-playback{
+  border:1px solid #bb974f;background:#eff7ed;border-radius:10px;
+  color:#285343;margin:10px 0 14px;padding:10px 13px;
+  display:flex;flex-direction:column;gap:7px;
+}
+.match-playback[hidden],.match-motion[hidden]{display:none!important}
+.match-playback-info,.match-playback-controls{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+}
+.match-playback-info strong{font-size:14px}
+.match-playback-info span{font-size:12px}
+.match-playback-controls label{
+  display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;
+}
+.match-playback-controls select{border-radius:6px;padding:5px;max-width:116px}
+.match-playback-controls button{min-height:34px}
+.match-playback-note{margin:0!important;font-size:11px;color:#576d5c}
+.match-board-center{position:relative;isolation:isolate}
+.match-motion{
+  position:absolute;z-index:9;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  pointer-events:none;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;gap:8px;min-width:145px;max-width:250px;
+  background:#f6edc9f2;color:#3a442c;
+  border:2px solid #f0bd57;border-radius:12px;padding:10px 13px;
+  box-shadow:0 8px 22px #041f17a3;
+  animation:match-action-pop 210ms ease-out;
+}
+.match-motion strong{font-size:13px;text-align:center}
+.match-motion .tile{width:39px;height:53px;pointer-events:none}
+.match-motion .match-tile-back{width:33px;height:46px}
+.match-motion.is-winning-motion{
+  background:#ffe6ab;border-color:#ed7848;color:#80361e;
+  box-shadow:0 8px 28px #be552c6b;
+}
+.match-board .match-seat.is-replay-acting{
+  outline:3px solid #f7d67e;outline-offset:1px;
+  background:#f4ca6644;box-shadow:0 0 18px #ffcc7045;
+}
+@keyframes match-action-pop{
+  from{opacity:.25;transform:translate(-50%,-40%) scale(.86)}
+  to{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+@media(prefers-reduced-motion:reduce){
+  .match-motion{animation:none}
+}
