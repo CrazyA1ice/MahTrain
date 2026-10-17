@@ -1661,3 +1661,95 @@
 @media(prefers-reduced-motion:reduce){
   .match-score-burst,.match-motion-big-action{animation:none}
 }
+
+
+/* M3.36: mobile hand locator and meaningful touch reaction buttons. */
+.match-hand-navigation{display:none}
+.match-reaction-actions{
+  display:flex;align-items:stretch;flex-wrap:wrap;gap:10px;
+  margin:8px 0;padding:2px 0;
+}
+.match-controls .match-reaction-button{
+  min-height:58px;min-width:112px;flex:1 1 135px;
+  padding:12px 18px;border-radius:12px;border:2px solid #95bca2;
+  font-size:18px;font-weight:850;letter-spacing:.025em;
+  box-shadow:0 3px 0 #194b3350;cursor:pointer;
+}
+.match-controls .match-reaction--hu{
+  background:linear-gradient(145deg,#eab24a,#cf773c);
+  color:#fff9e7;border-color:#f4d47d;
+  text-shadow:0 1px 2px #704323;
+}
+.match-controls .match-reaction--ming_gang,
+.match-controls .match-reaction--peng{
+  background:#e6f4df;color:#1f6348;border-color:#9bcdae;
+}
+.match-controls .match-reaction--pass{
+  background:#eef1ec;color:#526b59;border-color:#c2d0c3;
+  font-size:15px;font-weight:750;
+}
+.match-controls .match-reaction-button:focus-visible,
+.match-hand-navigation button:focus-visible{
+  outline:3px solid #e4ac48;outline-offset:2px;
+}
+.match-controls .match-reaction-button:active{
+  transform:translateY(2px);box-shadow:0 1px 0 #194b3350;
+}
+.match-controls .match-self-win-action{
+  font-size:19px;min-height:55px;padding:12px 20px;
+  background:linear-gradient(135deg,#e8b44c,#cb713b);color:#fffdf1;
+  border:2px solid #f5d381;border-radius:12px;
+}
+.match-table-self-summary{
+  font-size:14px;line-height:1.65;font-weight:800;
+  border:1px solid #e8d59b75;background:#e7c98219;
+  border-radius:8px;padding:9px 12px;color:#ffe4a4;
+}
+.match-table-score-note{
+  line-height:1.6;overflow-wrap:anywhere;
+}
+@media(max-width:700px){
+  .match-hand-navigation{
+    width:100%;max-width:100%;
+    display:flex;align-items:center;justify-content:space-between;
+    gap:5px;margin:8px 0 1px;padding:3px 0;
+  }
+  .match-hand-navigation button{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-height:39px;padding:8px 10px;border:1px solid #caab6e;
+    background:#113f32;border-radius:9px;
+    font-size:12px;font-weight:800;color:#ffeab9;
+    white-space:nowrap;cursor:pointer;
+  }
+  .match-hand-navigation button:disabled{
+    opacity:.4;cursor:default;
+  }
+  #match-hand-position{
+    flex:1;min-width:0;text-align:center;
+    font-size:10px;line-height:1.3;color:#f3d6a1;
+  }
+  .match-board .match-seat--bottom #match-hand{
+    margin:1px 0 7px;scroll-padding-inline:24px;
+    scrollbar-width:thin;
+  }
+  .match-reaction-actions{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;width:100%;
+  }
+  .match-controls .match-reaction-button{
+    min-width:0;min-height:62px;font-size:18px;padding:10px 6px;
+  }
+  .match-controls .match-reaction--pass{font-size:13px}
+  .match-controls .match-self-win-action{
+    width:100%;min-height:60px;font-size:20px;
+  }
+  .match-table-self-summary{font-size:13px;padding:8px}
+}
+@media(max-width:390px){
+  .match-hand-navigation{gap:3px}
+  .match-hand-navigation button{padding:7px 6px;font-size:11px}
+  #match-hand-position{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){
+  .match-controls .match-reaction-button{transition:none}
+}
