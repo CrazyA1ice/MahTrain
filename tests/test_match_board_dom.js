@@ -178,14 +178,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(Object.hasOwn(requests[0],"seed"),false,
     "ordinary match must let the server select an unused random seed");
   assert.equal(dom["match-voice-enabled"].checked,true);
-  // Changing the next game's house rule is a real game-setting request,
-  // unlike purely visual/tabletop navigation.
+  // No game request occurs simply from selecting a rule for the next game.
   dom["match-self-draw-mode"].value="add_fan";
-  const beforeModeChange=requests.length;
-  assert.equal(requests.length,beforeModeChange);
-  dom["match-new"].handlers.click();
-  await settle();
-  assert.equal(requests.at(-1).self_draw_mode,"add_fan");
+  assert.equal(requests.length,1);
   dom["match-self-draw-mode"].value="add_base";
   assert.equal(dom["match-voice-speed"].disabled,false);
   assert.equal(dom["match-voice-repeat"].disabled,true,
