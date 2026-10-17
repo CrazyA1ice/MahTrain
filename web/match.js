@@ -50,16 +50,23 @@
         if(newEvents.length>=before){
           const recorded=data.match.public_steps;
           const result=Array.isArray(recorded)
-            ?window.MahTrainPlayback.normalizeSteps(recorded)
+            ?window.MahTrainPlayback.normalizeSteps(recorded,80,state)
             :window.MahTrainPlayback.normalize(newEvents.slice(before));
-          if(result.frames.length){
+          const fullCount=result.frames.length;
+          const focusOnly=$("match-playback-focus").checked===true;
+          const frames=focusOnly
+            ?window.MahTrainPlayback.highlightFrames(result.frames)
+            :result.frames;
+          if(frames.length){
             $("match-playback").hidden=false;
             $("match-playback-note").textContent=
               (Array.isArray(recorded)
                 ?"逐动作展示真实公开牌山、牌河、副露与各家牌背数；本人的暗手在结束后同步。"
                 :"按公开事件顺序播放；完整牌桌在播放结束时同步。")+
-              (result.omitted?" 事件较多，已略过前"+result.omitted+"项。":"");
-            await new Promise(resolve=>playback.start(result.frames,resolve));
+              (result.omitted?" 事件较多，已略过前"+result.omitted+"项。":"")+
+              (focusOnly?" 精简模式：本次"+fullCount+
+                "个动作快照中播放"+frames.length+"个重点/最终画面。":"");
+            await new Promise(resolve=>playback.start(frames,resolve));
           }
         }
       }
@@ -105,8 +112,35 @@
     }
     const root=$("match-motion"),target=$("match-motion-card");
     root.hidden=false;
-    root.classList.toggle("is-winning-motion",frame.isWin);
+    root.classList.toggle("is-winning-motion",!!frame.isWin);
+    root.classList.toggle("is-kong-motion",!!frame.isKong);
+    root.classList.toggle("is-peng-motion",!!frame.isPeng);
     $("match-motion-text").textContent=frame.label;
+    const chain=$("match-motion-chain");
+    chain.replaceChildren();
+    if(frame.chain?.length>1){
+      // This is ONE completed rules action. Multiple labels are presentation
+      // stages, not invented intermediate game states.
+      for(const [i,label] of frame.chain.entries()){
+        if(i)chain.append(el("span","match-motion-arrow","→"));
+        chain.append(el("span","match-motion-chip",label));
+      }
+    }
+    const delta=$("match-motion-delta");
+    const change=frame.changes;
+    const notes=[];
+    if(change){
+      if(change.wall)notes.push("牌山 "+(change.wall>0?"+":"")+change.wall);
+      for(let i=1;i<4;i++){
+        if(change.backs[i])notes.push(i+"号牌背 "+
+          (change.backs[i]>0?"+":"")+change.backs[i]);
+        if(change.melds[i])notes.push(i+"号副露 "+
+          (change.melds[i]>0?"+":"")+change.melds[i]+"组");
+      }
+      if(change.rivers>0)notes.push("牌河 +"+change.rivers);
+    }
+    delta.textContent=notes.join(" · ");
+    delta.hidden=notes.length===0;
     target.replaceChildren();
     // Only publicly revealed physical tile kinds are depicted face-up.
     if(frame.publicTile){
@@ -129,6 +163,7 @@
     const pause=$("match-playback-pause");
     pause.textContent=status.paused?"继续播放":"暂停";
     pause.disabled=!status.playing;
+    $("match-playback-step").disabled=!status.playing||!status.paused;
     $("match-playback-skip").disabled=!status.playing;
   }
   function onPlaybackDone(){
@@ -569,6 +604,7 @@
       if(status.paused)playback.resume();
       else playback.pause();
     });
+    $("match-playback-step").addEventListener("click",()=>playback.step());
     $("match-playback-skip").addEventListener("click",()=>playback.skip());
     $("match-enable-kong").addEventListener("change",()=>{
       $("match-kong-base").disabled=!$("match-enable-kong").checked;
