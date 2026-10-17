@@ -34,6 +34,72 @@
     }
     return box;
   }
+  function renderOfficialScores(report){
+    const analysis=report?.official_score_analysis;
+    const area=$("ai-baseline-official");
+    area.hidden=!analysis;
+    if(!analysis)return;
+    $("ai-baseline-official-caveat").textContent=
+      "规则A（仅未胡玩家参加流局结算） · 系数"+
+      analysis.room_coefficient+" · 封顶"+analysis.fan_cap+"番 · "+
+      "不含模拟杠钱。请求"+analysis.requested_seeds+"个洗牌种子，"+
+      "核验"+analysis.valid_seeds+"个，"+
+      "未核验流局排除"+analysis.excluded_seed_count+"个种子的全部四轮。"+
+      (analysis.intervals?
+        "以下区间只是种子成组重抽样的探索性描述，非胜率置信区间。":
+        "有效种子少于5个，不提供统计区间。");
+    const cards=$("ai-baseline-official-levels");
+    cards.replaceChildren();
+    for(const level of report.opponents){
+      const score=analysis.levels[level];
+      const card=el("section","ai-replay-score");
+      card.append(el("h5","",names[level]+" · 正式积分"));
+      const figures=el("div","ai-replay-stats");
+      figures.append(stat("合格座位出场",score.seat_exposures));
+      figures.append(stat("正式净积分总额",score.official_total));
+      figures.append(stat("每次出场平均正式积分",
+        score.official_mean_per_exposure===null?"无已核验局":
+        (score.official_mean_per_exposure>=0?"+":"")+
+        score.official_mean_per_exposure));
+      if(analysis.intervals){
+        figures.append(stat("探索性区间",
+          analysis.intervals.levels[level].join(" ～ ")));
+      }
+      card.append(figures);
+      cards.append(card);
+    }
+    const differences=$("ai-baseline-official-differences");
+    differences.replaceChildren();
+    for(const level of ["basic","advanced","challenge"]){
+      const delta=analysis.paired_differences_vs_baseline[level];
+      const bounds=analysis.intervals?.differences_vs_baseline?.[level];
+      differences.append(el("p","review-footnote",
+        names[level]+"－独立牌形基线："+(
+          delta===null?"有效种子不足":
+          (delta>=0?"+":"")+delta+" 分/座位出场")+
+        (bounds?" · 探索性区间 ["+bounds.join("，")+"]":"")));
+    }
+  }
+  function exportOfficialScores(){
+    const analysis=result?.official_score_analysis;
+    if(!analysis)return;
+    const rows=["seed,policy,seat_exposures,official_total,mean_per_exposure"];
+    for(const entry of analysis.per_seed){
+      for(const level of result.opponents){
+        const item=entry.levels[level];
+        rows.push([entry.seed,level,item.seat_exposures,
+          item.official_total,item.official_mean_per_exposure].join(","));
+      }
+    }
+    const csv=String.fromCharCode(0xFEFF)+rows.join("\r\n")+"\r\n";
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download="mahtrain-independent-four-policy-official-scores.csv";
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1500);
+  }
   function render(report){
     result=report;
     const summary=$("ai-baseline-summary");
@@ -78,6 +144,7 @@
       }
       delta.append(section);
     }
+    renderOfficialScores(report);
     $("ai-baseline-results").hidden=false;
   }
   async function check(expected){
@@ -145,6 +212,7 @@
   function init(){
     $("ai-baseline-start").addEventListener("click",start);
     $("ai-baseline-export").addEventListener("click",exportCSV);
+    $("ai-baseline-official-export").addEventListener("click",exportOfficialScores);
   }
   window.MahTrainAIBaseline={init};
 })();
