@@ -287,12 +287,13 @@
           <div id="match-win-alert" class="match-win-alert" role="status"
                aria-live="assertive" hidden></div>
 
-          <div class="match-board-scroll" tabindex="0" aria-label="四家麻将牌桌，可横向滚动">
+          <div class="match-board-scroll" tabindex="0" aria-label="四家麻将牌桌，手机端自适应显示，手牌可单独滑动">
             <div id="match-board" class="match-board" aria-label="四人血战牌桌">
               <section id="match-seat-2" class="match-seat match-seat--top" aria-label="2号对家"></section>
               <section id="match-seat-3" class="match-seat match-seat--left" aria-label="3号上家"></section>
               <div class="match-board-center">
                 <div id="match-motion" class="match-motion" aria-live="polite" hidden>
+                  <div id="match-motion-big-action" class="match-motion-big-action" aria-hidden="true"></div>
                   <strong id="match-motion-text"></strong>
                   <div id="match-motion-chain" class="match-motion-chain"></div>
                   <div id="match-motion-card"></div>
@@ -317,6 +318,7 @@
                 <div id="match-river-0" class="match-river match-river--bottom" aria-label="自己牌河"></div>
               </div>
               <section id="match-seat-1" class="match-seat match-seat--right" aria-label="1号下家"></section>
+              <div id="match-score-bursts" class="match-score-bursts" aria-label="真实胡牌积分变动" aria-live="polite" hidden></div>
               <section id="match-seat-0" class="match-seat match-seat--bottom" aria-label="0号自己">
                 <div class="match-self-header"><span class="match-seat-avatar match-seat-avatar--self" aria-hidden="true">我</span><strong>0号 · 自己</strong></div>
                 <div id="match-self-status" class="match-seat-status"></div>
