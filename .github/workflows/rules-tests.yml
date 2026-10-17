@@ -44,6 +44,7 @@ jobs:
           node --check web/four_player.js
           node --check web/match_playback.js
           node --check web/match.js
+          node --check web/match_archives.js
           node --check web/ai_replay.js
           node --check web/ai_baseline.js
           node --check web/app.js
@@ -51,6 +52,8 @@ jobs:
         run: node tests/test_match_playback.js
       - name: Smoke-test four-sided live match DOM and click-to-discard
         run: node tests/test_match_board_dom.js
+      - name: Smoke-test SQLite match archive browser and comparison
+        run: node tests/test_match_archive_dom.js
       - name: Run no-dependency unit tests
         run: python -m unittest discover -s tests -v
       - name: Smoke-test Chinese discard demo
