@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 
 from mahtrain_core.kong_ledger import KongLedger
-from mahtrain_core.exhaustive_review import review_exhaustive_draw
+from mahtrain_core.exhaustive_review import review_exhaustive_draw, compare_exhaustive_scopes
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.rules import TILES
 from test_four_player_claims import staged_game
@@ -187,6 +187,62 @@ class ExhaustiveReviewTests(unittest.TestCase):
         preview2=g.public_state()["exhaustive_review"]
         self.assertNotIn((d+3)%4,preview2["participating_active_seats"])
         self.assertEqual(g.ledger.public_state(),before)
+
+    def test_won_inclusive_flower_pig_scope_is_auditable_not_posted(self):
+        # Completed winner 3 is never charged da-jiao in the alternative.
+        current={
+            "triggered": True, "posted": False,
+            "reason": "requires_confirmation_of_settlement_participants",
+            "participating_active_seats": [0, 1, 2],
+            "seats": [
+                {"seat": 0, "classification": "flower_pig"},
+                {"seat": 1, "classification": "listening"},
+                {"seat": 2, "classification": "unready"},
+            ],
+            "proposed_transfers": [
+                {"stage": "flower_pig", "payer": 0,
+                 "recipient": 1, "amount": 800},
+                {"stage": "flower_pig", "payer": 0,
+                 "recipient": 2, "amount": 800},
+                {"stage": "da_jiao", "payer": 2,
+                 "recipient": 1, "amount": 400, "effective_fan": 2},
+            ],
+        }
+        from copy import deepcopy
+        before=deepcopy(current)
+        comparison=compare_exhaustive_scopes(
+            current, won=[False,False,False,True], coefficient=100)
+        self.assertEqual(current,before,"audit must never alter actual preview")
+        self.assertFalse(comparison["posted"])
+        self.assertTrue(comparison["available"])
+        active,inclusive=comparison["scenarios"]
+        self.assertEqual(active["balances"],[-1600,1200,400,0])
+        self.assertEqual(inclusive["balances"],[-2400,1200,400,800])
+        self.assertEqual(inclusive["transfers"][-1],{
+            "stage":"flower_pig","payer":0,"recipient":3,"amount":800})
+        for scenario in comparison["scenarios"]:
+            self.assertFalse(scenario["posted"])
+            self.assertTrue(scenario["zero_sum"])
+            self.assertEqual(sum(scenario["balances"]),0)
+        self.assertEqual(
+            [x for x in inclusive["transfers"] if x["stage"]=="da_jiao"],
+            [x for x in active["transfers"] if x["stage"]=="da_jiao"])
+
+    def test_scope_disallows_undetermined_classification_or_invalid_state(self):
+        bad={"triggered":True,"posted":False,
+             "reason":"unresolved_missing_meld_or_nonstable_hand",
+             "seats":[],"participating_active_seats":[0,1],
+             "proposed_transfers":[]}
+        report=compare_exhaustive_scopes(
+            bad,won=[False,False,True,True],coefficient=100)
+        self.assertFalse(report["available"])
+        self.assertEqual(report["scenarios"],[])
+        for won,coeff in (([0,False,True,True],100),
+                          ([False]*4,0),
+                          ([False]*3,100)):
+            with self.subTest(won=won,coeff=coeff),self.assertRaises(ValueError):
+                compare_exhaustive_scopes(
+                    bad,won=won,coefficient=coeff)
 
     def test_no_preview_before_end_and_less_than_two_active(self):
         game=FourPlayerOpening(17)
