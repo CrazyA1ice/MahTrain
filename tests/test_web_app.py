@@ -64,6 +64,23 @@ class WebUI(unittest.TestCase):
         with urlopen(req, timeout=10) as response:
             return json.load(response)
 
+    def test_m337_public_speech_controls_are_locally_served(self):
+        page, _ = self.get("/")
+        voice, kind = self.get("/match_voice.js")
+        client, _ = self.get("/match.js")
+        css, _ = self.get("/app.css")
+        self.assertIn("javascript", kind)
+        for element in (b'id="match-voice-speed"', b'id="match-voice-repeat"',
+                        b'value="slow"', b'value="normal"', b'value="fast"'):
+            self.assertEqual(page.count(element), 1)
+        for token in (b"repeatLast", b"canRepeat", b"reset",
+                      b"RATES", b"announced"):
+            self.assertIn(token, voice)
+        for token in (b"syncVoiceControls", b"match-voice-speed",
+                      b"match-voice-repeat", b"voice?.reset()"):
+            self.assertIn(token, client)
+        self.assertIn(b".match-voice-controls", css)
+
     def test_page_and_existing_tile_art_are_served(self):
         html, kind = self.get("/")
         self.assertIn(b"MahTrain", html)

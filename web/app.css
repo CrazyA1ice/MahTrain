@@ -1773,3 +1773,15 @@
 #match-board.is-midnight-felt .match-table-settlement{
   background:#102e43e8;border-color:#dec78b;
 }
+
+/* M3.37: accessible, purely local public-action speech controls. */
+.match-voice-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:7px 0 4px}
+.match-voice-controls label{display:flex;align-items:center;gap:7px;
+  color:#456a55;font-size:12px;font-weight:700}
+.match-voice-controls select{border:1px solid #bdd3c0;border-radius:8px;
+  padding:8px 10px;background:#fff;color:#294938;font:inherit;min-height:40px}
+.match-voice-controls button{min-height:40px}
+.match-voice-controls :is(select,button):focus-visible{
+  outline:3px solid #c49b40;outline-offset:2px}
+.match-voice-controls :is(select,button):disabled{opacity:.5;cursor:not-allowed}

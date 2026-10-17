@@ -230,6 +230,17 @@
         <div class="match-extras">
           <label class="match-voice-switch"><input id="match-voice-enabled" type="checkbox" checked/> 语音播报出牌、碰、杠、胡</label>
           <span id="match-voice-status" class="review-footnote" aria-live="polite">语音由浏览器本地合成，可关闭</span>
+          <div class="match-voice-controls" role="group" aria-label="四人对局语音控制">
+            <label for="match-voice-speed">播报语速
+              <select id="match-voice-speed" aria-label="四人对局语音播报速度">
+                <option value="slow">慢速</option>
+                <option value="normal" selected>标准</option>
+                <option value="fast">快速</option>
+              </select>
+            </label>
+            <button id="match-voice-repeat" type="button" class="review-control" disabled
+                    title="只重播最近一次已经公开的动作播报，不读取任何暗牌">重听最近公开动作</button>
+          </div>
           <details id="match-lab" class="match-lab">
             <summary>实验室 · 固定种子复现</summary>
             <div class="match-lab-row">
