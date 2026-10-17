@@ -8,7 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
-  let playback=null,liveBoard=null;
+  let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   let reviewHistory=[],reviewDropped=0,reviewSelected=null;
   const publicBoard=()=>liveBoard||state;
@@ -34,6 +34,8 @@
     if(busy)return;
     busy=true;
     $("match-error").textContent="";
+    const previousEvents=state?.events?.length||0;
+    let announcedByPlayback=false;
     try{
       const response=await fetch("/api/action",{
         method:"POST",
@@ -67,6 +69,7 @@
             ?window.MahTrainPlayback.highlightFrames(result.frames)
             :result.frames;
           if(frames.length){
+            announcedByPlayback=true;
             $("match-playback").hidden=false;
             $("match-playback-note").textContent=
               (Array.isArray(recorded)
@@ -79,10 +82,18 @@
           }
         }
       }
-      if(name==="match_new" && playback){
-        playback.cancel();
-        $("match-playback").hidden=true;
-        $("match-motion").hidden=true;
+      if(name==="match_new"){
+        voice?.clear();
+        if(playback){
+          playback.cancel();
+          $("match-playback").hidden=true;
+          $("match-motion").hidden=true;
+        }
+      }else if(!announcedByPlayback && voice){
+        // Playback disabled/empty: still announce NEW publicly revealed
+        // events, never the complete historical event log or private draw.
+        const events=(data.match.events||[]).slice(previousEvents);
+        voice.announceEvents(window.MahTrainPlayback.normalize(events,96).frames);
       }
       liveBoard=null;
       if(name==="match_new"){
@@ -138,6 +149,7 @@
     return back;
   }
   function showPublicMotion(frame,step,total){
+    voice?.announceFrame(frame);
     if(frame.board){
       liveBoard=frame.board;
       renderBoard();
@@ -890,7 +902,45 @@
     }
     publicInfo.append(log);
   }
+  function startNewGame(alwaysRandom){
+    if(busy)return;
+    if(state && !["finished","wall_exhausted"].includes(state.phase) &&
+       !confirm("当前对局尚未结束，新开一局会放弃本局未完成的进度。确定开始吗？"))return;
+    const options={
+      room_coefficient:Number($("match-coefficient").value),
+      fan_cap:Number($("match-fan-cap").value),
+      ai_levels:[1,2,3].map(n=>$("match-ai-"+n).value),
+      kong_base:$("match-enable-kong").checked
+        ?Number($("match-kong-base").value):null,
+    };
+    if(!alwaysRandom && $("match-lab-enabled").checked){
+      const raw=$("match-seed").value.trim();
+      const number=Number(raw);
+      if(!/^\d+$/.test(raw)||!Number.isSafeInteger(number)||
+         number<0||number>4294967295){
+        $("match-error").textContent="实验室种子必须为0至4294967295的整数。";
+        return;
+      }
+      options.seed=number;
+    }
+    action("match_new",options);
+  }
   function init(){
+    if(window.MahTrainMatchVoice){
+      voice=window.MahTrainMatchVoice.create(window);
+    }
+    const toggleVoice=$("match-voice-enabled");
+    toggleVoice.checked=!!voice?.supported;
+    $("match-voice-status").textContent=voice?.supported
+      ?"使用浏览器语音合成播报已公开牌名与动作，可随时关闭"
+      :"此浏览器暂不支持语音合成，仍可正常对局";
+    toggleVoice.disabled=!voice?.supported;
+    toggleVoice.addEventListener("change",()=>{
+      voice?.setEnabled(toggleVoice.checked);
+    });
+    $("match-lab-enabled").addEventListener("change",()=>{
+      $("match-seed").disabled=!$("match-lab-enabled").checked;
+    });
     playback=window.MahTrainPlayback.createController({
       onFrame:showPublicMotion,onStatus:onPlaybackStatus,
       onDone:onPlaybackDone,
@@ -917,16 +967,8 @@
     $("match-enable-kong").addEventListener("change",()=>{
       $("match-kong-base").disabled=!$("match-enable-kong").checked;
     });
-    $("match-new").addEventListener("click",()=>{
-      const seed=Number($("match-seed").value);
-      action("match_new",{seed,
-        room_coefficient:Number($("match-coefficient").value),
-        fan_cap:Number($("match-fan-cap").value),
-        ai_levels:[1,2,3].map(n=>$("match-ai-"+n).value),
-        kong_base:$("match-enable-kong").checked
-          ?Number($("match-kong-base").value):null,
-      });
-    });
+    $("match-new").addEventListener("click",()=>startNewGame(false));
+    $("match-again").addEventListener("click",()=>startNewGame(true));
   }
   window.MahTrainMatch={init};
 })();

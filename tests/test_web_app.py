@@ -694,6 +694,41 @@ class WebUI(unittest.TestCase):
             with self.subTest(bad=bad),self.assertRaises(HTTPError):
                 self.post({"action":"match_new","seed":bad})
 
+    def test_m324_random_server_seeds_lab_and_voice_assets(self):
+        from unittest.mock import patch
+        first, second = 4190000041, 4190000042
+        web_server._MATCH_USED_SEEDS.discard(first)
+        web_server._MATCH_USED_SEEDS.discard(second)
+        with patch.object(web_server.secrets, "randbelow",
+                          side_effect=[first, first, second]) as rand:
+            a = self.post({"action": "match_new"})
+            b = self.post({"action": "match_new"})
+            self.assertEqual(rand.call_count, 3)
+        self.assertNotEqual(a["match_token"], b["match_token"])
+        self.assertEqual(a["match"]["phase"], "exchange_select")
+        self.assertEqual(b["match"]["phase"], "exchange_select")
+        self.assertIn(first, web_server._MATCH_USED_SEEDS)
+        self.assertIn(second, web_server._MATCH_USED_SEEDS)
+        for response in (a, b):
+            self.assertNotIn("seed", response["match"])
+            self.assertNotIn("seed", response)
+            self.assertNotIn("_wall", response["match"])
+        # Explicit old API seed is still accepted for laboratory replay.
+        old = self.post({"action": "match_new", "seed": 42})["match"]
+        self.assertEqual(old["hand"], self.post({
+            "action": "match_new", "seed": 42})["match"]["hand"])
+        html, _ = self.get("/")
+        script, content_type = self.get("/match_voice.js")
+        css, _ = self.get("/app.css")
+        self.assertIn("javascript", content_type)
+        for ident in ("match-again", "match-lab", "match-lab-enabled",
+                      "match-seed", "match-voice-enabled"):
+            self.assertEqual(html.count(('id="%s"' % ident).encode()), 1)
+        self.assertLess(html.index(b"/match_voice.js"), html.index(b"/match.js"))
+        self.assertIn(b"MahTrainMatchVoice", script)
+        self.assertIn(b".match-river-cell .tile{width:44px;height:60px}", css)
+        self.assertIn(b".match-seat-meld .tile{width:40px;height:54px}", css)
+
     def test_m314_live_match_four_sided_table_markup_and_privacy(self):
         page,_=self.get("/")
         css,_=self.get("/app.css")

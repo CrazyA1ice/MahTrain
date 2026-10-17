@@ -14,6 +14,7 @@
   <script src="/quiz_history.js" defer></script>
   <script src="/four_player.js" defer></script>
   <script src="/match_playback.js" defer></script>
+  <script src="/match_voice.js" defer></script>
   <script src="/match.js" defer></script>
   <script src="/match_archives.js" defer></script>
   <script src="/ai_replay.js" defer></script>
@@ -175,12 +176,11 @@
       </section>
       <section id="match-panel" class="panel match-panel">
         <div class="panel-title">
-          <h3>四人血战 · 四边牌桌人机对战（M3.14）</h3>
+          <h3>四人血战 · 四边牌桌人机对战</h3>
           <small>一炮多响 / 碰 / 明暗补杠 / 抢杠胡 / 已胡退出</small>
         </div>
         <p class="review-intro">你操作0号座位，另外三家使用入门、进阶、挑战三档<strong>可复现的启发式策略AI</strong>（非训练模型）。AI只使用自己的暗手与公开牌，不偷看别家的手牌或牌墙；胡牌账本与可选杠钱模拟保留，流局仍只预览不入账。<strong>目前不是正式完整的血战结算</strong>。</p>
         <div class="table-demo-toolbar">
-          <label>试验局种子 <input id="match-seed" type="number" min="0" max="4294967295" value="42"/></label>
           <label>房间系数 <input id="match-coefficient" type="number" min="1" max="1000000" value="100"/></label>
           <label>番数封顶 <input id="match-fan-cap" type="number" min="0" max="12" value="3"/></label>
           <label>1号AI <select id="match-ai-1" aria-label="1号AI难度">
@@ -194,12 +194,25 @@
           </select></label>
           <label class="match-kong-toggle"><input id="match-enable-kong" type="checkbox"/> 启用独立杠钱模拟</label>
           <label>杠钱底分 <input id="match-kong-base" type="number" min="1" max="1000000" value="100" disabled/></label>
-          <button id="match-new" type="button" class="primary">开始人机对战</button>
+          <button id="match-new" type="button" class="primary">随机开始一局</button>
+        </div>
+        <div class="match-extras">
+          <label class="match-voice-switch"><input id="match-voice-enabled" type="checkbox" checked/> 语音播报出牌、碰、杠、胡</label>
+          <span id="match-voice-status" class="review-footnote" aria-live="polite">语音由浏览器本地合成，可关闭</span>
+          <details id="match-lab" class="match-lab">
+            <summary>实验室 · 固定种子复现</summary>
+            <div class="match-lab-row">
+              <label><input id="match-lab-enabled" type="checkbox"/> 本次开始时使用固定种子</label>
+              <label>试验种子 <input id="match-seed" type="number" min="0" max="4294967295" value="42" disabled/></label>
+            </div>
+            <p>只影响“随机开始一局”：勾选后可复现同一洗牌。点击“再来一局”始终使用全新随机种子；进行中的牌墙和其他玩家暗牌不会公开。</p>
+          </details>
         </div>
         <p id="match-error" class="review-attention" aria-live="polite"></p>
         <div id="match-stage" hidden>
           <h4 id="match-title"></h4>
           <p id="match-status" class="review-footnote"></p>
+          <button id="match-again" type="button" class="primary match-again">再来一局 · 随机开局</button>
           <div class="match-playback-settings" role="group" aria-label="AI 播放设置">
             <label>AI 动作速度
               <select id="match-playback-speed">

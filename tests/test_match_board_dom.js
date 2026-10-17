@@ -26,7 +26,8 @@ class Node {
   addEventListener(type,fn){this.handlers[type]=fn;}
 }
 const ids=[
-  "match-new","match-enable-kong","match-kong-base","match-seed",
+  "match-new","match-again","match-lab-enabled","match-voice-enabled",
+  "match-voice-status","match-enable-kong","match-kong-base","match-seed",
   "match-coefficient","match-fan-cap","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status",
   "match-hand","match-controls","match-public","match-wall","match-wall-count",
@@ -86,7 +87,16 @@ const next={...base,wall_count:53,discards:[
 ]};
 let requests=[];
 let startMatch=base,replyMatch=next;
+const speechCalls=[];
 const window={
+  speechSynthesis:{
+    cancel:()=>speechCalls.push({kind:"cancel"}),
+    speak:utterance=>speechCalls.push({kind:"speak",text:utterance.text}),
+  },
+  SpeechSynthesisUtterance:class{
+    constructor(text){this.text=text;}
+  },
+  MahTrainMatchVoice:require("../web/match_voice.js"),
   MahTrainUI:{
     tileName:tile=>tile,
     tileElement:(tile,opts)=>{
@@ -154,6 +164,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-new"].handlers.click();
   await settle();
   assert.equal(requests[0].action,"match_new");
+  assert.equal(Object.hasOwn(requests[0],"seed"),false,
+    "ordinary match must let the server select an unused random seed");
+  assert.equal(dom["match-voice-enabled"].checked,true);
   assert.equal(dom["match-stage"].hidden,false);
   assert.equal(dom["match-wall-count"].textContent,"54");
   assert.equal(dom["match-hand"].children.length,14);
@@ -642,6 +655,27 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-round-report-events"].children.length,1);
   assert.equal(dom["match-review-preview-seats"].children.length,4);
   assert.equal(dom["match-wall-count"].textContent,"0");
+  // M3.24: seed is ONLY supplied when the laboratory fixed mode is chosen.
+  dom["match-lab-enabled"].checked=true;
+  dom["match-lab-enabled"].handlers.change();
+  assert.equal(dom["match-seed"].disabled,false);
+  dom["match-seed"].value="12345";
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(requests.at(-1).seed,12345);
+  assert.equal(dom["match-stage"].hidden,false);
+  dom["match-again"].handlers.click();
+  await settle();
+  assert.equal(requests.at(-1).action,"match_new");
+  assert.equal(Object.hasOwn(requests.at(-1),"seed"),false,
+    "rematch must ignore even the enabled lab seed and use server randomness");
+  dom["match-voice-enabled"].checked=false;
+  dom["match-voice-enabled"].handlers.change();
+  const spoken=speechCalls.filter(x=>x.kind==="speak").map(x=>x.text);
+  assert.ok(spoken.some(x=>x.includes("打")||x.includes("暗杠")||x.includes("自摸")),
+    "public live actions should be spoken");
+  assert.ok(spoken.every(x=>!x.includes("hidden-")&&!x.includes("secret-")));
+  console.log("M3.24 random rematch, lab seed, speech and privacy DOM smoke: PASS");
   console.log("M3.21 cross-turn public history, seat/filter navigation and reset DOM smoke: PASS");
   console.log("M3.20 grouped settlement animation and round report DOM smoke: PASS");
   console.log("M3.19 in-table settlement and directional meld DOM smoke: PASS");
