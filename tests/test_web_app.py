@@ -827,6 +827,16 @@ class WebUI(unittest.TestCase):
         parsed=json.loads(summary)
         self.assertEqual(parsed["summary"]["games"],count+1)
         self.assertIn(archive,[r["archive_id"] for r in parsed["matches"]])
+        card=parsed["scorecard"]
+        self.assertEqual(len(card["seats"]),4)
+        self.assertTrue(card["zero_sum"])
+        self.assertGreaterEqual(card["valid_games"],1)
+        self.assertEqual(sum(x["settled_total"] for x in card["seats"]),0)
+        self.assertNotIn("PRIVATE-MUST-NOT-SAVE",json.dumps(card))
+        for required in ("match-scorecard-status","match-scorecard-seats",
+                         "match-scorecard-trend"):
+            self.assertEqual(page.count(('id="%s"' % required).encode()),1)
+        self.assertIn(b".match-scorecard-trend-row",css)
         detail,_=self.get("/api/match_archives?archive_id="+archive)
         data=json.loads(detail)["report"]
         self.assertEqual(data["privacy"],"public_board_only")
