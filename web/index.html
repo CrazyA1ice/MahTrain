@@ -367,6 +367,20 @@
             aria-label="最近三十局的正式净额和累计得分"></div>
           <p class="review-footnote">统计范围为本机所有可核验的已完成档案；历史缺失账本的记录会单独计数排除。1—3号仅代表座位，不代表固定的同一名 AI；正式积分不含试验杠钱。</p>
         </section>
+        <section class="match-history-groups" aria-labelledby="match-history-groups-title">
+          <div class="match-history-groups-head">
+            <h4 id="match-history-groups-title">历史对局 · 按难度与房间规则分组</h4>
+            <label>分组方式
+              <select id="match-history-groups-mode">
+                <option value="ai" selected>三家 AI 难度配置</option>
+                <option value="rules">房间系数与封顶番</option>
+              </select>
+            </label>
+          </div>
+          <p id="match-history-groups-status" class="review-footnote" aria-live="polite"></p>
+          <div id="match-history-groups-rows" class="match-history-groups-rows"></div>
+          <p class="review-footnote">仅已核验的本机对局。不同房间系数、封顶番和 AI 组合不能直接用于推断算法强弱；平均“系数单位”只是去除底分倍率，非真实胜率或因果实验。</p>
+        </section>
         <div id="match-archives-list" class="match-archives-list"></div>
         <div class="match-archives-compare-tools">
           <button id="match-archives-compare" type="button" disabled>对比所选两局</button>

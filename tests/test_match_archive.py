@@ -341,6 +341,104 @@ class MatchArchiveTests(unittest.TestCase):
             with self.subTest(limit=limit),self.assertRaises(ValueError):
                 self.store.four_seat_scorecard(trend_limit=limit)
 
+    def test_m329_group_by_actual_ai_lineup_and_scoring_rules(self):
+        before, finished = self.fixture()
+        records = [
+            (100, 3, ["basic", "advanced", "challenge"], 0, 1),
+            (200, 3, ["basic", "advanced", "challenge"], 0, 1),
+            (100, 3, ["challenge", "advanced", "basic"], 1, 0),
+            (100, 3, ["basic", "advanced", "challenge"], 0, 1),
+        ]
+        ids = []
+        for coeff, cap, lineup, winner, payer in records:
+            ledger = WinLedger(room_coefficient=coeff, fan_cap=cap)
+            ledger.pay_win(
+                winner=winner, payers=[payer], source=payer,
+                kind="ron", tile="m2",
+                score={"legal": True, "main_pattern": "pinghu",
+                       "raw_fan": 0, "effective_fan": 0, "multiplier": 1,
+                       "combinations": {}, "bonuses": {}},
+            )
+            ids.append(self.store.save_completed(
+                {**finished, "win_ledger": ledger.public_state()},
+                [], before, lineup,
+            ))
+        # A legacy record never had room metadata; don't invent coefficient=100.
+        with sqlite3.connect(self.db) as db:
+            blob = json.loads(db.execute(
+                "SELECT record_json FROM completed_matches WHERE archive_id=?",
+                (ids[3],),
+            ).fetchone()[0])
+            del blob["match_config"]
+            db.execute("UPDATE completed_matches SET record_json=? WHERE archive_id=?",
+                       (json.dumps(blob), ids[3]))
+        reports = self.store.list_completed(limit=1)
+        group = reports["scorecard"]["groupings"]
+        self.assertEqual(reports["scorecard"]["valid_games"], 4)
+        self.assertEqual(group["missing_ai_games"], 0)
+        self.assertEqual(group["missing_rules_games"], 1)
+        self.assertEqual(sum(x["games"] for x in group["ai_lineups"]), 4)
+        self.assertEqual(sum(x["games"] for x in group["room_rules"]), 3)
+        lineup = next(x for x in group["ai_lineups"]
+                      if x["ai_levels"] == ["basic", "advanced", "challenge"])
+        self.assertEqual(lineup["games"], 3)
+        self.assertEqual(lineup["settled_total"], 400)
+        self.assertEqual(lineup["average_settled"], 133.33)
+        self.assertEqual(lineup["normalized_games"], 2)
+        self.assertEqual(lineup["average_per_coefficient"], 1.0)
+        self.assertEqual(lineup["rules_variant_count"], 3)
+        self.assertTrue(lineup["small_sample"])
+        rules100 = next(x for x in group["room_rules"]
+                        if x["room_coefficient"] == 100)
+        self.assertEqual(rules100["games"], 2)
+        self.assertEqual(rules100["settled_total"], 0)
+        self.assertEqual(rules100["fan_cap"], 3)
+        rules200 = next(x for x in group["room_rules"]
+                        if x["room_coefficient"] == 200)
+        self.assertEqual(rules200["average_per_coefficient"], 1.0)
+        self.assertEqual(reports["scorecard"]["seats"][0]["settled_total"], 300)
+        self.assertNotIn("match_config",
+                         self.store.detail(ids[3])["report"])
+        self.assertEqual(self.store.detail(ids[0])["report"]["match_config"],
+                         {"room_coefficient": 100, "fan_cap": 3})
+        # Dirty or malicious room parameters are not valid grouping evidence.
+        with sqlite3.connect(self.db) as db:
+            blob = json.loads(db.execute(
+                "SELECT record_json FROM completed_matches WHERE archive_id=?",
+                (ids[0],),
+            ).fetchone()[0])
+            blob["match_config"] = {"room_coefficient": True, "fan_cap": 3,
+                                    "hidden_wall": "SECRET_WALL"}
+            db.execute("UPDATE completed_matches SET record_json=? WHERE archive_id=?",
+                       (json.dumps(blob), ids[0]))
+        revised = self.store.four_seat_scorecard()
+        self.assertEqual(revised["excluded_games"], 1)
+        self.assertEqual(revised["valid_games"], 3)
+        self.assertNotIn("SECRET_WALL", str(revised))
+        # Even valid-looking config edits cannot disagree with published payouts.
+        with sqlite3.connect(self.db) as db:
+            blob = json.loads(db.execute(
+                "SELECT record_json FROM completed_matches WHERE archive_id=?",
+                (ids[1],),
+            ).fetchone()[0])
+            blob["match_config"]["room_coefficient"] = 900
+            db.execute("UPDATE completed_matches SET record_json=? WHERE archive_id=?",
+                       (json.dumps(blob), ids[1]))
+        self.assertEqual(self.store.four_seat_scorecard()["excluded_games"], 2)
+
+    def test_m329_refuse_fake_rule_config_or_mismatched_settlement(self):
+        before, finished = self.fixture()
+        import copy
+        for wrong in ({"room_coefficient": True, "fan_cap": 3},
+                      {"room_coefficient": 100, "fan_cap": 13},
+                      {"room_coefficient": 0, "fan_cap": 3}):
+            bad = copy.deepcopy(finished)
+            bad["win_ledger"].update(wrong)
+            with self.subTest(wrong=wrong), self.assertRaises(ValueError):
+                self.store.save_completed(
+                    bad, [], before, ["basic", "advanced", "challenge"])
+        self.assertEqual(self.store.list_completed()["summary"]["games"], 0)
+
     def test_four_seat_empty_scorecard_uses_zeros_and_no_fake_trend(self):
         card=self.store.four_seat_scorecard()
         self.assertEqual(card["valid_games"],0)

@@ -832,11 +832,18 @@ class WebUI(unittest.TestCase):
         self.assertTrue(card["zero_sum"])
         self.assertGreaterEqual(card["valid_games"],1)
         self.assertEqual(sum(x["settled_total"] for x in card["seats"]),0)
+        self.assertIn("groupings",card)
+        self.assertIn("ai_lineups",card["groupings"])
+        self.assertIn("room_rules",card["groupings"])
         self.assertNotIn("PRIVATE-MUST-NOT-SAVE",json.dumps(card))
         for required in ("match-scorecard-status","match-scorecard-seats",
                          "match-scorecard-trend"):
             self.assertEqual(page.count(('id="%s"' % required).encode()),1)
         self.assertIn(b".match-scorecard-trend-row",css)
+        self.assertIn(b".match-history-group-item",css)
+        for ident in ("match-history-groups-mode","match-history-groups-status",
+                      "match-history-groups-rows"):
+            self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
         detail,_=self.get("/api/match_archives?archive_id="+archive)
         data=json.loads(detail)["report"]
         self.assertEqual(data["privacy"],"public_board_only")

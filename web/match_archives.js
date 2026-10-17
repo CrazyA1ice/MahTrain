@@ -4,6 +4,7 @@
   const $=id=>document.getElementById(id);
   const playback=()=>window.MahTrainPlayback;
   let listed=[],opened=null,selected=new Set(),frames=[],active=null;
+  let lastGrouping=null;
   const el=(tag,kind,txt)=>{
     const n=document.createElement(tag);
     if(kind)n.className=kind;
@@ -95,6 +96,50 @@
       trend.append(row);
     }
   }
+  function renderGroupings(){
+    const status=$("match-history-groups-status");
+    const root=$("match-history-groups-rows");
+    root.replaceChildren();
+    const mode=$("match-history-groups-mode").value;
+    const byAI=mode!=="rules";
+    const rows=lastGrouping?.[byAI?"ai_lineups":"room_rules"]||[];
+    const missing=lastGrouping?.[byAI?"missing_ai_games":"missing_rules_games"]||0;
+    status.textContent=(byAI?"按AI难度组合":"按房间系数与番封顶")+
+      " · 共"+rows.reduce((sum,r)=>sum+r.games,0)+"局进入分组"+
+      " · "+missing+"局缺少对应历史配置未参与该分组";
+    if(!rows.length){
+      root.append(el("p","review-footnote",
+        "暂无具有完整配置和有效结算账本的对局；新对局完成后将自动加入。"));
+      return;
+    }
+    const level={basic:"入门",advanced:"进阶",challenge:"挑战"};
+    for(const item of rows){
+      const card=el("div","match-history-group-item");
+      const name=byAI?
+        item.ai_levels.map((x,i)=>(i+1)+"号"+(level[x]||x)).join(" · "):
+        "房间系数"+item.room_coefficient+" · 封顶"+item.fan_cap+"番";
+      card.append(el("strong","",name));
+      card.append(el("span","match-history-group-total",
+        "0号正式净额合计 "+sign(item.settled_total)+
+        " · 场均 "+sign(item.average_settled)));
+      card.append(el("span","",
+        "胡牌 "+sign(item.hu_total)+" · 流局 "+sign(item.draw_total)+
+        " · "+item.games+"局 · 正/负/零 "+
+        item.positive_games+"/"+item.negative_games+"/"+item.zero_games));
+      card.append(el("small","",
+        "按房间系数折算的场均 "+
+        (item.average_per_coefficient===null?"不可计算":
+          sign(item.average_per_coefficient)+"系数单位")+
+        "（可计算"+item.normalized_games+"/"+item.games+"局）"+
+        (byAI&&item.rules_variant_count>1?
+          " · 含"+item.rules_variant_count+"种房间配置":"")));
+      if(item.small_sample){
+        card.append(el("small","match-history-group-warning",
+          "样本不足5局，仅供观察，不支持判断哪种AI更强。"));
+      }
+      root.append(card);
+    }
+  }
   function renderList(){
     const root=$("match-archives-list");
     root.replaceChildren();
@@ -141,6 +186,8 @@
         " · 累计 "+response.summary.paid_wins+"笔胡牌";
       renderList();
       renderScorecard(response.scorecard);
+      lastGrouping=response.scorecard?.groupings||null;
+      renderGroupings();
     }catch(err){fail(err)}
   }
   function renderArchiveBoard(frame){
@@ -264,6 +311,7 @@
     }catch(err){fail(err)}
   }
   function init(){
+    $("match-history-groups-mode").addEventListener("change",renderGroupings);
     $("match-archives-refresh").addEventListener("click",refresh);
     $("match-archives-compare").addEventListener("click",comparison);
     for(const id of ["match-archives-seat","match-archives-action"]){

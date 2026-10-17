@@ -25,10 +25,13 @@ const ids=[
   "match-archives-balances","match-archives-wins",
   "match-archives-count","match-archives-actions",
   "match-scorecard-status","match-scorecard-seats","match-scorecard-trend",
+  "match-history-groups-mode","match-history-groups-status",
+  "match-history-groups-rows",
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
 dom["match-archives-seat"].value="all";
 dom["match-archives-action"].value="all";
+dom["match-history-groups-mode"].value="ai";
 const board=(n,wall,won)=>({
   phase:won?"finished":"await_discard",turn:1,wall_count:wall,
   hand_counts:[13,13,10,13],
@@ -83,6 +86,25 @@ const fetch=async url=>{
          score:18,cumulative:10},
       ],
       trend_limit:30,
+      groupings:{
+        ai_lineups:[{
+          ai_levels:["basic","advanced","challenge"],games:2,
+          settled_total:10,hu_total:-8,draw_total:18,
+          average_settled:5,positive_games:1,negative_games:1,
+          zero_games:0,normalized_games:1,
+          average_per_coefficient:0.5,rules_variant_count:2,
+          small_sample:true,
+        }],
+        room_rules:[{
+          room_coefficient:100,fan_cap:3,games:1,
+          settled_total:18,hu_total:8,draw_total:10,
+          average_settled:18,positive_games:1,negative_games:0,
+          zero_games:0,normalized_games:1,
+          average_per_coefficient:0.18,rules_variant_count:1,
+          small_sample:true,
+        }],
+        missing_ai_games:0,missing_rules_games:1,
+      },
     },
   };
   return {ok:true,json:async()=>data};
@@ -116,6 +138,23 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-scorecard-trend"].children[0].children[1].children[0].style.width.endsWith("%"));
   assert.equal(dom["match-scorecard-trend"].children[1].children[2].children.length,1);
   assert.ok(!JSON.stringify(dom).includes("hidden-hand"));
+  assert.equal(dom["match-history-groups-rows"].children.length,1);
+  assert.ok(dom["match-history-groups-rows"].children[0].children[0]
+    .textContent.includes("1号入门"));
+  assert.ok(dom["match-history-groups-rows"].children[0].children[3]
+    .textContent.includes("系数单位"));
+  assert.ok(dom["match-history-groups-rows"].children[0].children[4]
+    .textContent.includes("样本不足5局"));
+  assert.ok(dom["match-history-groups-status"].textContent.includes("0局缺少"));
+  dom["match-history-groups-mode"].value="rules";
+  dom["match-history-groups-mode"].handlers.change();
+  assert.equal(dom["match-history-groups-rows"].children.length,1);
+  assert.ok(dom["match-history-groups-rows"].children[0].children[0]
+    .textContent.includes("房间系数100"));
+  assert.ok(dom["match-history-groups-status"].textContent.includes("1局缺少"));
+  dom["match-history-groups-mode"].value="ai";
+  dom["match-history-groups-mode"].handlers.change();
+  assert.ok(dom["match-history-groups-status"].textContent.includes("按AI难度组合"));
   let rows=dom["match-archives-list"].children;
   rows[0].children[0].checked=true;rows[0].children[0].handlers.change();
   rows[1].children[0].checked=true;rows[1].children[0].handlers.change();
