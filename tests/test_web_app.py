@@ -782,7 +782,7 @@ class WebUI(unittest.TestCase):
         self.assertIn(b"renderScoreBursts(",js)
         for ident in ("match-hand-prev","match-hand-next",
                       "match-hand-draw","match-hand-position",
-                      "match-table-self-summary"):
+                      "match-table-self-summary","match-skin-toggle"):
             self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
         self.assertIn(b"updateHandNavigation()",js)
         self.assertIn(b'navigateHand("draw")',js)
@@ -791,6 +791,8 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".match-hand-navigation",css)
         self.assertIn(b".match-reaction--hu",css)
         self.assertIn(b".match-table-self-summary",css)
+        self.assertIn(b"is-midnight-felt",css)
+        self.assertIn(b"midnightFelt",js)
         self.assertIn(b"match-motion-big-action",css)
         self.assertIn(b".match-score-burst.is-credit",css)
         self.assertIn(b".match-score-burst.is-debit",css)
