@@ -93,8 +93,9 @@
       melds,discards,won:board.won.map(Boolean),
     };
   }
-  function normalizeSteps(steps,maxFrames=80){
+  function normalizeSteps(steps,maxFrames=80,initialBoard=null){
     const accepted=[];
+    let previous=normalizeBoard(initialBoard);
     for(const step of Array.isArray(steps)?steps:[]){
       const board=normalizeBoard(step?.board);
       const events=normalize(step?.events).frames;
@@ -104,15 +105,41 @@
       const last=events[events.length-1];
       const winner=events.find(f=>f.isWin);
       const exposed=[...events].reverse().find(f=>f.publicTile);
+      const actionTypes=events.map(f=>f.type);
+      const isKong=actionTypes.some(type=>[
+        "an_gang","ming_gang","bu_gang","bu_gang_declared",
+      ].includes(type));
+      const isPeng=actionTypes.includes("peng");
+      const isWin=events.some(f=>f.isWin);
+      const tailDraw=actionTypes.includes("kong_supplement");
+      const changes=previous?{
+        wall:board.wall_count-previous.wall_count,
+        backs:board.hand_counts.map((n,i)=>n-previous.hand_counts[i]),
+        melds:board.melds.map((n,i)=>n.length-previous.melds[i].length),
+        rivers:board.discards.length-previous.discards.length,
+      }:null;
       accepted.push({
         ...last,label:events.map(f=>f.label).join(" → "),
+        chain:events.map(f=>f.label),
+        actionTypes,
         publicTile:exposed?.publicTile||null,
-        isWin:events.some(f=>f.isWin),
-        winSeats:winner?.winSeats||last.winSeats,board,
+        isWin,winSeats:winner?.winSeats||last.winSeats,
+        isKong,isPeng,tailDraw,
+        important:isKong||isPeng||isWin,
+        holdScale:isWin?2.2:(isKong?1.7:(isPeng?1.4:1)),
+        changes,board,
       });
+      previous=board;
     }
     const omitted=Math.max(0,accepted.length-maxFrames);
     return {omitted,frames:accepted.slice(omitted)};
+  }
+  function highlightFrames(frames){
+    if(!Array.isArray(frames)||!frames.length)return [];
+    // The final AUTHENTIC post-action snapshot must always be included,
+    // even when all earlier non-critical draws/discards were skipped.
+    return frames.filter((frame,index)=>
+      frame.important||index===frames.length-1);
   }
   function createController({onFrame,onDone,onStatus,clock,clearClock}){
     if(typeof onFrame!=="function"||typeof onDone!=="function"||
@@ -121,6 +148,12 @@
     let items=[],index=-1,timer=null,playing=false,paused=false,
       duration=550,completed=null;
     function clear(){if(timer!==null){cancel(timer);timer=null;}}
+    function schedule(){
+      const multiplier=items[index]?.holdScale;
+      timer=later(advance,Math.round(duration*(
+        Number.isFinite(multiplier)&&multiplier>=1&&multiplier<=4
+        ?multiplier:1)));
+    }
     function status(){onStatus({
       playing,paused,index,total:items.length,duration,
     });}
@@ -137,7 +170,7 @@
       if(index>=items.length){finish();return;}
       onFrame(items[index],index+1,items.length);
       status();
-      timer=later(advance,duration);
+      schedule();
     }
     return {
       start(frames,done){
@@ -149,17 +182,24 @@
         return playing;
       },
       pause(){if(!playing||paused)return;paused=true;clear();status();},
-      resume(){if(!playing||!paused)return;paused=false;status();timer=later(advance,duration);},
+      resume(){if(!playing||!paused)return;paused=false;status();schedule();},
+      step(){
+        if(!playing||!paused)return;
+        index++;
+        if(index>=items.length){finish();return;}
+        onFrame(items[index],index+1,items.length);
+        status();
+      },
       skip(){finish();},
       cancel(){clear();playing=false;paused=false;completed=null;status();},
       setSpeed(ms){
         if(![180,450,900].includes(ms))throw new RangeError("unsupported animation speed");
         duration=ms;
-        if(playing&&!paused){clear();timer=later(advance,duration);}
+        if(playing&&!paused){clear();schedule();}
         status();
       },
       getState(){return {playing,paused,index,total:items.length,duration};},
     };
   }
-  return {normalize,normalizeSteps,createController};
+  return {normalize,normalizeSteps,highlightFrames,createController};
 });
