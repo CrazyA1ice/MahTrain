@@ -905,6 +905,35 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     x.className==="match-self-win-preview"),false,
     "a nonwinning/old round must not retain the prior quote");
 
+  // M3.42: all four concealed-kong backs remain if an old board had no
+  // explicit public marker. A newly-declared kong flips only the last tile.
+  startMatch={...base,melds:[[],[],
+    [{type:"an_gang",tile:"m7",revealed:true}],[]]};
+  dom["match-new"].handlers.click();
+  await settle();
+  const newKong=dom["match-seat-2"];
+  assert.equal(descendants(newKong,x=>x.tile==="m7").length,1);
+  assert.equal(descendants(newKong,x=>
+    x.className==="match-tile-back").length,13);
+  assert.equal(descendants(newKong,x=>
+    x.className.includes("match-kong-revealed")).length,1);
+  const visibleMeld=descendants(newKong,x=>
+    x.className==="match-seat-meld--an_gang");
+  // The full rack has one authorized visible face and 3 backs.
+  assert.ok(descendants(newKong,x=>x.attributes["aria-label"]?.includes(
+    "一张翻开")).length===1);
+  assert.equal(requests.at(-1).action,"match_new");
+  // Old archived/legacy redacted kong stays strictly face-down.
+  startMatch={...base,melds:[[],[],
+    [{type:"an_gang",tile:null}],[]]};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(descendants(dom["match-seat-2"],x=>x.tile==="m7").length,0);
+  // All sides still display the exact public concealed-hand COUNTS.
+  assert.equal(descendants(dom["match-seat-1"],x=>
+    x.className==="match-tile-back").length,13);
+  console.log("M3.42 one flipped kong tile and concealed legacy DOM: PASS");
+
   // M3.41: a continuation may include silent authentic steps followed by
   // one spoken discard. Quiet intermediate visual placeholders are skipped,
   // while the complete verified snapshots remain inspectable in review.
