@@ -341,6 +341,19 @@ class MatchArchive:
         } for step in history[-_MAX_ARCHIVE_STEPS:]]
         safe_board = sanitize_board(public)
         ledger = sanitize_win_ledger(public["win_ledger"])
+        # Explicitly preserve ONLY the public, typed room scoring settings.
+        # Legacy archives are not altered or retroactively assigned settings.
+        raw_ledger = public["win_ledger"]
+        coefficient = raw_ledger.get("room_coefficient")
+        fan_cap = raw_ledger.get("fan_cap")
+        if (type(coefficient) is not int or coefficient <= 0 or
+                type(fan_cap) is not int or not 0 <= fan_cap <= 12):
+            raise ValueError("invalid archived room scoring configuration")
+        for win in ledger["wins"]:
+            if (win["effective_fan"] > fan_cap or
+                    win["amount_per_payer"] !=
+                    coefficient * win["multiplier"]):
+                raise ValueError("win payout incompatible with room configuration")
         exhaustive = sanitize_exhaustive_settlement(
             public.get("exhaustive_settlement"), safe_board,
         )
@@ -348,6 +361,10 @@ class MatchArchive:
         if not isinstance(kong, dict):
             raise ValueError("invalid kong ledger")
         kong_balances = _balances(kong.get("balances"), "kong balances")
+        if exhaustive is not None and (
+                exhaustive["room_coefficient"] != coefficient or
+                exhaustive["fan_cap"] != fan_cap):
+            raise ValueError("exhaustive and HU room configurations disagree")
         base = kong.get("base")
         if base is not None and (type(base) is not int or not 1 <= base <= 10**6):
             raise ValueError("invalid kong base")
@@ -355,6 +372,10 @@ class MatchArchive:
             "privacy": "public_board_only", "version": 1,
             "phase": public["phase"], "dealer": public["dealer"],
             "ai_levels": list(ai_levels),
+            "match_config": {
+                "room_coefficient": coefficient,
+                "fan_cap": fan_cap,
+            },
             "opening": sanitize_board(initial_board),
             "steps": safe_steps, "truncated": max(0, len(history)-len(safe_steps)),
             "final_board": safe_board,
