@@ -291,6 +291,92 @@ def _archived_score_components(report: dict) -> tuple[list[int], list[int]]:
     return hu, draw
 
 
+_AI_LEVELS = frozenset(("basic", "advanced", "challenge"))
+
+
+def _archive_ai_lineup(report: dict) -> tuple[str, str, str] | None:
+    values = report.get("ai_levels")
+    if values is None:  # A historical record may predate AI level archiving.
+        return None
+    if (type(values) is not list or len(values) != 3 or
+            any(type(x) is not str or x not in _AI_LEVELS for x in values)):
+        raise ValueError("unverified historical AI lineup")
+    return tuple(values)
+
+
+def _archive_scoring_rules(report: dict) -> tuple[int, int] | None:
+    config = report.get("match_config")
+    if config is None:
+        # Pre-M3.29 did NOT archive the game's room parameters; don't
+        # guess defaults or infer them from a non-exhaustive win.
+        return None
+    if type(config) is not dict:
+        raise ValueError("unverified historical match config")
+    coefficient, cap = config.get("room_coefficient"), config.get("fan_cap")
+    if (type(coefficient) is not int or coefficient <= 0 or
+            type(cap) is not int or not 0 <= cap <= 12):
+        raise ValueError("unverified historical match config")
+    terminal = report.get("exhaustive_settlement")
+    if terminal is not None and (
+            coefficient != terminal.get("room_coefficient") or
+            cap != terminal.get("fan_cap")):
+        raise ValueError("historic HU/draw scoring settings disagree")
+    return (coefficient, cap)
+
+
+def _group_score(groups: dict, key: tuple, score: int, hu: int, draw: int,
+                 rules: tuple[int, int] | None) -> None:
+    item = groups.setdefault(key, {
+        "games": 0, "settled_total": 0, "hu_total": 0, "draw_total": 0,
+        "positive_games": 0, "negative_games": 0, "zero_games": 0,
+        "normalized_sum": 0.0, "normalized_games": 0, "rules_seen": set(),
+    })
+    item["games"] += 1
+    item["settled_total"] += score
+    item["hu_total"] += hu
+    item["draw_total"] += draw
+    item[("positive_games" if score > 0 else
+          "negative_games" if score < 0 else "zero_games")] += 1
+    item["rules_seen"].add(rules)
+    if rules is not None:
+        item["normalized_sum"] += score / rules[0]
+        item["normalized_games"] += 1
+
+
+def _group_rows(groups: dict, kind: str) -> list[dict]:
+    rows = []
+    for key, item in groups.items():
+        count = item["games"]
+        row = {
+            "games": count,
+            "settled_total": item["settled_total"],
+            "hu_total": item["hu_total"],
+            "draw_total": item["draw_total"],
+            "average_settled": round(item["settled_total"] / count, 2),
+            "positive_games": item["positive_games"],
+            "negative_games": item["negative_games"],
+            "zero_games": item["zero_games"],
+            # Normalized by ROOM COEFFICIENT only; different fan caps or AI
+            # lineups are still not directly comparable or causal evidence.
+            "normalized_games": item["normalized_games"],
+            "average_per_coefficient": (
+                round(item["normalized_sum"] / item["normalized_games"], 3)
+                if item["normalized_games"] else None
+            ),
+            "rules_variant_count": len(item["rules_seen"]),
+            "small_sample": count < 5,
+        }
+        if kind == "ai":
+            row["ai_levels"] = list(key)
+        else:
+            row["room_coefficient"], row["fan_cap"] = key
+        rows.append(row)
+    if kind == "ai":
+        return sorted(rows, key=lambda x: (-x["games"], x["ai_levels"]))
+    return sorted(rows, key=lambda x: (-x["games"], x["room_coefficient"],
+                                      x["fan_cap"]))
+
+
 class MatchArchive:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -455,6 +541,8 @@ class MatchArchive:
         skipped = 0
         trends = []
         cumulative = 0
+        ai_groups, room_groups = {}, {}
+        missing_ai, missing_rules = 0, 0
         with self._connect() as db:
             rows = db.execute("""
                 SELECT archive_id,created_at,record_json
@@ -463,14 +551,25 @@ class MatchArchive:
             """)
             for row in rows:
                 try:
-                    hu, draw = _archived_score_components(
-                        json.loads(row["record_json"])
-                    )
+                    report = json.loads(row["record_json"])
+                    hu, draw = _archived_score_components(report)
+                    lineup = _archive_ai_lineup(report)
+                    rules = _archive_scoring_rules(report)
                 except (ValueError, TypeError, KeyError, IndexError,
                         json.JSONDecodeError):
                     skipped += 1
                     continue
                 official = [a + b for a, b in zip(hu, draw)]
+                if lineup is None:
+                    missing_ai += 1
+                else:
+                    _group_score(ai_groups, lineup, official[0],
+                                 hu[0], draw[0], rules)
+                if rules is None:
+                    missing_rules += 1
+                else:
+                    _group_score(room_groups, rules, official[0],
+                                 hu[0], draw[0], rules)
                 for seat in range(4):
                     totals[0][seat] += hu[seat]
                     totals[1][seat] += draw[seat]
@@ -513,6 +612,14 @@ class MatchArchive:
             "zero_sum": True,
             "trend": trends,
             "trend_limit": trend_limit,
+            "groupings": {
+                "ai_lineups": _group_rows(ai_groups, "ai"),
+                "room_rules": _group_rows(room_groups, "rules"),
+                "missing_ai_games": missing_ai,
+                "missing_rules_games": missing_rules,
+                "scope": "only_verified_completed_matches",
+                "player_seat": 0,
+            },
         }
 
     def detail(self, archive_id: str) -> dict:
