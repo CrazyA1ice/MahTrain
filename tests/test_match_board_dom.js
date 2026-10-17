@@ -83,7 +83,15 @@ const window={
     }
   }
 };
-window.MahTrainPlayback=require("../web/match_playback.js");
+const playbackModule=require("../web/match_playback.js");
+window.MahTrainPlayback={
+  normalize:playbackModule.normalize,
+  createController:callbacks=>playbackModule.createController({
+    ...callbacks,
+    clock:(fn,delay)=>context.setTimeout(fn,delay),
+    clearClock:id=>context.clearTimeout(id),
+  }),
+};
 let timerIndex=0;
 const pendingTimers=new Map();
 const context={
