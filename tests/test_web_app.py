@@ -802,7 +802,7 @@ class WebUI(unittest.TestCase):
         self.assertIn(b".match-board-scroll",css)
         for ident in ("match-hud-turn","match-hud-wall",
                       "match-hud-missing","match-hud-tip",
-                      "match-focus-toggle","match-large-tiles-toggle",
+                      "match-focus-toggle","match-decision",
                       "match-confirm-discard"):
             self.assertEqual(page.count(('id="%s"' % ident).encode()),1)
         self.assertIn(b"#match-stage.is-immersive #match-public",css)
