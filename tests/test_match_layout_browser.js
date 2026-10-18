@@ -58,6 +58,17 @@ function check(report,w,label){
   if(w>=701){
     assert.ok(report.hand.clientWidth>=report.hand.scrollWidth-2,
       w+" desktop must show all 14 hand tiles without own scroll");
+    assert.ok(report.board.height<=report.viewportDebug.innerHeight+1,
+      w+" desktop board must fit one 100%-zoom viewport");
+    assert.ok(report.board.top>=-1&&
+      report.board.bottom<=report.viewportDebug.innerHeight+1,
+      w+" board must be completely visible when scrolled into view");
+    assert.equal(report.safeLayout?.allVisible,true,
+      w+" all four river/meld/missing zones must fit their own seats");
+    assert.equal(report.safeLayout?.promptInsideCenter,true,
+      w+" exchange prompt must stay inside the central safe bay");
+    assert.equal(report.safeLayout?.promptOverlaps.length,0,
+      w+" exchange prompt overlays a hand, river, exposed meld or missing badge");
   }else{
     assert.equal(report.hand.overflowX,"auto",
       w+" mobile may scroll only the own hand horizontally");
@@ -122,6 +133,52 @@ async function main(){
     });
     for(const spec of specs){
       await page.setViewportSize(spec);
+      if(spec.width>=701){
+        // Public-only visual stress: four possible open melds, a missing
+        // suit badge and 14 physical hand tiles simultaneously in every seat.
+        // This is a layout test, not a claim of a reachable 108-tile state.
+        await page.evaluate(()=>{
+          for(let seat=0;seat<4;seat++){
+            const root=seat===0
+              ?document.getElementById("match-self-melds")
+              :document.querySelector("#match-seat-"+seat+" .match-seat-melds");
+            root.replaceChildren();
+            for(let meld=0;meld<4;meld++){
+              const group=document.createElement("div");
+              group.className="match-seat-meld";
+              const name=document.createElement("small");
+              name.textContent="碰/杠";
+              group.append(name);
+              const tiles=document.createElement("div");
+              tiles.className="match-meld-tiles";
+              for(let n=0;n<4;n++){
+                const tile=document.createElement("div");
+                tile.className="tile";
+                const face=document.createElement("span");
+                face.className="tile-atlas-face";
+                tile.append(face);
+                tiles.append(tile);
+              }
+              group.append(tiles);
+              root.append(group);
+            }
+            let missing=seat===0
+              ?document.getElementById("match-self-missing-flag")
+              :document.querySelector("#match-seat-"+seat+" .match-missing-flag");
+            if(!missing){
+              missing=document.createElement("strong");
+              missing.className="match-missing-flag";
+              document.querySelector("#match-seat-"+seat+" .match-seat-identity")
+                .append(missing);
+            }
+            missing.hidden=false;
+            missing.textContent="缺条";
+          }
+        });
+        // Explicitly center the entire table instead of leaving 7px out.
+        await page.evaluate(()=>document.getElementById("match-board")
+          .scrollIntoView({block:"center",inline:"nearest",behavior:"instant"}));
+      }
       await page.evaluate(()=>new Promise(requestAnimationFrame));
       const report=await page.evaluate(()=>{
         function box(e){
@@ -133,7 +190,8 @@ async function main(){
         const board=box(boardElement);
         const computedBoard=getComputedStyle(boardElement);
         const viewportDebug={
-          innerWidth:innerWidth,bodyMinWidth:getComputedStyle(document.body).minWidth,
+          innerWidth:innerWidth,innerHeight:innerHeight,
+          bodyMinWidth:getComputedStyle(document.body).minWidth,
           matchNarrow:matchMedia("(min-width:320px) and (max-width:359px)").matches,
           boardColumns:computedBoard.gridTemplateColumns,
           riverHCell:computedBoard.getPropertyValue("--river-h-cell").trim(),
@@ -185,8 +243,50 @@ async function main(){
             outside,cellOverlap:overlap,
           });
         }
+        // M3.65: geometric visibility checks independent of real private
+        // state. All synthetic melds are visibly PUBLIC tile placeholders.
+        const overlaps=(a,b)=>Math.min(a.right,b.right)-Math.max(a.left,b.left)>1&&
+          Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top)>1;
+        const inside=(small,large)=>small.left>=large.left-2&&
+          small.right<=large.right+2&&small.top>=large.top-2&&
+          small.bottom<=large.bottom+2;
+        const prompt=document.querySelector("#match-controls:not([hidden])");
+        const safeBox=box(document.getElementById("match-wall"));
+        const handBox=box(handEl);
+        const vulnerable=[
+          handEl,...Array.from(document.querySelectorAll(
+            ".match-river, #match-self-melds .match-seat-meld, "+
+            ".match-seat:not(.match-seat--bottom) .match-seat-meld, "+
+            ".match-board .match-missing-flag:not([hidden])"))
+        ];
+        let allVisible=true;
+        for(let seat=0;seat<4;seat++){
+          const holder=document.getElementById("match-seat-"+seat);
+          const seatBox=box(holder);
+          const flag=seat===0
+            ?document.getElementById("match-self-missing-flag")
+            :holder.querySelector(".match-missing-flag");
+          if(!flag||flag.hidden||!inside(box(flag),seatBox))allVisible=false;
+          const melds=seat===0
+            ?document.getElementById("match-self-melds")
+            :holder.querySelector(".match-seat-melds");
+          if(!melds||melds.querySelectorAll(".match-seat-meld").length!==4||
+             !inside(box(melds),seatBox))allVisible=false;
+          for(const tile of melds?.querySelectorAll(".tile")||[]){
+            if(!inside(box(tile),seatBox))allVisible=false;
+          }
+        }
+        const promptBox=prompt?box(prompt):null;
+        const safeLayout={
+          allVisible,promptInsideCenter:!!promptBox&&inside(promptBox,safeBox),
+          promptOverlaps:promptBox?vulnerable
+            .filter(item=>overlaps(promptBox,box(item)))
+            .map(item=>item.id||item.className):[],
+          safeBox,promptBox,handBox,
+        };
         return {
-          board,viewportDebug,rivers,riverHandGap:handBounds.top-bottomRiver.bottom,
+          board,viewportDebug,rivers,safeLayout,
+          riverHandGap:handBounds.top-bottomRiver.bottom,
           hand:{
             clientWidth:handEl.clientWidth,scrollWidth:handEl.scrollWidth,
             overflowX:getComputedStyle(handEl).overflowX,

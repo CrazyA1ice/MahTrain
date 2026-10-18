@@ -13,7 +13,7 @@
   // The owner may decline an optional self-kong without losing the right
   // to reopen it. Never reopen the same offer on each render or redraw.
   let dismissedKongKey=null,kongPromptReopened=false;
-  let backColor="jade";
+  let backColor="indigo";
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
   const MATCH_SESSION_KEY="mahtrain.match.session.v1";
@@ -1106,7 +1106,7 @@
     stage.classList.toggle("is-immersive",immersive);
     $("match-board").classList.toggle("is-midnight-felt",midnightFelt);
     $("match-skin-toggle").setAttribute("aria-pressed",String(midnightFelt));
-    $("match-skin-toggle").textContent=midnightFelt?"绿色桌布":"深蓝桌布";
+    $("match-skin-toggle").textContent=midnightFelt?"经典深蓝桌布":"午夜深蓝桌布";
     $("match-focus-toggle").setAttribute("aria-pressed",String(immersive));
     $("match-focus-toggle").textContent=immersive?"显示详细信息":"沉浸牌桌";
   }

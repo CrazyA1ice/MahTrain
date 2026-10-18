@@ -337,11 +337,11 @@
             </div>
             <div class="match-hud-actions" role="group" aria-label="牌桌显示与操作偏好">
               <button id="match-focus-toggle" type="button" class="review-control" aria-pressed="false">沉浸牌桌</button>
-              <button id="match-skin-toggle" type="button" class="review-control" aria-pressed="false">深蓝桌布</button>
+              <button id="match-skin-toggle" type="button" class="review-control" aria-pressed="false">午夜深蓝桌布</button>
               <label class="match-back-picker">牌背颜色
                 <select id="match-back-color" aria-label="其他玩家及牌墙牌背颜色">
-                  <option value="jade" selected>翡翠绿</option>
-                  <option value="indigo">宝石蓝</option>
+                  <option value="jade">翡翠绿</option>
+                  <option value="indigo" selected>宝石蓝</option>
                   <option value="red">朱砂红</option>
                   <option value="gold">琥珀金</option>
                 </select>
@@ -386,17 +386,6 @@
               <section id="match-seat-2" class="match-seat match-seat--top" aria-label="2号对家"></section>
               <section id="match-seat-3" class="match-seat match-seat--left" aria-label="3号上家"></section>
               <div class="match-board-center">
-                <div id="match-decision" class="match-decision" role="group"
-                     aria-label="牌桌中央碰杠胡操作" hidden></div>
-                <div id="match-motion" class="match-motion" aria-live="polite" hidden>
-                  <div id="match-motion-big-action" class="match-motion-big-action" aria-hidden="true"></div>
-                  <strong id="match-motion-text"></strong>
-                  <div id="match-motion-chain" class="match-motion-chain"></div>
-                  <div id="match-motion-card"></div>
-                  <p id="match-motion-delta" class="match-motion-delta"></p>
-                  <div id="match-motion-settlements" class="match-motion-settlements"
-                       aria-label="本次真实胡牌入账"></div>
-                </div>
                 <div id="match-river-2" class="match-river match-river--top" aria-label="对家牌河"></div>
                 <div id="match-river-3" class="match-river match-river--left" aria-label="上家牌河"></div>
                 <div id="match-wall" class="match-wall">
@@ -409,6 +398,20 @@
                   <span>牌山剩余</span>
                   <strong id="match-wall-count">0</strong>
                   <small>张 · 牌墙图示不代表逐张位置</small>
+                  <div id="match-center-prompt" class="match-center-prompt" aria-label="牌桌中央操作与公开动作">
+                    <div id="match-decision" class="match-decision" role="group"
+                         aria-label="牌桌中央碰杠胡操作" hidden></div>
+                    <div id="match-motion" class="match-motion" aria-live="polite" hidden>
+                      <div id="match-motion-big-action" class="match-motion-big-action" aria-hidden="true"></div>
+                      <strong id="match-motion-text"></strong>
+                      <div id="match-motion-chain" class="match-motion-chain"></div>
+                      <div id="match-motion-card"></div>
+                      <p id="match-motion-delta" class="match-motion-delta"></p>
+                      <div id="match-motion-settlements" class="match-motion-settlements"
+                           aria-label="本次真实胡牌入账"></div>
+                    </div>
+                    <div id="match-controls" class="match-controls"></div>
+                  </div>
                 </div>
                 <div id="match-river-1" class="match-river match-river--right" aria-label="下家牌河"></div>
                 <div id="match-river-0" class="match-river match-river--bottom" aria-label="自己牌河"></div>
@@ -426,26 +429,25 @@
                 </div>
                 <div id="match-hand" class="retry-hand" tabindex="0" role="group"
                   aria-label="我的手牌；预留14张牌与摸牌空间；手机可左右滑动，选牌后按需要确认出牌"></div>
-                <div id="match-ready-hint" class="match-ready-hint" aria-live="polite"></div>
                 <div id="match-self-melds" class="match-seat-melds"></div>
                 <div id="match-own-score" class="match-seat-score" hidden></div>
               </section>
-              <section id="match-table-settlement" class="match-table-settlement" aria-label="桌面胡牌积分" hidden>
-                <div class="match-table-settlement-head">
-                  <strong id="match-table-settlement-title">胡牌结算</strong>
-                  <span id="match-table-round-phase"></span>
-                </div>
-                <div id="match-table-self-summary" class="match-table-self-summary" role="status"
-                  aria-live="polite"></div>
-                <div id="match-table-scores" class="match-table-scores"></div>
-                <div id="match-table-wins" class="match-table-wins"></div>
-                <div id="match-table-history" class="match-table-history"></div>
-                <p id="match-table-score-note" class="match-table-score-note"></p>
-              </section>
+
             </div>
           </div>
-
-          <div id="match-controls" class="match-controls"></div>
+          <div id="match-ready-hint" class="match-ready-hint match-ready-hint--below-board" aria-live="polite"></div>
+    <section id="match-table-settlement" class="match-table-settlement" aria-label="本局积分结算详情" hidden>
+      <div class="match-table-settlement-head">
+        <strong id="match-table-settlement-title">胡牌结算</strong>
+        <span id="match-table-round-phase"></span>
+      </div>
+      <div id="match-table-self-summary" class="match-table-self-summary" role="status"
+        aria-live="polite"></div>
+      <div id="match-table-scores" class="match-table-scores"></div>
+      <div id="match-table-wins" class="match-table-wins"></div>
+      <div id="match-table-history" class="match-table-history"></div>
+      <p id="match-table-score-note" class="match-table-score-note"></p>
+    </section>
           <section id="match-round-report" class="match-round-report"
                    aria-label="本局结束复盘" hidden>
             <div class="match-round-report-heading">
