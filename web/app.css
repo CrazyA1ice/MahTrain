@@ -2301,3 +2301,6 @@
 .match-resume-tools[hidden]{display:none!important}
 .match-resume-tools p{margin:0;flex:1;font-size:13px;line-height:1.6}
 .match-resume-tools button:disabled{cursor:wait;opacity:.6}
+
+/* M3.50: keyboard-readable archived match score points. */
+.match-stats-dot:focus-visible{outline:none;stroke:#163f32;stroke-width:4;fill:#f6ae44;r:7}
