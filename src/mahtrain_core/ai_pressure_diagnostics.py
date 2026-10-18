@@ -1,61 +1,74 @@
-"""M3.12 shadow diagnostics of the *public-meld* pressure tie-break.
+"""Public-meld risk diagnostic for M3.52 expected-value challenge AI.
 
-This compares two legal candidate choices on the SAME observed decision state,
-without mutating the game or re-playing a counterfactual wall. Only boolean
-aggregates leave the server; never export the alternative concealed tile.
+This is an observational shadow comparison on the SAME authorized view.
+Never expose either the counterfactual tile or opponent hidden information.
 """
 from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .ai import public_suit_pressure
+from .ai import challenge_discard_scores, public_suit_pressure
 from .rules import TILE_INDEX
 
 
 def diagnose_pressure_tiebreak(view: Mapping[str, Any],
                                oracle: Mapping[str, Any],
                                actual_discard: str, *,
-                               policy: str) -> dict[str, bool]:
-    """Compare pressure / no-pressure ties using an already computed oracle.
+                               policy: str,
+                               ranking: list[dict[str, Any]] | None = None) -> dict[str, bool]:
+    """Compare full EV policy vs identical EV policy without risk weights.
 
-    The candidate restriction exactly mirrors the legal missing-suit-first
-    policy and then the same minimum-shanten and maximum-ukeire priorities.
-    Called only for 'challenge' and 'challenge_no_pressure'.
+    Historical output keys are retained for compatible trend reports, but
+    'effective_tie' now means equal top unadjusted EV (not equal ukeire).
+    Risk is only a weak modifier of viable minimum-shanten cuts; therefore
+    it can change decisions even when raw EV is not tied exactly.
     """
     if policy not in ("challenge", "challenge_no_pressure"):
         raise ValueError("pressure telemetry only supports challenge variants")
-    hand = view["hand"]
-    missing = view["missing_suits"][view["seat"]]
-    eligible = {tile for tile in hand if tile.startswith(missing)}
-    if not eligible:
-        eligible = set(hand)
-    rows = {entry["discard"]: entry for entry in oracle["candidates"]}
-    if not eligible or not eligible <= rows.keys():
-        raise ValueError("discard oracle is missing valid choices")
-    min_shanten = min(rows[t]["shanten"] for t in eligible)
-    shanten_best = [t for t in eligible if rows[t]["shanten"] == min_shanten]
-    max_ukeire = max(rows[t]["effective_tile_count"] for t in shanten_best)
-    tied = sorted(
-        (t for t in shanten_best
-         if rows[t]["effective_tile_count"] == max_ukeire),
-        key=TILE_INDEX.__getitem__,
-    )
-    # With single candidate or no visible pressure differences, a shadow
-    # comparison cannot change the action even if a public meld is exposed.
-    exposures = [public_suit_pressure(t, view) for t in tied]
-    no_pressure_cut = tied[0]
-    pressure_cut = min(tied, key=lambda t: (
-        public_suit_pressure(t, view), TILE_INDEX[t],
-    ))
-    expected = (pressure_cut if policy == "challenge" else no_pressure_cut)
+    ranked = ranking if ranking is not None else challenge_discard_scores(view)
+    if not ranked:
+        raise ValueError("no legal challenge EV candidates")
+    rows = {
+        item["discard"]: item for item in oracle["candidates"]
+    }
+    if any(item["discard"] not in rows for item in ranked):
+        raise ValueError("discard oracle is missing legal candidate")
+    chosen = min(ranked, key=lambda item: (
+        -item["expected_fan_weighted_copies"],
+        -item["effective_tile_count"],
+        TILE_INDEX[item["discard"]],
+    ))["discard"]
+    if ranking is not None and policy == "challenge_no_pressure":
+        # The cached baseline has no pressure. Rebuild its risk-weighted
+        # counterfactual from public melds without recomputing ukeire.
+        wall = view.get("wall_count")
+        late = type(wall) is int and wall <= 24
+        def risk_score(item):
+            risk = public_suit_pressure(item["discard"], view)
+            multiplier = max(0.72, 1 - (0.055 if late else 0.025) * risk)
+            return round(item["expected_fan_weighted_copies"] * multiplier, 5)
+        pressure_choice = min(ranked, key=lambda item: (
+            -risk_score(item), -item["effective_tile_count"],
+            TILE_INDEX[item["discard"]]))["discard"]
+        pressure = [public_suit_pressure(item["discard"], view)
+                    for item in ranked]
+    else:
+        pressure_choice = ranked[0]["discard"]
+        pressure = [item["public_pressure"] for item in ranked]
+    expected = pressure_choice if policy == "challenge" else chosen
     if actual_discard != expected:
-        raise RuntimeError("AI pressure probe disagrees with legal policy")
+        raise RuntimeError("AI pressure probe disagrees with legal EV policy")
+    maximum = max(item["expected_fan_weighted_copies"] for item in ranked)
+    equal_best = [
+        item for item in ranked
+        if abs(item["expected_fan_weighted_copies"] - maximum) < 1e-9
+    ]
     return {
-        "effective_tie": len(tied) > 1,
-        "public_pressure_present": any(value > 0 for value in exposures),
-        "public_pressure_discriminates": len(set(exposures)) > 1,
-        "choice_would_change": pressure_cut != no_pressure_cut,
+        "effective_tie": len(equal_best) > 1,
+        "public_pressure_present": any(value > 0 for value in pressure),
+        "public_pressure_discriminates": len(set(pressure)) > 1,
+        "choice_would_change": pressure_choice != chosen,
         "actual_choice_changed": (
-            policy == "challenge" and pressure_cut != no_pressure_cut
+            policy == "challenge" and pressure_choice != chosen
         ),
     }

@@ -55,7 +55,8 @@ class AIBenchmarkTests(unittest.TestCase):
             for record in controlled:
                 self.assertEqual(record["shanten_regret"],0)
                 if level=="challenge":
-                    self.assertTrue(record["best_ukeire"])
+                    self.assertGreaterEqual(record["chosen_effective_copies"],0)
+                    # Scoring value can legitimately beat maximum ukeire.
 
     def test_rates_and_report_json_are_auditable(self):
         report=self.report
@@ -93,34 +94,24 @@ class AIBenchmarkTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             sample_views(True,2)
 
-    def test_challenge_uses_open_meld_pressure_only_as_equal_ukeire_tiebreak(self):
+    def test_challenge_uses_expected_value_ranking_on_min_shanten(self):
         hand=["m1","m1","m2","m2","m3","m3","m4",
               "s1","s1","s2","s2","s3","s3","s4"]
         view={
             "seat":0,"hand":hand,"own_melds":[],"phase":"dealer_discard",
             "missing_suits":["p","p","p","p"],
-            "won":[False,False,False,False],
-            "melds":[[],[{"type":"peng","tile":"m5"},
-                          {"type":"peng","tile":"m7"}],[],[]],
-            "discards":[],
+            "won":[False]*4,"melds":[[],[],[],[]],"discards":[],
         }
-        candidates=[
-            {"discard":tile,"effective_tile_count":(8 if tile in ("m1","s1") else 1)}
-            for tile in sorted(set(hand))
-        ]
         decision=MahjongAgent("challenge",seed=1,seat=0)
-        with patch("mahtrain_core.ai._cut_shanten",return_value=1),patch(
-            "mahtrain_core.ai.analyze_discards",
-            return_value={"candidates":candidates}):
-            self.assertEqual(decision.discard(view),"s1")
-            # A larger effective-draw count must override weak risk proxy.
-            prioritized=[
-                {**row,"effective_tile_count":(
-                    9 if row["discard"]=="m1" else row["effective_tile_count"]
-                )} for row in candidates
-            ]
-            with patch("mahtrain_core.ai.analyze_discards",
-                       return_value={"candidates":prioritized}):
+        with patch("mahtrain_core.ai._cut_shanten",return_value=1):
+            with patch("mahtrain_core.ai.challenge_discard_scores",
+                       return_value=[{"discard":"s1"}]) as score:
+                self.assertEqual(decision.discard(view),"s1")
+                # All candidates passed to EV evaluator were minimum-shanten.
+                self.assertEqual(set(score.call_args.args[1]),set(hand))
+        with patch("mahtrain_core.ai._cut_shanten",return_value=1):
+            with patch("mahtrain_core.ai.challenge_discard_scores",
+                       return_value=[{"discard":"m1"}]):
                 self.assertEqual(decision.discard(view),"m1")
 
     def test_public_open_meld_suit_pressure_only_active_and_visible(self):

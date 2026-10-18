@@ -295,7 +295,9 @@
       }
       if(name!=="match_new" && !announcedByPlayback && voice){
         const events=(data.match.events||[]).slice(previousEvents);
-        await voice.announceEventsWait(
+        // Audio is optional UI feedback. Never delay an already-computed AI turn
+        // until browser speechSynthesis fires onend (or its 2.5s watchdog).
+        voice.announceEvents(
           window.MahTrainPlayback.normalize(events,96).frames);
         syncVoiceControls();
       }
@@ -333,8 +335,8 @@
       }
     }finally{
       busy=false;
-      // One AI transition per request: never submit the next transition
-      // before visual playback and speech have both reached their ends.
+      // A server-approved next AI transition follows the short visual hold;
+      // speech never gates rule execution, but HTTP requests remain serialized.
       if(needsContinue && token && (name==="match_new"||requestToken===token)){
         const expectedToken=token;
         setTimeout(()=>{
@@ -512,11 +514,9 @@
         "is-replay-acting",seat.id===frame.seat||
           frame.winSeats.includes(seat.id));
     }
-    // Start speaking only after the physical tile is on the visible table.
-    // Playback may move forward only after both visual hold and speech end.
-    const finished=voice?.announceFrameWait(frame);
+    // Start speech after rendering, but do not gate playback on its duration.
+    voice?.announceFrame(frame);
     syncVoiceControls();
-    return finished;
   }
   function onPlaybackStatus(status){
     $("match-playback-progress").textContent=
@@ -531,7 +531,7 @@
     $("match-playback-skip").disabled=!status.playing;
   }
   function onPlaybackDone(){
-    voice?.clear();
+    // Do not cancel the last callout just because the short animation ended.
     $("match-motion").hidden=true;
     $("match-playback").hidden=true;
     for(const seat of seats)$("match-seat-"+seat.id)
@@ -1547,7 +1547,7 @@
       onDone:onPlaybackDone,
     });
     const speed=$("match-playback-speed");
-    playback.setSpeed(Number(speed.value)||450);
+    playback.setSpeed(Number(speed.value)||180);
     speed.addEventListener("change",()=>{
       const milliseconds=Number(speed.value);
       if(milliseconds===0){playback.skip();return;}

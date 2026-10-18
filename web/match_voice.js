@@ -26,17 +26,18 @@
     const tile=tileLabel(item.publicTile);
     const winners=Array.isArray(item.winSeats)?
       [...new Set(item.winSeats.filter(n=>Number.isInteger(n)&&n>=0&&n<=3))]:[];
+    // Public discards retain the tile name; peng/kong/hu speak ONLY
+    // the action itself. Seat, meld identity and win source stay visual.
     switch(item.type){
-      case "discard":return tile||""; // only tile name, no player prefix
-      case "peng":return lead+"碰"+tile;
-      case "ming_gang":return lead+"明杠"+tile;
-      case "an_gang":return lead+"暗杠"+
-        (item.exposedKong===true?tile:""); // say ONLY verified public flip
-      case "bu_gang":return lead+"补杠"+tile;
-      case "ron":return (winners.length?winners.map(x=>x+"号").join("、"):lead)+"胡了";
-      case "multi_ron":return (winners.length?winners.map(x=>x+"号").join("、"):"多家")+"一炮多响，胡了";
-      case "rob_kong":return (winners.length?winners.map(x=>x+"号").join("、"):lead)+"抢杠胡";
-      case "self_draw_win":return lead+"自摸，胡了";
+      case "discard":return tile||"";
+      case "peng":return "碰";
+      case "ming_gang":
+      case "an_gang":
+      case "bu_gang":return "杠";
+      case "ron":
+      case "multi_ron":
+      case "rob_kong":
+      case "self_draw_win":return "胡";
       default:return "";
     }
   }

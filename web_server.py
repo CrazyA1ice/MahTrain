@@ -188,8 +188,8 @@ _MATCH_PUBLIC_BOARD_FIELDS = (
 )
 _MAX_MATCH_PUBLIC_STEPS = 96
 # These public moves are visible or narrated; cross at most one per HTTP
-# continuation. Silent draws, claim passes and arbitration may be combined
-# without allowing the next player to act before the visible move is spoken.
+# continuation. Silent draws, claim passes and arbitration may be combined.
+# The browser no longer waits for audio completion before continuing.
 _MATCH_TURN_BEATS = frozenset((
     "discard", "peng", "ming_gang", "an_gang", "bu_gang_declared",
     "bu_gang", "ron", "multi_ron", "rob_kong", "self_draw_win",
@@ -621,27 +621,27 @@ def _process(action: str, payload: dict) -> dict:
                     suit=agents[s].missing(game.private_view(s))
                     _match_record(game,steps,lambda s=s,suit=suit:
                                   game.select_missing(s,suit))
-                # AI acts via match_continue after animation and speech finish.
+                # AI acts via match_continue after the short visual frame.
             elif action=="match_discard":
                 _match_record(game,steps,lambda: game.discard(
                     0,payload.get("tile"),
                     from_draw=payload.get("from_draw")))
-                # AI acts via match_continue after animation and speech finish.
+                # AI acts via match_continue after the short visual frame.
             elif action=="match_claim":
                 _match_record(game,steps,lambda: game.respond_discard(
                     0,payload.get("choice")))
-                # AI acts via match_continue after animation and speech finish.
+                # AI acts via match_continue after the short visual frame.
             elif action=="match_rob":
                 _match_record(game,steps,lambda: game.respond_rob_kong(
                     0,payload.get("choice")))
-                # AI acts via match_continue after animation and speech finish.
+                # AI acts via match_continue after the short visual frame.
             elif action=="match_kong":
                 _match_record(game,steps,lambda: game.declare_kong(
                     0,payload.get("kind"),payload.get("tile")))
-                # AI acts via match_continue after animation and speech finish.
+                # AI acts via match_continue after the short visual frame.
             elif action=="match_win":
                 _match_record(game,steps,lambda: game.declare_self_win(0))
-                # AI acts via match_continue after animation and speech finish.
+                # AI acts via match_continue after the short visual frame.
             view=_match_private_view(game,agents)
             view["needs_continue"]=_match_requires_continue(game)
             view["public_steps"]=steps

@@ -36,54 +36,49 @@ def view_and_oracle():
 
 
 class PressureDiagnosticsTests(unittest.TestCase):
-    def test_shadow_cut_differs_only_on_equal_ukeire_and_variable_pressure(self):
+    def test_shadow_ev_risk_changes_choice_without_exposing_alternative(self):
         view,oracle=view_and_oracle()
-        with patch("mahtrain_core.ai_pressure_diagnostics.public_suit_pressure",
-                   side_effect=lambda tile, _: {"m1":2,"m2":0}.get(tile,0)):
+        ranked=[
+            {"discard":"m2","expected_fan_weighted_copies":10.0,
+             "effective_tile_count":10,"public_pressure":0,"score":10.0},
+            {"discard":"m1","expected_fan_weighted_copies":10.0,
+             "effective_tile_count":10,"public_pressure":2,"score":9.5},
+        ]
+        with patch("mahtrain_core.ai_pressure_diagnostics.challenge_discard_scores",
+                   return_value=ranked):
             normal=diagnose_pressure_tiebreak(
                 view,oracle,"m2",policy="challenge")
             disabled=diagnose_pressure_tiebreak(
                 view,oracle,"m1",policy="challenge_no_pressure")
+            with self.assertRaises(RuntimeError):
+                diagnose_pressure_tiebreak(view,oracle,"m1",policy="challenge")
         self.assertEqual(normal,{
-            "effective_tie":True,
-            "public_pressure_present":True,
+            "effective_tie":True,"public_pressure_present":True,
             "public_pressure_discriminates":True,
-            "choice_would_change":True,
-            "actual_choice_changed":True,
+            "choice_would_change":True,"actual_choice_changed":True,
         })
         self.assertTrue(disabled["choice_would_change"])
         self.assertFalse(disabled["actual_choice_changed"])
         self.assertNotIn("alternative_tile",normal)
-        self.assertNotIn("shadow_tile",json.dumps(normal))
-        with self.assertRaises(RuntimeError):
-            with patch("mahtrain_core.ai_pressure_diagnostics.public_suit_pressure",
-                       side_effect=lambda tile,_:2 if tile=="m1" else 0):
-                diagnose_pressure_tiebreak(
-                    view,oracle,"m1",policy="challenge")
 
-    def test_missing_suit_priority_and_clear_ukeire_prevent_false_changes(self):
+    def test_raw_ev_advantage_can_dominate_weak_public_risk(self):
         view,oracle=view_and_oracle()
-        forced=copy.deepcopy(view)
-        forced["missing_suits"][0]="s"
-        with patch("mahtrain_core.ai_pressure_diagnostics.public_suit_pressure",
-                   return_value=0):
-            result=diagnose_pressure_tiebreak(
-                forced,oracle,"s1",policy="challenge")
-        self.assertTrue(result["effective_tie"])
-        self.assertFalse(result["public_pressure_discriminates"])
-        self.assertFalse(result["choice_would_change"])
-        for entry in oracle["candidates"]:
-            if entry["discard"]=="m2":
-                entry["effective_tile_count"]=11
-        with patch("mahtrain_core.ai_pressure_diagnostics.public_suit_pressure",
-                   return_value=4):
-            result=diagnose_pressure_tiebreak(
+        ranked=[
+            {"discard":"m2","expected_fan_weighted_copies":20.0,
+             "effective_tile_count":10,"public_pressure":1,"score":19.0},
+            {"discard":"m1","expected_fan_weighted_copies":10.0,
+             "effective_tile_count":10,"public_pressure":1,"score":9.5},
+        ]
+        with patch("mahtrain_core.ai_pressure_diagnostics.challenge_discard_scores",
+                   return_value=ranked):
+            normal=diagnose_pressure_tiebreak(
                 view,oracle,"m2",policy="challenge")
-        self.assertFalse(result["effective_tie"])
-        self.assertTrue(result["public_pressure_present"])
-        self.assertFalse(result["choice_would_change"])
-        with self.assertRaises(ValueError):
-            diagnose_pressure_tiebreak(view,oracle,"m2",policy="baseline")
+            self.assertFalse(normal["effective_tie"])
+            self.assertTrue(normal["public_pressure_present"])
+            self.assertFalse(normal["public_pressure_discriminates"])
+            self.assertFalse(normal["choice_would_change"])
+            with self.assertRaises(ValueError):
+                diagnose_pressure_tiebreak(view,oracle,"m2",policy="baseline")
 
     def test_aggregate_counts_and_observed_wins_are_not_claimed_causal(self):
         assignment=ablation_lineup(0)
