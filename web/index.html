@@ -297,7 +297,7 @@
         </div>
         <div class="match-extras">
           <label class="match-voice-switch"><input id="match-voice-enabled" type="checkbox" checked/> 语音播报出牌、碰、杠、胡</label>
-          <span id="match-voice-status" class="review-footnote" aria-live="polite">语音由浏览器本地合成，可关闭</span>
+          <span id="match-voice-status" class="review-footnote" aria-live="polite">语音仅播报弃牌牌名及“碰、杠、胡”，不会拖慢AI出牌，可关闭</span>
           <div class="match-voice-controls" role="group" aria-label="四人对局语音控制">
             <label for="match-voice-speed">播报语速
               <select id="match-voice-speed" aria-label="四人对局语音播报速度">
@@ -353,8 +353,8 @@
           <div class="match-playback-settings" role="group" aria-label="AI 播放设置">
             <label>AI 动作速度
               <select id="match-playback-speed">
-                <option value="180">快速</option>
-                <option value="450" selected>标准</option>
+                <option value="180" selected>快速（默认）</option>
+                <option value="450">标准</option>
                 <option value="900">慢速</option>
                 <option value="0">关闭播放</option>
               </select>
