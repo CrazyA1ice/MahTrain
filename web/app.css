@@ -2495,3 +2495,45 @@
     margin-left:14px;
   }
 }
+
+
+/* M3.61: viewport geometry guard. The four-sided layout remains FIXED
+   throughout one hand, but its reserved slot pitch is calculated up front
+   from viewport width; nothing depends on the discard count.
+   At 280–360px, the M3.60 15px lateral pitch could exceed the actual
+   left/right track and silently clip column #4. This narrower clamp fits all
+   56 slots, including the claimed-discard placeholder, without tray scroll. */
+@media(max-width:700px){
+  .match-board{
+    --river-h-cell:clamp(10px,3.1vw,21px);
+    --river-side-cell:clamp(10px,3.6vw,22px);
+  }
+  .match-board .match-river--left .match-river-tiles,
+  .match-board .match-river--right .match-river-tiles,
+  .match-board .match-river--top .match-river-tiles,
+  .match-board .match-river--bottom .match-river-tiles{
+    justify-content:center;max-width:100%;overflow:hidden!important;
+  }
+}
+/* Fit the desktop table height to its preallocated 4 horizontal rows,
+   14 vertical rows and headings. M3.60 used an unconditional 962px
+   center band, leaving a very large blank region on small laptops. */
+@media(min-width:701px){
+  .match-board{
+    --m361-h-band:calc(4 * var(--river-h-row) + 33px);
+    --m361-side-band:calc(14 * var(--river-side-row) + 67px);
+    --m361-center-h:calc(2 * var(--m361-h-band) + var(--m361-side-band) + 14px);
+    grid-template-rows:140px var(--m361-center-h) 206px 210px;
+  }
+  .match-board-center{
+    grid-template-rows:var(--m361-h-band) var(--m361-side-band) var(--m361-h-band);
+  }
+}
+/* A hidden/replay-only table cannot grow because an empty river's label
+   auto-places onto the first track: all 56 tracks exist irrespective of
+   actual discarded tile count. Side meld lists may scroll inside their own
+   seat, but the board and RIVER never do. */
+.match-board .match-river .match-river-tiles{
+  overflow:hidden!important;
+  overscroll-behavior:none;
+}
