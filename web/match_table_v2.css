@@ -469,6 +469,7 @@
     grid-template-rows:72px var(--mid-h) 113px;
     padding:5px;gap:3px;border-width:5px;
   #match-board .match-seat--top {grid-template-columns:minmax(0,1fr) 51%;}
+  #match-board .match-seat--top .match-seat-melds {position:relative;right:18px;}
   }
   #match-board .match-board-center{grid-template-columns:minmax(0,1fr) 166px minmax(0,1fr)}
   #match-board #match-wall{width:152px;height:137px}
