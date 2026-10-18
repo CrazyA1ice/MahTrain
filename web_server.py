@@ -71,6 +71,7 @@ _MAX_SESSIONS = 32
 _STATIC = {
     "/": ROOT / "web" / "index.html",
     "/app.css": ROOT / "web" / "app.css",
+    "/match_table_v2.css": ROOT / "web" / "match_table_v2.css",
     "/app.js": ROOT / "web" / "app.js",
     "/review.js": ROOT / "web" / "review.js",
     "/retry.js": ROOT / "web" / "retry.js",
