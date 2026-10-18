@@ -286,11 +286,19 @@
       $("match-archives-export").href=uri(archiveId);
       $("match-archives-export").download="mahtrain_"+archiveId+".json";
       const score=$("match-archives-balances");score.replaceChildren();
-      report.win_ledger.balances.forEach((n,i)=>score.append(
-        el("span","match-archive-balance",i+"号胡牌已入账 "+sign(n)+
-          (report.kong_included?"（已计入杠钱 ":"（旧局试验杠钱 ")+
-          sign(report.kong_balances[i])+"）")));
       const exhaustive=report.exhaustive_settlement;
+      // Pre-settled_b0 JSON may have no combined total. Reconstruct ONLY
+      // previously official HU + posted draw, never promote trial kongs.
+      const official=Array.isArray(report.settled_balances)&&
+        report.settled_balances.length===4?report.settled_balances:
+        report.win_ledger.balances.map((n,i)=>n+
+          (exhaustive?.posted?exhaustive.balances[i]:0));
+      report.win_ledger.balances.forEach((n,i)=>score.append(
+        el("span","match-archive-balance",
+          i+"号正式净额 "+sign(official[i])+
+          "（胡牌 "+sign(n)+"；"+
+          (report.kong_included?"已入账杠钱 ":"旧局试验杠钱 ")+
+          sign(report.kong_balances?.[i]||0)+"）")));
       if(exhaustive){
         const status=el("p","match-net",
           exhaustive.posted?
@@ -299,10 +307,6 @@
           "流局异常牌形待核验，未执行流局赔付");
         score.append(status);
       }
-      score.append(el("p","review-footnote",
-        "本局正式净额："+report.settled_balances.map((n,i)=>
-          i+"号"+sign(n)).join(" · ")+
-        (report.kong_included?"（包含本局杠钱）":"（旧局试验杠钱未计入）")));
       const wins=$("match-archives-wins");wins.replaceChildren();
       for(const w of report.win_ledger.wins)wins.append(el("p","",
         w.winner+"号"+(winType[w.kind]||"胡牌")+
