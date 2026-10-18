@@ -1118,6 +1118,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const reopenedRequests=[];
   const reopenedWindow={...window};
   const resumedState={...base,needs_continue:false};
+  let dropDiscardReply=false,denyReconcile=false;
+  let authoritativeState=resumedState;
   const reloadedContext={
     document:{createElement:tag=>new Node(tag),getElementById:id=>{
       assert.ok(reloadDom[id],"missing reloaded id "+id);return reloadDom[id];
@@ -1126,8 +1128,17 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     fetch:async (_url,opts)=>{
       const req=JSON.parse(opts.body);
       reopenedRequests.push(req);
+      if(req.action==="match_discard"&&dropDiscardReply){
+        // The server already committed the discard; its HTTP reply was
+        // lost. Sending the same discard again would be a dangerous retry.
+        dropDiscardReply=false;
+        throw new Error("simulated connection drop after server commit");
+      }
+      if(req.action==="match_resume"&&denyReconcile){
+        throw new Error("simulated temporary recovery outage");
+      }
       return {ok:true,json:async()=>({
-        match_token:"test-session",match:resumedState,
+        match_token:"test-session",match:authoritativeState,
       })};
     },
     confirm:()=>true,
@@ -1150,6 +1161,54 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(reloadDom["home-match-state"].textContent.includes("已有对局"));
   assert.equal(sessionStore.get("mahtrain.match.session.v1"),"test-session");
   assert.equal(reopenedRequests.length,1,"restoring must not issue new/continue");
+  // M3.49: a discard was committed, but its HTTP response never reached the
+  // browser. Reconcile with a READ-ONLY snapshot; do not cut the same tile.
+  authoritativeState={...resumedState,
+    hand:resumedState.hand.slice(1),
+    wall_count:53,
+    discards:[...resumedState.discards,{seat:0,tile:"m1"}],
+    events:[{type:"discard",seat:0,tile:"m1"}],
+    needs_continue:false,
+  };
+  dropDiscardReply=true;
+  reloadDom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.deepEqual(reopenedRequests.slice(1).map(x=>x.action),
+    ["match_discard","match_resume"],
+    "a lost mutation reply must cause exactly one read-only reconciliation");
+  assert.equal(reopenedRequests[1].tile,"m1");
+  assert.equal(reopenedRequests[2].match_token,"test-session");
+  assert.equal(reloadDom["match-wall-count"].textContent,"53");
+  assert.equal(reloadDom["match-hand"].children.length,13);
+  assert.equal(reloadDom["match-resume-tools"].hidden,true);
+  assert.ok(reloadDom["match-request-status"].textContent.includes("没有重复提交"));
+  assert.equal(reopenedRequests.filter(x=>x.action==="match_discard").length,1);
+  // A second lost HTTP response AND a temporarily unavailable recovery
+  // endpoint must freeze all game mutations until manual reconnection.
+  authoritativeState={...resumedState};
+  // The client is still in an await-discard phase. Restore that on the
+  // server via an authorized snapshot before simulating another attempt.
+  reloadDom["match-resume-retry"].handlers.click();
+  await settle();
+  denyReconcile=true;dropDiscardReply=true;
+  const requestCountBefore=reopenedRequests.length;
+  reloadDom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.deepEqual(reopenedRequests.slice(requestCountBefore).map(x=>x.action),
+    ["match_discard","match_resume"]);
+  assert.equal(reloadDom["match-resume-tools"].hidden,false);
+  const frozenRequestCount=reopenedRequests.length;
+  reloadDom["match-hand"].children[0].handlers.click();
+  await settle();
+  assert.equal(reopenedRequests.length,frozenRequestCount,
+    "no duplicate discard is permitted while state is uncertain");
+  denyReconcile=false;
+  reloadDom["match-resume-retry"].handlers.click();
+  await settle();
+  assert.equal(reopenedRequests.at(-1).action,"match_resume");
+  assert.equal(reloadDom["match-resume-tools"].hidden,true);
+  assert.ok(reloadDom["match-request-status"].textContent.includes("已恢复原对局"));
+  console.log("M3.49 lost POST reply reconciles without duplicate mutation: PASS");
   // A response lost during navigation may already have changed the server
   // phase. Resume only schedules the NEXT safe AI continuation once.
   reopenedWindow.sessionStorage.setItem("mahtrain.match.session.v1","stale-token");
