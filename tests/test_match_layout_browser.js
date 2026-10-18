@@ -175,7 +175,9 @@ async function main(){
             missing.textContent="缺条";
           }
         });
-        await page.locator("#match-board").scrollIntoViewIfNeeded();
+        // Explicitly center the entire table instead of leaving 7px out.
+        await page.evaluate(()=>document.getElementById("match-board")
+          .scrollIntoView({block:"center",inline:"nearest",behavior:"instant"}));
       }
       await page.evaluate(()=>new Promise(requestAnimationFrame));
       const report=await page.evaluate(()=>{
