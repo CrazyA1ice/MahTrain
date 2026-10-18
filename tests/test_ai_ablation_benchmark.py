@@ -62,57 +62,43 @@ class ChallengeAblationTests(unittest.TestCase):
                 ablation_lineup(bad)
 
     def test_controlled_cut_tie_breaks(self):
-        hand = ["m"+str(i) for i in range(1,8)] + [
+        # The new full strategy can trade a little ukeire for scoring
+        # potential. Isolate this from the old purely lexicographic oracle.
+        hand=["m"+str(i) for i in range(1,8)] + [
             "s"+str(i) for i in range(1,8)]
-        view = {
-            "seat": 0, "phase": "dealer_discard", "hand": hand,
-            "own_melds": [], "missing_suits": ["p", "m", "s", "p"],
-            "discards": [], "melds": [[],[],[],[]],
-            "won": [False]*4,
+        view={
+            "seat":0,"phase":"dealer_discard","hand":hand,
+            "own_melds":[],"missing_suits":["p","m","s","p"],
+            "discards":[],"melds":[[],[],[],[]],"won":[False]*4,
         }
-        agents = {
-            "advanced": MahjongAgent("advanced", seed=11, seat=0),
-            "challenge": MahjongAgent("challenge", seed=11, seat=0),
-            "challenge_no_ukeire": AblationMahjongAgent(
-                "challenge_no_ukeire", seed=11, seat=0),
-            "challenge_no_pressure": AblationMahjongAgent(
-                "challenge_no_pressure", seed=11, seat=0),
+        agents={
+            "advanced":MahjongAgent("advanced",seed=11,seat=0),
+            "challenge":MahjongAgent("challenge",seed=11,seat=0),
+            "challenge_no_ukeire":AblationMahjongAgent(
+                "challenge_no_ukeire",seed=11,seat=0),
+            "challenge_no_pressure":AblationMahjongAgent(
+                "challenge_no_pressure",seed=11,seat=0),
         }
-        with patch("mahtrain_core.ai._cut_shanten", return_value=0):
-            # Same effective copies: public pressure changes only full model.
-            rows = {"candidates": [
-                {"discard": tile,
-                 "effective_tile_count": 10 if tile in ("m1","m2") else 1}
-                for tile in hand
-            ]}
-            with patch("mahtrain_core.ai.analyze_discards", return_value=rows):
+        def ranked(_view, _cuts, *, use_pressure=True):
+            return [{"discard":"m2" if use_pressure else "m1"}]
+        with patch("mahtrain_core.ai._cut_shanten",return_value=0):
+            with patch("mahtrain_core.ai.challenge_discard_scores",
+                       side_effect=ranked):
                 with patch("mahtrain_core.ai.public_suit_pressure",
-                           side_effect=lambda t, v: (
-                               {"m1": 3, "m2": 0}.get(t, 99))):
-                    self.assertEqual(agents["advanced"].discard(view), "m1")
-                    self.assertEqual(agents["challenge"].discard(view), "m2")
-                    self.assertEqual(agents["challenge_no_pressure"].discard(view), "m1")
-                    self.assertEqual(agents["challenge_no_ukeire"].discard(view), "m2")
-            # A clear effective-copy advantage beats pressure in the full model.
-            rows = {"candidates": [
-                {"discard": tile,
-                 "effective_tile_count": 20 if tile == "m2" else 2}
-                for tile in hand
-            ]}
-            with patch("mahtrain_core.ai.analyze_discards", return_value=rows):
-                with patch("mahtrain_core.ai.public_suit_pressure",
-                           side_effect=lambda t,v: 0 if t=="m1" else 9):
-                    self.assertEqual(agents["challenge"].discard(view), "m2")
-                    self.assertEqual(agents["challenge_no_ukeire"].discard(view), "m1")
-            # Pressure-only does not run the effective-draw oracle at all.
-            with patch("mahtrain_core.ai.analyze_discards",
-                       side_effect=AssertionError("must not call oracle")):
-                with patch("mahtrain_core.ai.public_suit_pressure",
-                           return_value=0):
+                           side_effect=lambda tile,v:
+                               {"m1":3,"m2":0}.get(tile,99)):
+                    self.assertEqual(agents["advanced"].discard(view),"m1")
+                    self.assertEqual(agents["challenge"].discard(view),"m2")
+                    self.assertEqual(agents["challenge_no_pressure"].discard(view),"m1")
+                    self.assertEqual(agents["challenge_no_ukeire"].discard(view),"m2")
+            # No-ukeire ablation must not accidentally evaluate new EV.
+            with patch("mahtrain_core.ai.challenge_discard_scores",
+                       side_effect=AssertionError("unexpected EV")):
+                with patch("mahtrain_core.ai.public_suit_pressure",return_value=0):
                     self.assertEqual(
-                        agents["challenge_no_ukeire"].discard(view), "m1")
+                        agents["challenge_no_ukeire"].discard(view),"m1")
         with self.assertRaises(ValueError):
-            AblationMahjongAgent("challenge", seed=11, seat=0)
+            AblationMahjongAgent("challenge",seed=11,seat=0)
 
     def test_whole_seed_bootstrap_is_reproducible_and_compact(self):
         callbacks = []
