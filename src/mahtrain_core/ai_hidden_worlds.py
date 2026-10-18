@@ -313,5 +313,5 @@ def sample_discard_losses(tiles: Sequence[str], view: Mapping[str, Any], *,
                 "mean_loss_multiplier": round(totals[tile] / worlds, 6),
             } for tile in candidates
         },
-        "model": "proposal_mc_v1",
+        "model": "river_conditioned_proposal_v2",
     }
