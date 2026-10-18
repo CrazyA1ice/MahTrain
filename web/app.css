@@ -2873,9 +2873,9 @@
     overflow:visible;max-width:100%;gap:1px;
   }
   .match-seat--top .match-tile-back{
-    width:clamp(15px,1.9vw,26px);
+    width:clamp(11px,1.65vw,24px);
     height:clamp(22px,2.7vw,34px);
-    flex-basis:clamp(15px,1.9vw,26px);
+    flex-basis:clamp(11px,1.65vw,24px);
   }
   .match-seat--top .match-seat-melds{
     grid-column:2;grid-row:2;
@@ -2883,11 +2883,11 @@
     max-width:100%;max-height:100%;overflow:hidden;
   }
   .match-board .match-seat--top .match-seat-meld .tile{
-    width:clamp(12px,1.4vw,18px);height:clamp(19px,1.9vw,27px);
+    width:clamp(9px,1.1vw,17px);height:clamp(19px,1.9vw,27px);
   }
   .match-board .match-seat--top .match-seat-meld .match-tile-back{
-    width:clamp(12px,1.4vw,18px);height:clamp(19px,1.9vw,27px);
-    flex-basis:clamp(12px,1.4vw,18px);
+    width:clamp(9px,1.1vw,17px);height:clamp(19px,1.9vw,27px);
+    flex-basis:clamp(9px,1.1vw,17px);
   }
   .match-board .match-seat--left,
   .match-board .match-seat--right{
@@ -2935,7 +2935,7 @@
     flex:0 0 clamp(12px,1.4vw,17px);
   }
   .match-board .match-seat--bottom{
-    display:grid;grid-template-columns:minmax(0,1fr) minmax(0,26%);
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(0,33%);
     grid-template-rows:22px 18px minmax(0,1fr);align-items:center;
     padding:3px 7px;
   }
