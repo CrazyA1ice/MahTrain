@@ -1,0 +1,59 @@
+name: Queju 3D Mahjong client integration
+on:
+  push:
+    branches:
+      - feat/m367-vendor-queju-3d-client
+    paths:
+      - "frontend_3d/**"
+      - "web_server.py"
+      - "web/index.html"
+      - "tests/test_web_app.py"
+      - ".github/workflows/queju-3d.yml"
+  pull_request:
+    paths:
+      - "frontend_3d/**"
+      - "web_server.py"
+      - "web/index.html"
+      - "tests/test_web_app.py"
+      - ".github/workflows/queju-3d.yml"
+jobs:
+  third-party-client-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend_3d/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install real 3D client dependencies
+        run: cd frontend_3d && npm ci --no-audit --no-fund
+      - name: Test MahTrain to Queju state/action boundary
+        run: cd frontend_3d && npm run test:bridge
+      - name: Compile original Queju 3D WebGL frontend
+        run: cd frontend_3d && npm run build
+      - name: Verify built page is served from Python without source access
+        run: |
+          python - <<'PY'
+          import web_server
+          from pathlib import Path
+          import html
+          entry=web_server._asset_path('/3d/game.html')
+          assert entry.is_file(),entry
+          body=entry.read_text(encoding='utf-8')
+          assert '<canvas' in body or 'id="app"' in body
+          assert '/3d/assets/' in body
+          for path in ['/3d/assets/../secret','/3d/node_modules/a','/frontend_3d/public/src/main.ts']:
+              assert web_server._asset_path(path) is None,path
+          print('MahTrain secure static mapping / 3D compiled entry PASS')
+          PY
+      - name: Upload real compiled client for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: mahtrain-queju-3d-dist
+          path: frontend_3d/dist/
+          retention-days: 7
