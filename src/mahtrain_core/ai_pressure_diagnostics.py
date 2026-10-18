@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .ai import challenge_discard_scores
+from .ai import challenge_discard_scores, public_suit_pressure
 from .rules import TILE_INDEX
 
 
