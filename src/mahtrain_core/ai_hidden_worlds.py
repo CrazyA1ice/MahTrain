@@ -145,9 +145,10 @@ def sample_discard_losses(tiles: Sequence[str], view: Mapping[str, Any], *,
     """
     if type(worlds) is not int or not 1 <= worlds <= MAX_WORLDS:
         raise ValueError("world budget must be 1..64")
-    candidates = sorted(set(tiles), key=TILE_INDEX.__getitem__)
-    if not candidates or any(tile not in TILE_INDEX for tile in candidates):
+    if not tiles or any(type(tile) is not str or tile not in TILE_INDEX
+                        for tile in tiles):
         raise ValueError("invalid candidate tiles")
+    candidates = sorted(set(tiles), key=TILE_INDEX.__getitem__)
     inputs = _private_world_inputs(view)
     blank = {tile: {"hits": 0, "mean_loss_multiplier": 0.0}
              for tile in candidates}
