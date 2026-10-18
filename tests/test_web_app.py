@@ -64,6 +64,18 @@ class WebUI(unittest.TestCase):
         with urlopen(req, timeout=10) as response:
             return json.load(response)
 
+    def test_m366_standalone_match_table_skin_is_served(self):
+        page,_=self.get("/")
+        style,content_type=self.get("/match_table_v2.css")
+        self.assertIn(b'href="/match_table_v2.css"',page)
+        self.assertIn(b'match-board--riichi',page)
+        self.assertIn(b'M3.66',style)
+        self.assertIn(b'grid-template-rows',style)
+        self.assertIn("text/css",content_type)
+        old_style,_=self.get("/app.css")
+        self.assertNotIn(b'M3.65 | Tenhou-inspired four-player Sichuan table',
+                         old_style)
+
     def test_m348_read_only_match_resume_and_invalid_capabilities(self):
         created=self.post({"action":"match_new","seed":137})
         token=created["match_token"]
