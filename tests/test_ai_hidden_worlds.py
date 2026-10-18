@@ -77,7 +77,8 @@ class HiddenWorldsTests(unittest.TestCase):
         self.assertFalse(no_sample["available"])
         self.assertEqual(no_sample["worlds"],0)
         bad=copy.deepcopy(view)
-        bad["melds"][1]=[{"type":"an_gang","tile":None}]
+        opponent=next(seat for seat in range(4) if seat != bad["seat"])
+        bad["melds"][opponent]=[{"type":"an_gang","tile":None}]
         # A redacted kong consumes four unknown matching copies; without
         # knowing the actual kind, declining ALL sampling is safer than
         # misallocating those four physical cards to another player.
