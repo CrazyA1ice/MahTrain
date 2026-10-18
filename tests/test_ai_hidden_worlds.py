@@ -78,11 +78,12 @@ class HiddenWorldsTests(unittest.TestCase):
         self.assertEqual(no_sample["worlds"],0)
         bad=copy.deepcopy(view)
         bad["melds"][1]=[{"type":"an_gang","tile":None}]
-        if len(bad["melds"][1]) > 0:
-            # A redacted meld cannot be assigned a made-up identity; the
-            # affected opponent is never fed to rule validation.
-            result=sample_discard_losses(["m1"],bad,worlds=3)
-            self.assertEqual(result["worlds"],3)
+        # A redacted kong consumes four unknown matching copies; without
+        # knowing the actual kind, declining ALL sampling is safer than
+        # misallocating those four physical cards to another player.
+        result=sample_discard_losses(["m1"],bad,worlds=3)
+        self.assertFalse(result["available"])
+        self.assertEqual(result["worlds"],0)
 
     def test_valid_actual_ron_pattern_uses_rules_multiplier_not_fake_odds(self):
         view={
