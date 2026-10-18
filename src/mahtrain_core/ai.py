@@ -20,6 +20,7 @@ from typing import Any, Mapping, Sequence
 from .efficiency import shanten_13, effective_draws
 from .rules import TILE_INDEX, TILES, SUITS, score_win, winning_tiles
 from .ai_table_read import read_discard_threat, discard_survival_factor
+from .ai_hidden_worlds import sample_discard_losses
 
 AI_LEVELS = ("basic", "advanced", "challenge")
 # Evaluation-only controlled variants; not advertised as player difficulty tiers.
@@ -93,6 +94,55 @@ def _cut_shanten(hand: Sequence[str], melds: Sequence[Mapping[str, str]],
     after = list(hand)
     after.remove(discard)
     return shanten_13(after, melds, missing)
+
+
+def _reweight_bounded_risk(rows: list[dict[str, Any]],
+                           view: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Reconstruct defense from base EV and probe at most three close cuts.
+
+    Shared worlds reduce one-sample ranking noise; risk is a weak bounded
+    penalty rather than a hallucinated 100% safe discard. Offline ablation
+    diagnostics call the SAME reweighting, avoiding policy disagreement.
+    """
+    updated = []
+    for row in rows:
+        item = dict(row)
+        tile = item["discard"]
+        pressure = public_suit_pressure(tile, view)
+        survival = discard_survival_factor(tile, view, pressure)
+        item["public_pressure"] = pressure
+        item["survival_factor"] = survival
+        item["score"] = round(item["expected_fan_weighted_copies"] * survival, 5)
+        item["sampled_worlds"] = 0
+        item["sampled_ron_hits"] = 0
+        item["sampled_mean_loss"] = 0.0
+        updated.append(item)
+    # A random 13-tile opponent hand is almost never actually tenpai;
+    # blind late-wall Monte Carlo added cost but changed no cuts in our
+    # 25-match paired probe. Sample only if a live opponent has at least
+    # TWO publicly exposed melds, shortening the concealed wait structure.
+    # Retain the M3.53 public-risk prior for everybody else and all misses.
+    exposed = any(
+        seat != view["seat"] and not view["won"][seat] and len(groups) >= 2
+        for seat, groups in enumerate(view["melds"])
+    )
+    if exposed and len(updated) >= 2:
+        close = sorted(updated, key=lambda x: (
+            -x["score"], -x["effective_tile_count"],
+            TILE_INDEX[x["discard"]]))[:3]
+        estimate = sample_discard_losses([x["discard"] for x in close], view)
+        if estimate["available"]:
+            for item in close:
+                info = estimate["by_tile"][item["discard"]]
+                item["sampled_worlds"] = estimate["worlds"]
+                item["sampled_ron_hits"] = info["hits"]
+                item["sampled_mean_loss"] = info["mean_loss_multiplier"]
+                # A hit provides extra caution, but all misses NEVER imply
+                # a safe tile. Keep the earlier public heuristic as a prior.
+                penalty = min(0.12, 0.018 * info["mean_loss_multiplier"])
+                item["score"] = round(item["score"] * (1 - penalty), 5)
+    return sorted(updated, key=lambda x: (
+        -x["score"], -x["effective_tile_count"], TILE_INDEX[x["discard"]]))
 
 
 def challenge_discard_scores(view: Mapping[str, Any],
@@ -190,11 +240,11 @@ def challenge_discard_scores(view: Mapping[str, Any],
             "score": round(expected * risk_multiplier, 5),
         })
     minimum = min(item["shanten"] for item in result)
-    return sorted(
-        (item for item in result if item["shanten"] == minimum),
-        key=lambda item: (-item["score"], -item["effective_tile_count"],
-                          TILE_INDEX[item["discard"]]),
-    )
+    viable = [item for item in result if item["shanten"] == minimum]
+    return (_reweight_bounded_risk(viable, view) if use_pressure else
+            sorted(viable, key=lambda item: (
+                -item["score"], -item["effective_tile_count"],
+                TILE_INDEX[item["discard"]])))
 
 
 class MahjongAgent:
@@ -352,7 +402,7 @@ class MahjongAgent:
         return {
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
-            "challenge":"保持最少向听，听牌时按可见剩余张数×番值比较；再结合公开弃牌顺序、定缺、副露、牌山阶段与放铳风险指数",
+            "challenge":"最小向听及番值期望优先；依据公开场况防守，残局对少量候选以有限合成隐藏牌世界作直接放铳损失敏感性分析",
         }[self.level]
 
 

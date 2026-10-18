@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-from .ai import challenge_discard_scores, public_suit_pressure
+from .ai import challenge_discard_scores, public_suit_pressure, _reweight_bounded_risk
 from .rules import TILE_INDEX
 from .ai_table_read import discard_survival_factor
 
@@ -40,15 +40,11 @@ def diagnose_pressure_tiebreak(view: Mapping[str, Any],
         TILE_INDEX[item["discard"]],
     ))["discard"]
     if ranking is not None and policy == "challenge_no_pressure":
-        # The cached baseline has no pressure. Rebuild its risk-weighted
-        # counterfactual from public melds without recomputing ukeire.
-        def risk_score(item):
-            pressure = public_suit_pressure(item["discard"], view)
-            multiplier = discard_survival_factor(item["discard"], view, pressure)
-            return round(item["expected_fan_weighted_copies"] * multiplier, 5)
-        pressure_choice = min(ranked, key=lambda item: (
-            -risk_score(item), -item["effective_tile_count"],
-            TILE_INDEX[item["discard"]]))["discard"]
+        # Restore exactly the full strategy's *bounded* risk adjustment,
+        # including its deterministic shared hidden-world sample, without
+        # recomputing the expensive effective-draw oracle.
+        pressure_choice = _reweight_bounded_risk(
+            ranked, view)[0]["discard"]
         pressure = [public_suit_pressure(item["discard"], view)
                     for item in ranked]
     else:
