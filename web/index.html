@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#122b2b">
   <title>MahTrain · 四川麻将训练</title>
   <link rel="stylesheet" href="/app.css">
+    <link rel="stylesheet" href="/match_table_v2.css">
   <script src="/sound.js" defer></script>
   <script src="/review.js" defer></script>
   <script src="/retry.js" defer></script>
@@ -382,7 +383,7 @@
                aria-live="assertive" hidden></div>
 
           <div class="match-board-scroll" aria-label="四家固定尺寸牌桌，四家牌河各预留56个格位，无上下滚动；手机仅自己手牌可左右滑动">
-            <div id="match-board" class="match-board" aria-label="四人血战牌桌">
+            <div id="match-board" class="match-board match-board--riichi" aria-label="四人血战牌桌">
               <section id="match-seat-2" class="match-seat match-seat--top" aria-label="2号对家"></section>
               <section id="match-seat-3" class="match-seat match-seat--left" aria-label="3号上家"></section>
               <div class="match-board-center">
@@ -395,9 +396,9 @@
                     <span class="match-wall-row"></span>
                     <span class="match-wall-row"></span>
                   </div>
-                  <span>牌山剩余</span>
+                  <span>血战到底</span>
                   <strong id="match-wall-count">0</strong>
-                  <small>张 · 牌墙图示不代表逐张位置</small>
+                  <small>牌山余张 · 108张制</small>
                   <div id="match-center-prompt" class="match-center-prompt" aria-label="牌桌中央操作与公开动作">
                     <div id="match-decision" class="match-decision" role="group"
                          aria-label="牌桌中央碰杠胡操作" hidden></div>
