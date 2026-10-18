@@ -297,7 +297,7 @@
         </div>
         <div class="match-extras">
           <label class="match-voice-switch"><input id="match-voice-enabled" type="checkbox" checked/> 语音播报出牌、碰、杠、胡</label>
-          <span id="match-voice-status" class="review-footnote" aria-live="polite">语音仅播报弃牌牌名及“碰、杠、胡”，不会拖慢AI出牌，可关闭</span>
+          <span id="match-voice-status" class="review-footnote" aria-live="polite">语音最长1.3秒自动停止，不拖慢AI出牌；浏览器后台计时可能延迟</span>
           <div class="match-voice-controls" role="group" aria-label="四人对局语音控制">
             <label for="match-voice-speed">播报语速
               <select id="match-voice-speed" aria-label="四人对局语音播报速度">
@@ -353,12 +353,13 @@
           <div class="match-playback-settings" role="group" aria-label="AI 播放设置">
             <label>AI 动作速度
               <select id="match-playback-speed">
-                <option value="180" selected>快速（默认）</option>
-                <option value="450">标准</option>
-                <option value="900">慢速</option>
+                <option value="180">快速（180毫秒）</option>
+                <option value="450" selected>标准（450毫秒，默认）</option>
+                <option value="900">慢速（900毫秒）</option>
                 <option value="0">关闭播放</option>
               </select>
             </label>
+            <span class="review-footnote">每个AI公开动作最多显示1.4秒，碰杠胡动画也不超过1.5秒；服务器运算与网络耗时另计。</span>
             <label class="match-playback-focus-option">
               <input id="match-playback-focus" type="checkbox">
               只看碰杠胡及最终动作
