@@ -2290,3 +2290,14 @@
   background:#d9eadc;color:#20573e;font-weight:750;font-size:11px}
 .home-match-state:empty{display:none}
 @media(prefers-reduced-motion:reduce){.home-module-card{transition:none}}
+
+/* M3.48: recovery notice appears only while the tab reconnects or if the
+   server is temporarily unreachable, not as a permanent overlay. */
+.match-resume-tools{
+  display:flex;align-items:center;flex-wrap:wrap;gap:12px;
+  margin:10px 0;padding:11px 14px;border-radius:11px;
+  border:1px solid #d8e4ca;background:#f1f7e8;color:#37573b;
+}
+.match-resume-tools[hidden]{display:none!important}
+.match-resume-tools p{margin:0;flex:1;font-size:13px;line-height:1.6}
+.match-resume-tools button:disabled{cursor:wait;opacity:.6}

@@ -31,6 +31,8 @@ const ids=[
   "match-enable-kong","match-kong-base","match-seed",
   "match-coefficient","match-fan-cap","match-self-draw-mode","match-ai-1","match-ai-2","match-ai-3",
   "match-error","match-stage","match-title","match-status","match-request-status",
+  "match-resume-tools","match-resume-message","match-resume-retry",
+  "home-match-state",
   "match-hud-turn","match-hud-wall","match-hud-missing","match-hud-tip",
   "match-focus-toggle","match-skin-toggle","match-decision",
   "match-back-color","match-self-missing-flag",
@@ -98,6 +100,7 @@ const next={...base,wall_count:53,discards:[
   ...base.discards,{seat:0,tile:"m1"}
 ]};
 let requests=[];
+const sessionStore=new Map();
 let startMatch=base,replyMatch=next;
 const speechCalls=[];
 const window={
@@ -112,6 +115,11 @@ const window={
     constructor(text){this.text=text;}
   },
   MahTrainMatchVoice:require("../web/match_voice.js"),
+  sessionStorage:{
+    getItem:key=>sessionStore.has(key)?sessionStore.get(key):null,
+    setItem:(key,val)=>sessionStore.set(key,String(val)),
+    removeItem:key=>sessionStore.delete(key),
+  },
   MahTrainUI:{
     tileName:tile=>tile,
     tileElement:(tile,opts)=>{
@@ -179,6 +187,10 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-new"].handlers.click();
   await settle();
   assert.equal(requests[0].action,"match_new");
+  assert.equal(sessionStore.get("mahtrain.match.session.v1"),"test-session");
+  assert.ok([...sessionStore.values()].every(v=>!v.includes("hand")),
+    "Web Storage must contain only an opaque capability, never tile state");
+
   assert.equal(requests[0].self_draw_mode,"add_base");
   assert.equal(Object.hasOwn(requests[0],"seed"),false,
     "ordinary match must let the server select an unused random seed");
@@ -1089,6 +1101,89 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-review-count"].textContent.includes("4 步"),
     "full review should keep opening, real manual state, draw and discard");
   assert.equal(pendingTimers.size,0);
+  // M3.48: simulate a full JS reload with the same TAB storage and a new
+  // DOM instance, but the server's original token and authorized state.
+  const reloadDom=Object.fromEntries(ids.map(id=>[id,new Node()]));
+  for(const id of ids)reloadDom[id].id=id;
+  reloadDom["match-stage"].hidden=true;
+  reloadDom["match-resume-tools"].hidden=true;
+  reloadDom["match-playback-speed"].value="450";
+  reloadDom["match-voice-speed"].value="normal";
+  reloadDom["match-back-color"].value="jade";
+  reloadDom["match-self-draw-mode"].value="add_base";
+  reloadDom["match-coefficient"].value="100";
+  reloadDom["match-fan-cap"].value="3";
+  reloadDom["match-seed"].value="42";
+  for(const n of [1,2,3])reloadDom["match-ai-"+n].value="advanced";
+  const reopenedRequests=[];
+  const reopenedWindow={...window};
+  const resumedState={...base,needs_continue:false};
+  const reloadedContext={
+    document:{createElement:tag=>new Node(tag),getElementById:id=>{
+      assert.ok(reloadDom[id],"missing reloaded id "+id);return reloadDom[id];
+    }},
+    window:reopenedWindow,
+    fetch:async (_url,opts)=>{
+      const req=JSON.parse(opts.body);
+      reopenedRequests.push(req);
+      return {ok:true,json:async()=>({
+        match_token:"test-session",match:resumedState,
+      })};
+    },
+    confirm:()=>true,
+    setTimeout:(fn,delay)=>{pendingTimers.set(++timerIndex,{fn,delay});return timerIndex},
+    clearTimeout:id=>pendingTimers.delete(id),
+    console,
+  };
+  vm.runInNewContext(script,reloadedContext,{filename:"web/match.js"});
+  reopenedWindow.MahTrainMatch.init();
+  await settle();
+  assert.deepEqual(reopenedRequests.map(r=>r.action),["match_resume"]);
+  assert.deepEqual(Object.keys(reopenedRequests[0]).sort(),
+    ["action","match_token"]);
+  assert.equal(reopenedRequests[0].match_token,"test-session");
+  assert.equal(reloadDom["match-stage"].hidden,false);
+  assert.equal(reloadDom["match-wall-count"].textContent,"54");
+  assert.equal(reloadDom["match-hand"].children.length,14);
+  assert.equal(reloadDom["match-resume-tools"].hidden,true);
+  assert.ok(reloadDom["match-request-status"].textContent.includes("已恢复原对局"));
+  assert.ok(reloadDom["home-match-state"].textContent.includes("已有对局"));
+  assert.equal(sessionStore.get("mahtrain.match.session.v1"),"test-session");
+  assert.equal(reopenedRequests.length,1,"restoring must not issue new/continue");
+  // A response lost during navigation may already have changed the server
+  // phase. Resume only schedules the NEXT safe AI continuation once.
+  reopenedWindow.sessionStorage.setItem("mahtrain.match.session.v1","stale-token");
+  const expiredDom=Object.fromEntries(ids.map(id=>[id,new Node()]));
+  for(const id of ids)expiredDom[id].id=id;
+  expiredDom["match-resume-tools"].hidden=true;
+  expiredDom["match-stage"].hidden=true;
+  expiredDom["match-playback-speed"].value="450";
+  expiredDom["match-voice-speed"].value="normal";
+  const expiredWindow={...window};
+  let invalidCalls=0;
+  const expiredCtx={
+    document:{createElement:tag=>new Node(tag),getElementById:id=>expiredDom[id]},
+    window:expiredWindow,
+    fetch:async (_,opts)=>{
+      invalidCalls++;
+      assert.equal(JSON.parse(opts.body).action,"match_resume");
+      return {ok:false,status:400,json:async()=>({
+        error:"对局会话已失效，请重新开局",
+      })};
+    },
+    confirm:()=>true,setTimeout:(fn,delay)=>0,clearTimeout:()=>{},console,
+  };
+  vm.runInNewContext(script,expiredCtx,{filename:"web/match.js"});
+  expiredWindow.MahTrainMatch.init();
+  await settle();
+  assert.equal(invalidCalls,1);
+  assert.equal(sessionStore.has("mahtrain.match.session.v1"),false);
+  assert.equal(expiredDom["match-stage"].hidden,true,
+    "invalid stored token cannot create a pretend game");
+  assert.equal(expiredDom["match-hand"].children.length,0);
+  assert.equal(expiredDom["match-resume-tools"].hidden,true);
+  assert.ok(expiredDom["match-error"].textContent.includes("已失效"));
+  console.log("M3.48 same-tab resume, zero new draws, stale-token cleanup: PASS");
   console.log("M3.41 silent AI frame coalescing and complete public review: PASS");
 
   console.log("M3.39 server-only HU quote and no booking before confirmation: PASS");
