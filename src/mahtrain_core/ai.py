@@ -243,7 +243,7 @@ def challenge_discard_scores(view: Mapping[str, Any],
     return (_reweight_bounded_risk(viable, view) if use_pressure else
             sorted(viable, key=lambda item: (
                 -item["score"], -item["effective_tile_count"],
-                TILE_INDEX[item["discard"]))))
+                TILE_INDEX[item["discard"]])))
 
 
 class MahjongAgent:
