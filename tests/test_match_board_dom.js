@@ -266,7 +266,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-skin-toggle"].handlers.click();
   assert.equal(dom["match-board"].classList.contains("is-midnight-felt"),true);
   assert.equal(dom["match-skin-toggle"].attributes["aria-pressed"],"true");
-  assert.equal(dom["match-skin-toggle"].textContent,"绿色桌布");
+  assert.equal(dom["match-skin-toggle"].textContent,"经典深蓝桌布");
   dom["match-skin-toggle"].handlers.click();
   assert.equal(dom["match-board"].classList.contains("is-midnight-felt"),false);
   assert.equal(dom["match-skin-toggle"].attributes["aria-pressed"],"false");
