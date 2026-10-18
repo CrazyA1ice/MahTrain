@@ -1553,7 +1553,7 @@ class WebUI(unittest.TestCase):
         created=self.post({"action":"match_new","seed":42})
         self.assertEqual(
             [x["difficulty"] for x in created["match"]["ai_opponents"]],
-            ["basic","advanced","challenge"])
+            ["challenge","challenge","challenge"])
         with self.assertRaises(HTTPError):
             self.post({"action":"match_discard",
                        "match_token":created["match_token"],"seat":2,"tile":"m1"})
