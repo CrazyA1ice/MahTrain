@@ -8,6 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
+  let recoveryRequired=false;
   let pendingDiscard=null,immersive=false,midnightFelt=false;
   // The owner may decline an optional self-kong without losing the right
   // to reopen it. Never reopen the same offer on each render or redraw.
@@ -37,9 +38,57 @@
     const label=$("home-match-state");
     if(label)label.textContent=activeMatch()?"已有对局界面，点击继续查看":"";
   }
+  // Both reload and an uncertain HTTP mutation reconcile through this
+  // read-only endpoint. There is NO automatic re-send of a discard or kong.
+  async function fetchMatchSnapshot(stored){
+    const response=await fetch("/api/action",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","X-MahTrain":"1"},
+      body:JSON.stringify({action:"match_resume",match_token:stored}),
+    });
+    const data=await response.json();
+    if(!response.ok){
+      const error=new Error(data.error||"恢复对局失败");
+      error.expired=response.status===400 &&
+        /失效|不存在|未初始化/.test(error.message);
+      throw error;
+    }
+    if(data.match_token!==stored||!data.match||data.match.seat!==0)
+      throw new Error("服务器返回的对局身份不一致，已停止恢复");
+    return data.match;
+  }
+  function acceptMatchSnapshot(stored,snapshot){
+    // A snapshot might be ahead of the browser's last rendered turn.
+    // Never replay/speak old events or guess the hidden wall contents.
+    playback?.cancel();
+    $("match-playback").hidden=true;
+    $("match-motion").hidden=true;
+    voice?.reset();
+    syncVoiceControls();
+    token=stored;state=snapshot;
+    choice.clear();pendingDiscard=null;
+    dismissedKongKey=null;kongPromptReopened=false;
+    liveBoard=null;reviewHistory=[];reviewDropped=0;reviewSelected=null;
+    const opening=window.MahTrainPlayback.openingFrame(state);
+    if(opening)appendReviewFrames([{
+      ...opening,type:"state",label:"恢复时的当前公开状态",
+    }]);
+    recoveryRequired=false;
+    saveMatchToken();syncHomeMatchHint();render();
+    $("match-resume-tools").hidden=true;
+    return state.needs_continue===true;
+  }
+  function invalidateLostSession(){
+    clearSavedMatchToken();
+    token=null;state=null;recoveryRequired=false;
+    liveBoard=null;reviewHistory=[];reviewDropped=0;reviewSelected=null;
+    $("match-stage").hidden=true;
+    $("match-resume-tools").hidden=true;
+    syncHomeMatchHint();
+  }
   async function resumeMatch(){
     if(busy)return;
-    const stored=savedMatchToken();
+    const stored=savedMatchToken()||(recoveryRequired?token:null);
     const tools=$("match-resume-tools");
     if(!stored){tools.hidden=true;return}
     busy=true;
@@ -49,50 +98,19 @@
     $("match-error").textContent="";
     let pendingContinue=false;
     try{
-      const response=await fetch("/api/action",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","X-MahTrain":"1"},
-        body:JSON.stringify({action:"match_resume",match_token:stored}),
-      });
-      const data=await response.json();
-      if(!response.ok){
-        const error=new Error(data.error||"恢复对局失败");
-        error.expired=response.status===400 &&
-          /失效|不存在|未初始化/.test(error.message);
-        throw error;
-      }
-      if(data.match_token!==stored||!data.match||data.match.seat!==0)
-        throw new Error("服务器返回的对局身份不一致，已停止恢复");
-      // Never replay or speak the previous public actions as NEW events.
-      playback?.cancel();
-      $("match-playback").hidden=true;
-      $("match-motion").hidden=true;
-      voice?.reset();
-      syncVoiceControls();
-      token=stored;state=data.match;
-      choice.clear();pendingDiscard=null;
-      dismissedKongKey=null;kongPromptReopened=false;
-      liveBoard=null;reviewHistory=[];reviewDropped=0;reviewSelected=null;
-      const snapshot=window.MahTrainPlayback.openingFrame(state);
-      if(snapshot)appendReviewFrames([{
-        ...snapshot,type:"state",label:"恢复时的当前公开状态",
-      }]);
-      pendingContinue=state.needs_continue===true;
-      saveMatchToken();
-      syncHomeMatchHint();
-      render();
-      tools.hidden=true;
+      const snapshot=await fetchMatchSnapshot(stored);
+      pendingContinue=acceptMatchSnapshot(stored,snapshot);
       $("match-request-status").textContent=
         "已恢复原对局 · 历史语音不会重复播放，复盘从恢复时的公开状态继续";
     }catch(err){
       if(err.expired){
-        clearSavedMatchToken();
-        tools.hidden=true;
+        invalidateLostSession();
         $("match-error").textContent="上次对局会话已失效，请开始新局。";
       }else{
+        recoveryRequired=true;
         tools.hidden=false;
         $("match-resume-message").textContent=
-          "原对局暂时无法连接，未新开局。请检查网络后点击重新连接。";
+          "原对局暂时无法连接，已暂停操作。请检查网络后点击重新连接。";
         $("match-error").textContent=err.message||String(err);
       }
     }finally{
@@ -100,7 +118,7 @@
       $("match-resume-retry").disabled=false;
       if(pendingContinue&&token===stored){
         setTimeout(()=>{
-          if(!busy&&token===stored&&state?.needs_continue===true)
+          if(!busy&&!recoveryRequired&&token===stored&&state?.needs_continue===true)
             action("match_continue");
         },0);
       }
@@ -132,7 +150,9 @@
     return b;
   }
   async function action(name,fields={}){
-    if(busy)return;
+    // An interrupted mutation may ALREADY have run on the server. Until a
+    // read-only snapshot resolves that ambiguity, NEVER repeat the action.
+    if(busy||(recoveryRequired&&name!=="match_new"))return;
     busy=true;
     $("match-request-status").textContent=
       name==="match_continue"?"正在执行下一步 AI 操作…":"已收到操作，正在计算本步…";
@@ -148,7 +168,13 @@
         body:JSON.stringify({action:name,match_token:token,...fields}),
       });
       const data=await response.json();
-      if(!response.ok)throw new Error(data.error||"对局操作失败");
+      if(!response.ok){
+        const failure=new Error(data.error||"对局操作失败");
+        // Explicit 4xx responses reject the operation. Lost HTTP/5xx
+        // responses can be ambiguous: the server may have committed it.
+        failure.rejected=response.status>=400&&response.status<500;
+        throw failure;
+      }
       const service=Number(data.server_elapsed_ms);
       $("match-request-status").textContent=Number.isFinite(service)?
         "服务器本步计算 "+service.toFixed(0)+" ms · 正在同步牌桌与语音":
@@ -229,6 +255,7 @@
         $("match-review-type-filter").value="all";
       }
       token=data.match_token;state=data.match;choice.clear();
+      recoveryRequired=false;
       kongPromptReopened=false;
       saveMatchToken();
       syncHomeMatchHint();
@@ -274,9 +301,36 @@
       }
     }catch(err){
       liveBoard=null;
-      if(state)render();
-      $("match-error").textContent=err.message||String(err);
-      $("match-request-status").textContent="操作未完成，请检查错误提示";
+      if(name!=="match_new"&&requestToken&&!err.rejected){
+        recoveryRequired=true;
+        const tools=$("match-resume-tools");
+        tools.hidden=false;
+        $("match-resume-message").textContent=
+          "本步响应中断，正在核对服务器真实牌局；请不要重复出牌…";
+        try{
+          const snapshot=await fetchMatchSnapshot(requestToken);
+          needsContinue=acceptMatchSnapshot(requestToken,snapshot);
+          $("match-request-status").textContent=
+            "网络响应中断 · 已重新同步服务器牌局，本步没有重复提交";
+          $("match-error").textContent="";
+        }catch(resyncError){
+          needsContinue=false;
+          if(resyncError.expired){
+            invalidateLostSession();
+            $("match-error").textContent="对局会话已失效，无法恢复本步，请重新开局。";
+          }else{
+            recoveryRequired=true;
+            tools.hidden=false;
+            $("match-resume-message").textContent=
+              "本步结果尚未确认，已暂停出牌与碰杠。请重新连接原对局。";
+            $("match-error").textContent=resyncError.message||String(resyncError);
+          }
+        }
+      }else{
+        if(state)render();
+        $("match-error").textContent=err.message||String(err);
+        $("match-request-status").textContent="操作未完成，请检查错误提示";
+      }
     }finally{
       busy=false;
       // One AI transition per request: never submit the next transition
@@ -284,7 +338,7 @@
       if(needsContinue && token && (name==="match_new"||requestToken===token)){
         const expectedToken=token;
         setTimeout(()=>{
-          if(!busy&&token===expectedToken&&state?.needs_continue===true)
+          if(!busy&&!recoveryRequired&&token===expectedToken&&state?.needs_continue===true)
             action("match_continue");
         },0);
       }

@@ -116,6 +116,20 @@ class WebUI(unittest.TestCase):
             self.assertIn(field,script)
         self.assertIn(b".match-resume-tools[hidden]",css)
 
+    def test_m349_interrupted_action_reconciliation_contract(self):
+        page,_=self.get("/")
+        client,_=self.get("/match.js")
+        self.assertIn(b"fetchMatchSnapshot",client)
+        self.assertIn(b"acceptMatchSnapshot",client)
+        self.assertIn(b"recoveryRequired",client)
+        self.assertIn(b"resyncError.expired",client)
+        self.assertIn(b"failure.rejected=",client)
+        self.assertIn(b'if(busy||(recoveryRequired',client)
+        self.assertIn("本步结果尚未确认".encode(),client)
+        self.assertIn("已重新同步服务器牌局".encode(),client)
+        self.assertIn("没有重复提交".encode(),client)
+        self.assertIn(b'id="match-resume-retry"',page)
+
     def test_m337_public_speech_controls_are_locally_served(self):
         page, _ = self.get("/")
         voice, kind = self.get("/match_voice.js")
