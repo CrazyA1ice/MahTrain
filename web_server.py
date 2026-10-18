@@ -565,6 +565,19 @@ def _process(action: str, payload: dict) -> dict:
             _MATCH_OPENING[token]=_match_public_board(game)
             return {"match_token":token,
                     "match":_match_private_view(game,agents)}
+        if action == "match_resume":
+            # Read-only recovery of a SAME-TAB bearer session. Never accept
+            # a seat id, replay private walls, generate a new game, or move AI.
+            token=payload.get("match_token")
+            game=(_MATCH_SESSIONS.get(token) if type(token) is str else None)
+            agents=(_MATCH_AGENTS.get(token) if game is not None else None)
+            if game is None or agents is None:
+                raise ValueError("对局会话已失效，请重新开局")
+            view=_match_private_view(game,agents)
+            view["needs_continue"]=_match_requires_continue(game)
+            view["public_steps"]=[]
+            view["match_archive_id"]=_MATCH_ARCHIVE_IDS.get(token)
+            return {"match_token":token,"match":view}
         if action in ("match_exchange","match_missing","match_discard",
                       "match_claim","match_kong","match_rob","match_win",
                       "match_continue"):
