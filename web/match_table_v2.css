@@ -496,3 +496,48 @@
   #match-board .match-seat--bottom #match-hand{left:auto;bottom:auto;width:100%;max-width:100%;position:relative;overflow-x:auto}
   #match-board .match-seat--bottom #match-hand .tile{width:51px;height:70px}
 }
+
+/* Surrounding controls are quiet, so the playing surface (not a green app
+   dashboard) stays the focal point. Gameplay rules and control IDs unchanged. */
+#match-stage .match-game-hud,
+#match-stage.is-immersive .match-game-hud{
+  background:#eef2f8;border:1px solid #d0d9e7;
+  border-radius:9px;padding:9px;margin:7px 0 9px;gap:7px;
+}
+#match-stage .match-hud-readouts{gap:7px}
+#match-stage .match-hud-chip{
+  background:#fff;border:1px solid #d5ddec;
+  border-radius:6px;padding:7px 10px;gap:3px;
+}
+#match-stage .match-hud-chip--turn{
+  background:#1a3359;border-color:#42628d;
+}
+#match-stage .match-hud-chip--turn b{color:#c7d6ed}
+#match-stage .match-hud-chip--turn strong{color:#fae6ae}
+#match-stage .match-hud-chip:not(.match-hud-chip--turn) b{color:#64748b}
+#match-stage .match-hud-chip:not(.match-hud-chip--turn) strong{color:#243e60}
+#match-stage .match-hud-actions button,
+#match-stage .match-confirm-option{
+  background:#fff;border:1px solid #bdcbe0;
+  color:#27405d;border-radius:6px;
+}
+#match-stage .match-hud-actions button[aria-pressed="true"]{
+  background:#1c3b65;color:#fff;
+}
+#match-stage .match-playback-settings{
+  display:flex;align-items:center;gap:7px 14px;
+  padding:7px 12px;margin:6px 0 8px;
+  background:#172d4d;border:1px solid #3b577c;
+  color:#eaf1fc;border-radius:7px;
+  font-size:12px;font-weight:600;
+}
+#match-stage .match-playback-settings .review-footnote{color:#c4d5ed;font-size:10px}
+#match-stage .match-playback-settings select{
+  background:#f7f9fc;color:#25374f;
+  border:1px solid #91a5c1;border-radius:5px;
+  padding:5px 7px;
+}
+#match-stage .match-playback-settings input{accent-color:#bd9663}
+#match-stage #match-title{margin:9px 0 4px;color:#263e60}
+#match-stage #match-status{margin:0 0 3px;color:#5e708c}
+#match-stage .match-request-status{color:#61758e}
