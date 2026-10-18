@@ -130,7 +130,8 @@ def _take_action(game: FourPlayerOpening, agents: dict[int, Any],
             # Private, aggregate-only instrumentation. The unplayed shadow
             # tile never enters the trace, public replay or network result.
             event["pressure_probe"]=diagnose_pressure_tiebreak(
-                view, oracle, tile, policy=level
+                view, oracle, tile, policy=level,
+                ranking=getattr(agent, "_last_discard_scores", None),
             )
         trace.append(event)
         game.discard(seat,tile)
