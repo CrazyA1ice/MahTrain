@@ -13,7 +13,7 @@
   --rv-sw:clamp(22px,2.55vw,33px);
   --rv-sh:clamp(18px,2.05vw,23px);
   --band-h:calc(4 * var(--rv-h) + 15px);
-  --middle-h:calc(14 * var(--rv-sh) + 24px);
+  --middle-h:calc(14 * var(--rv-sh) + 36px);
   --mid-h:calc(2 * var(--band-h) + var(--middle-h) + 12px);
   position:relative;isolation:isolate;
   display:grid;box-sizing:border-box;
