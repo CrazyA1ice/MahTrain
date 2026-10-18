@@ -7,17 +7,17 @@ assert.equal(api.tileLabel("s9"),"九条");
 assert.equal(api.tileLabel("p3"),"三筒");
 assert.equal(api.tileLabel("private"),"");
 assert.equal(api.phrase({type:"discard",seat:1,publicTile:"m5"}),"五万");
-assert.equal(api.phrase({type:"peng",seat:3,publicTile:"p2"}),"3号碰二筒");
-assert.equal(api.phrase({type:"an_gang",seat:2,publicTile:"s9"}),"2号暗杠",
+assert.equal(api.phrase({type:"peng",seat:3,publicTile:"p2"}),"碰");
+assert.equal(api.phrase({type:"an_gang",seat:2,publicTile:"s9"}),"杠",
   "without explicit public reveal marker, never say a concealed card");
 assert.equal(api.phrase({type:"an_gang",seat:2,publicTile:"s9",
-  exposedKong:true}),"2号暗杠九条");
+  exposedKong:true}),"杠");
 assert.equal(api.phrase({type:"an_gang",seat:0,publicTile:"m4",
-  exposedKong:true}),"我方暗杠四万");
+  exposedKong:true}),"杠");
 assert.equal(api.phrase({type:"an_gang",seat:3,publicTile:"SECRET",
-  exposedKong:true}),"3号暗杠");
+  exposedKong:true}),"杠");
 assert.equal(api.phrase({type:"multi_ron",winSeats:[1,3],publicTile:"p2"}),
-  "1号、3号一炮多响，胡了");
+  "胡");
 assert.equal(api.phrase({type:"draw",seat:1,publicTile:"s4"}),"");
 assert.equal(api.phrase({type:"discard",seat:1,publicTile:"SECRET-HAND"}),"");
 const spoken=[];
@@ -42,7 +42,7 @@ assert.equal(speaker.announceEvents([
   {type:"self_draw_win",seat:3},
 ]),true);
 assert.deepEqual(spoken[0],
-  {text:"五筒。2号暗杠。3号自摸，胡了",lang:"zh-CN"});
+  {text:"五筒。杠。胡",lang:"zh-CN"});
 assert.ok(cancelled>0);
 assert.equal(spokenRates[0],1.12);
 assert.equal(speaker.canRepeat(),true);
@@ -51,12 +51,12 @@ speaker.announceFrame({announcements:[
   {type:"peng",seat:1,publicTile:"m4"},
   {type:"ming_gang",seat:0,publicTile:"s8"},
 ]});
-assert.equal(spoken[1].text,"1号碰四万。我方明杠八条");
+assert.equal(spoken[1].text,"碰。杠");
 speaker.announceFrame({announcements:[
   {type:"an_gang",seat:1,publicTile:"p7",exposedKong:true},
   {type:"kong_supplement",seat:1,publicTile:"hidden"},
 ]});
-assert.equal(spoken[2].text,"1号暗杠七筒",
+assert.equal(spoken[2].text,"杠",
   "kong supplement identity is never spoken");
 speaker.setEnabled(false);
 assert.equal(speaker.announceEvents([{type:"discard",seat:0,publicTile:"m1"}]),false);
@@ -65,7 +65,7 @@ assert.equal(speaker.canRepeat(),false);
 assert.equal(speaker.repeatLast(),false,"mute must block manual replay");
 speaker.setEnabled(true);
 assert.equal(speaker.repeatLast(),true);
-assert.equal(spoken[3].text,"1号暗杠七筒");
+assert.equal(spoken[3].text,"杠");
 assert.equal(speaker.setRate("slow"),"slow");
 assert.equal(speaker.announceEvents([{type:"discard",seat:0,publicTile:"m3"}]),true);
 assert.equal(spokenRates.at(-1),0.85);
@@ -82,7 +82,7 @@ speaker.reset();
 assert.equal(speaker.canRepeat(),false);
 assert.equal(speaker.repeatLast(),false,"new game clears previous round speech");
 assert.equal(speaker.announceEvents([{type:"an_gang",seat:1,publicTile:"SECRET"}]),true);
-assert.equal(spoken.at(-1).text,"1号暗杠");
+assert.equal(spoken.at(-1).text,"杠");
 const unsupported=api.create({});
 assert.equal(unsupported.supported,false);
 assert.equal(unsupported.canRepeat(),false);
@@ -106,7 +106,7 @@ assert.equal(unsupported.announceFrame({type:"discard",seat:1,publicTile:"m2"}),
     type:"discard",seat:1,publicTile:"s7",
   }).then(()=>{resolved=true;});
   await Promise.resolve();
-  assert.equal(resolved,false,"next seat cannot play during spoken tile");
+  assert.equal(resolved,false,"legacy wait API still waits when called explicitly");
   assert.equal(finishUtterance.text,"七条");
   finishUtterance.onend();
   await announced;
@@ -124,6 +124,6 @@ assert.equal(unsupported.announceFrame({type:"discard",seat:1,publicTile:"m2"}),
   await delayed.announceFrameWait({type:"discard",seat:2,publicTile:"p4"});
   const noAudio=api.create({});
   await noAudio.announceFrameWait({type:"discard",seat:3,publicTile:"m2"});
-  console.log("M3.40 tile-only speech and onend/error/watchdog turn gate: PASS");
+  console.log("M3.52 legacy speech completion remains backward compatible: PASS");
 })().catch(e=>{console.error(e);process.exitCode=1});
 console.log("M3.37 speech rate, public-only replay, reset, mute and privacy: PASS");
