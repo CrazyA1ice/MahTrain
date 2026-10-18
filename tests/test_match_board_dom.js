@@ -287,6 +287,24 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const declared=dom["match-seat-3"];
   assert.equal(descendants(declared,x=>x.tile==="p4").length,3);
 
+  // M3.63: unchanged public rivers must retain their real DOM slots even
+  // when another UI setting triggers a complete match render.
+  const previousTrays=[0,1,2,3].map(seat=>
+    dom["match-river-"+seat].children[1]);
+  const initialOwnCell=descendants(dom["match-river-0"],x=>
+    x.className==="match-river-cell")[0];
+  assert.equal(initialOwnCell.classList.contains("is-latest"),true);
+  dom["match-confirm-discard"].checked=true;
+  dom["match-confirm-discard"].handlers.change();
+  dom["match-confirm-discard"].checked=false;
+  dom["match-confirm-discard"].handlers.change();
+  for(let seat=0;seat<4;seat++){
+    assert.equal(dom["match-river-"+seat].children[1],previousTrays[seat],
+      "unchanged river "+seat+" must retain its DOM tray");
+  }
+  assert.equal(descendants(dom["match-river-0"],x=>
+    x.className==="match-river-cell")[0],initialOwnCell);
+
   const river=dom["match-river-2"];
   assert.equal(descendants(river,x=>x.tile==="s3").length,0,
     "claimed discard must not be duplicated as a physical tile in river");
@@ -304,6 +322,37 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(requests[1].from_draw,false);
   assert.equal(dom["match-wall-count"].textContent,"53");
   assert.equal(descendants(dom["match-river-0"],x=>x.tile==="m1").length,1);
+  // A public append creates only its new slot: even the prior own tile
+  // stays mounted, and the old latest highlight is removed.
+  for(let seat=0;seat<4;seat++){
+    assert.equal(dom["match-river-"+seat].children[1],previousTrays[seat],
+      "appending one seat's discard must not rebuild any river tray");
+  }
+  const ownCells=descendants(dom["match-river-0"],x=>
+    x.className==="match-river-cell");
+  assert.equal(ownCells.length,2);
+  assert.equal(ownCells[0],initialOwnCell);
+  assert.equal(ownCells[0].classList.contains("is-latest"),false);
+  assert.equal(ownCells[1].classList.contains("is-latest"),true);
+  assert.deepEqual(ownCells.map(x=>[x.attributes["data-river-row"],
+    x.attributes["data-river-column"]]),[["1","1"],["1","2"]]);
+
+  // An earlier public claim changes the physical meaning of that slot;
+  // invalidate that river, remove the taken tile, preserve other seats.
+  startMatch={...next,discards:next.discards.map((item,index)=>
+    index===2?{...item,claimed_by:1}:item)};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.notEqual(dom["match-river-0"].children[1],previousTrays[0],
+    "a changed claim must invalidate the old physical slots");
+  assert.equal(descendants(dom["match-river-0"],
+    x=>x.tile==="p1").length,0);
+  assert.equal(descendants(dom["match-river-0"],
+    x=>x.className==="match-river-claimed").length,1);
+  for(const seat of [1,2,3]){
+    assert.equal(dom["match-river-"+seat].children[1],previousTrays[seat],
+      "a claim on another seat must not rebuild river "+seat);
+  }
 
   // Same-valued physical copy: own old m1 and freshly drawn m1 must be
   // separate clickable cards. Only the far-right card is marked drawn.
