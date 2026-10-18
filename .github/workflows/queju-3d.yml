@@ -25,13 +25,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend_3d/package-lock.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install real 3D client dependencies
-        run: cd frontend_3d && npm ci --no-audit --no-fund
+        run: cd frontend_3d && npm install --no-audit --no-fund
       - name: Test MahTrain to Queju state/action boundary
         run: cd frontend_3d && npm run test:bridge
       - name: Compile original Queju 3D WebGL frontend
