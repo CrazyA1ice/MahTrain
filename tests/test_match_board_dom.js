@@ -1156,6 +1156,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const expiredDom=Object.fromEntries(ids.map(id=>[id,new Node()]));
   for(const id of ids)expiredDom[id].id=id;
   expiredDom["match-resume-tools"].hidden=true;
+  expiredDom["match-stage"].hidden=true;
   expiredDom["match-playback-speed"].value="450";
   expiredDom["match-voice-speed"].value="normal";
   const expiredWindow={...window};
@@ -1177,8 +1178,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(invalidCalls,1);
   assert.equal(sessionStore.has("mahtrain.match.session.v1"),false);
-  assert.equal(expiredDom["match-stage"].hidden,false,
-    "fake DOM defaults differ from HTML; invalid restore cannot create game");
+  assert.equal(expiredDom["match-stage"].hidden,true,
+    "invalid stored token cannot create a pretend game");
   assert.equal(expiredDom["match-hand"].children.length,0);
   assert.equal(expiredDom["match-resume-tools"].hidden,true);
   assert.ok(expiredDom["match-error"].textContent.includes("已失效"));
