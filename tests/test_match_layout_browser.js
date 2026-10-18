@@ -288,7 +288,8 @@ async function main(){
           }
           for(const tile of melds?.querySelectorAll(".tile")||[]){
             if(!inside(box(tile),seatBox)){
-              allVisible=false;visibilityIssues.push("seat"+seat+":meld-tile");
+              allVisible=false;visibilityIssues.push("seat"+seat+":meld-tile "+
+                JSON.stringify({tile:box(tile),seat:seatBox}));
             }
           }
         }
