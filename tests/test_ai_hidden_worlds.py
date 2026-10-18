@@ -115,8 +115,11 @@ class HiddenWorldsTests(unittest.TestCase):
             "hand":["m1","m2","m3","m4","m5","m6","m7","m8","m9",
                     "s1","s2","s3","s4","s5"],
             "own_melds":[],"missing_suits":["p","m","m","s"],
-            "melds":[[],[],[],[]],"won":[False]*4,
-            "discards":[],"wall_count":8,
+            # Seat 1 has two published, non-missing-suit pungs.
+            # This is the case in which bounded sampling is enabled.
+            "melds":[[],[{"type":"peng","tile":"p1"},
+                         {"type":"peng","tile":"p2"}],[],[]],
+            "won":[False]*4,"discards":[],"wall_count":8,
         }
         info={"shanten":0,"effective_tile_count":6,
               "effective_types":["p1"],
@@ -135,6 +138,26 @@ class HiddenWorldsTests(unittest.TestCase):
         self.assertEqual(protected[0]["sampled_worlds"],24)
         self.assertEqual(bare[0]["score"],bare[1]["score"])
         self.assertTrue(all(x["shanten"]==0 for x in protected))
+
+    def test_no_opaque_mc_work_without_two_exposed_opponent_melds(self):
+        view={
+            "seat":0,"phase":"dealer_discard",
+            "hand":["m1","m2","m3","m4","m5","m6","m7","m8","m9",
+                    "s1","s2","s3","s4","s5"],
+            "own_melds":[],"missing_suits":["p","m","m","s"],
+            "melds":[[],[],[],[]],"won":[False]*4,
+            "discards":[],"wall_count":2, # even at the final wall
+        }
+        fake={"shanten":0,"effective_tile_count":3,
+              "effective_types":["p1"],
+              "effective_details":[{"tile":"p1","remaining":3}]}
+        with patch("mahtrain_core.ai.effective_draws",return_value=fake), \
+             patch("mahtrain_core.ai.score_win",return_value={"multiplier":2}), \
+             patch("mahtrain_core.ai.sample_discard_losses",
+                   side_effect=AssertionError("unexpected expensive sampler")):
+            ranked=challenge_discard_scores(view,cuts=["m4","s4"])
+        self.assertEqual(len(ranked),2)
+        self.assertTrue(all(x["sampled_worlds"]==0 for x in ranked))
 
 
 if __name__=="__main__":
