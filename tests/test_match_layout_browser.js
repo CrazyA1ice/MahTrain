@@ -98,7 +98,12 @@ async function main(){
           cell.style.gridColumn=String(pos[1]);
           const tile=document.createElement("div");
           tile.className="tile";
-          tile.textContent=String(n+1);
+          tile.dataset.fixtureIndex=String(n);
+          // The real MahTrain tile is an atlas face, not oversized text.
+          // Text "55" can overflow an otherwise correctly clipped 10px slot.
+          const face=document.createElement("span");
+          face.className="tile-atlas-face";
+          tile.append(face);
           cell.append(tile);
           tray.append(cell);
         }
