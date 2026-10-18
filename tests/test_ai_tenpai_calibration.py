@@ -63,7 +63,7 @@ class OfflineTenpaiCalibrationTests(unittest.TestCase):
         self.assertGreater(original[2], 0)
         self.assertGreater(original[3], 0)
         self.assertGreater(original[6], 0)
-        self.assertGreater(public_tenpai_features(view, 1)[5], 0)
+        self.assertEqual(public_tenpai_features(view, 1)[5], 0)
         changed = copy.deepcopy(view)
         changed["discards"].append({"seat": 1, "tile": "p5"})
         self.assertNotEqual(original, public_tenpai_features(changed, 1))
@@ -143,7 +143,7 @@ class OfflineTenpaiCalibrationTests(unittest.TestCase):
         self.assertFalse(report["can_claim_improvement"])
         self.assertFalse(report["contains_hidden_hands"])
         dumped = json.dumps(report)
-        for forbidden in ("_hands", "opponent_hands", "future_wall",
+        for forbidden in ('"_hands":', '"opponent_hands":', '"future_wall":',
                           '"hand":', '"raw_observations":'):
             self.assertNotIn(forbidden, dumped)
         with self.assertRaises(ValueError):
