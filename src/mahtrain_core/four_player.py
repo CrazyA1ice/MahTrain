@@ -62,6 +62,8 @@ class FourPlayerOpening:
         self._drawn_tiles: list[str | None] = [None] * 4
         self._kong_draw: list[bool] = [False] * 4
         self._kong_reference: list[int | None] = [None] * 4
+        # Remember which seat actually drew the final physical wall tile.
+        self._last_wall_draw: list[bool] = [False] * 4
         self._settlement_pending: list[dict[str, Any]] = []
         self.phase = "exchange_select"
         self.turn: int | None = None
@@ -189,7 +191,9 @@ class FourPlayerOpening:
                    heaven: bool = False, earth: bool = False,
                    kong_bloom: bool = False,
                    kong_discard: bool = False,
-                   rob_kong: bool = False) -> dict[str, Any]:
+                   rob_kong: bool = False,
+                   sea_bottom_draw: bool = False,
+                   river_bottom_ron: bool = False) -> dict[str, Any]:
         ctx={
             "tian_ting_verified":self._tian_ting[seat]["eligible"],
             "heaven_win_verified":heaven,
@@ -197,6 +201,8 @@ class FourPlayerOpening:
             "kong_bloom":kong_bloom,
             "kong_discard_ron":kong_discard,
             "rob_added_kong":rob_kong,
+            "sea_bottom_draw":sea_bottom_draw,
+            "river_bottom_ron":river_bottom_ron,
         }
         result=score_win(concealed,self._melds[seat],
                          self.missing_suits[seat],
@@ -212,6 +218,7 @@ class FourPlayerOpening:
             heaven=(seat == self.dealer and len(self._discards) == 0
                     and not self._melds[seat]),
             kong_bloom=self._kong_draw[seat],
+            sea_bottom_draw=self._last_wall_draw[seat],
         )
 
     def _self_draw_payers(self, seat: int) -> list[int]:
@@ -315,9 +322,13 @@ class FourPlayerOpening:
         self._drawn_tiles[seat] = None
         self._verify_tian_ting_checkpoint(seat)
         after_kong=self._kong_draw[seat]
+        last_wall_discard=self._last_wall_draw[seat]
+        self._last_wall_draw[seat]=False
         self._kong_draw[seat]=False
         entry = {"seat": seat, "tile": tile, "index": len(self._discards) + 1,
                  "discard_kind": "tsumogiri" if from_draw else "tedashi"}
+        if last_wall_discard:
+            entry["last_wall_discard"]=True
         if after_kong:
             entry["after_kong"]=True
             entry["kong_id"]=self._kong_reference[seat]
@@ -386,6 +397,7 @@ class FourPlayerOpening:
                     seat,[*self._hands[seat],tile],
                     earth=(len(self._discards)==1 and source==self.dealer),
                     kong_discard=bool(entry.get("after_kong")),
+                    river_bottom_ron=bool(entry.get("last_wall_discard")),
                 )
                 payment=self._post_win(
                     seat,source=source,tile=tile,kind="ron",score=points,
@@ -436,8 +448,8 @@ class FourPlayerOpening:
 
     def _pending_kong_price(self, seat: int, kind: str,
                             source: int | None = None) -> None:
-        # Only a caller who has explicitly configured an independent kong
-        # base can post *simulated* kong amounts.
+        # A priced kong is posted immediately; a kong-discard win reverses
+        # this exact event rather than charging both kong and bonus.
         payers=([source] if kind=="ming_gang"
                 else [s for s in range(4) if s!=seat and not self._won[s]])
         event_id=self.kong_ledger.declare(
@@ -451,6 +463,7 @@ class FourPlayerOpening:
         tile = self._wall.pop()  # TAIL, not the normal front draw.
         self._hands[seat].append(tile)
         self._drawn_tiles[seat] = tile
+        self._last_wall_draw[seat] = not self._wall
         self.turn = seat
         self.phase = "await_discard"
         self._kong_draw[seat]=True
@@ -577,6 +590,7 @@ class FourPlayerOpening:
         )
         self._won[seat] = True
         self._drawn_tiles[seat] = None
+        self._last_wall_draw[seat] = False
         self._winners.append({"seat":seat,"source":seat,
                               "kind":"self_draw","score":payment})
         self._events.append({"type":"self_draw_win","seat":seat})
@@ -600,6 +614,7 @@ class FourPlayerOpening:
         tile = self._wall.pop(0)
         self._hands[seat].append(tile)
         self._drawn_tiles[seat] = tile
+        self._last_wall_draw[seat] = not self._wall
         self._kong_draw[seat]=False
         self._kong_reference[seat]=None
         self.phase="await_discard"
@@ -630,6 +645,7 @@ class FourPlayerOpening:
             "winners":[dict(w) for w in self._winners],
             "win_ledger":self.ledger.public_state(),
             "kong_ledger":self.kong_ledger.public_state(),
+            "kong_included":self.kong_ledger.base is not None,
             "exhaustive_settlement": (
                 {**self._exhaustive_settlement,
                  "balances": list(self._exhaustive_settlement["balances"]),
@@ -637,8 +653,9 @@ class FourPlayerOpening:
                 if self._exhaustive_settlement is not None else None
             ),
             "settled_balances": [
-                a + (self._exhaustive_settlement["balances"][i]
-                     if self._exhaustive_settlement is not None else 0)
+                a + self.kong_ledger.public_state()["balances"][i] + (
+                    self._exhaustive_settlement["balances"][i]
+                    if self._exhaustive_settlement is not None else 0)
                 for i, a in enumerate(self.ledger.public_state()["balances"])
             ],
             "combined_balances":[
@@ -673,8 +690,8 @@ class FourPlayerOpening:
                 if event["type"]=="an_gang" else dict(event)
             ) for event in self._events],
             "prototype_limitations":{
-                "win_payments_only":True,
-                "kong_simulation_optional":True,
+                "win_payments_only":False,
+                "kong_simulation_optional":self.kong_ledger.base is None,
                 "kong_payments_pending":self.kong_ledger.base is None,
                 "exhaustive_draw_payments_posted":bool(
                     self._exhaustive_settlement and
