@@ -64,6 +64,58 @@ class WebUI(unittest.TestCase):
         with urlopen(req, timeout=10) as response:
             return json.load(response)
 
+    def test_m348_read_only_match_resume_and_invalid_capabilities(self):
+        created=self.post({"action":"match_new","seed":137})
+        token=created["match_token"]
+        game=web_server._MATCH_SESSIONS[token]
+        before=game.public_state()
+        count=len(web_server._MATCH_SESSIONS)
+        first=self.post({"action":"match_resume","match_token":token,
+                         "seat":3,"action_override":"match_discard"})
+        self.assertEqual(first["match_token"],token)
+        self.assertEqual(first["match"]["seat"],0)
+        self.assertEqual(first["match"]["hand"],created["match"]["hand"])
+        self.assertEqual(first["match"]["phase"],created["match"]["phase"])
+        self.assertEqual(first["match"]["public_steps"],[])
+        self.assertFalse(first["match"]["needs_continue"])
+        self.assertEqual(first["match"]["ai_opponents"],
+                         created["match"]["ai_opponents"])
+        self.assertEqual(len(web_server._MATCH_SESSIONS),count)
+        self.assertEqual(game.public_state(),before,
+                         "read-only resume must not advance a tile or event")
+        for key in ("_hands","_wall","seed","wall_tiles","other_hands"):
+            self.assertNotIn(key,first["match"])
+        with self.assertRaises(HTTPError) as cm:
+            self.post({"action":"match_resume","match_token":"invalid"})
+        self.assertEqual(cm.exception.code,400)
+        with self.assertRaises(HTTPError):
+            self.post({"action":"match_resume"})
+        exchange=next([t for t in created["match"]["hand"]
+                       if t.startswith(s)][:3] for s in "msp"
+                      if sum(t.startswith(s) for t in created["match"]["hand"])>=3)
+        self.post({"action":"match_exchange","match_token":token,"tiles":exchange})
+        self.post({"action":"match_missing","match_token":token,"suit":"p"})
+        current=game.public_state()
+        resumed=self.post({"action":"match_resume","match_token":token})
+        self.assertEqual(resumed["match"]["phase"],current["phase"])
+        self.assertEqual(resumed["match"]["turn"],current["turn"])
+        self.assertEqual(resumed["match"]["needs_continue"],
+                         web_server._match_requires_continue(game))
+        self.assertEqual(game.public_state(),current)
+        html,_=self.get("/")
+        script,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        for element in (b'id="match-resume-tools"',
+                        b'id="match-resume-message"',
+                        b'id="match-resume-retry"'):
+            self.assertIn(element,html)
+        for field in (b"sessionStorage",b"match_resume",
+                      b"MATCH_SESSION_KEY",b"savedMatchToken",
+                      b"clearSavedMatchToken",b"resumeMatch()",
+                      b"token===expectedToken"):
+            self.assertIn(field,script)
+        self.assertIn(b".match-resume-tools[hidden]",css)
+
     def test_m337_public_speech_controls_are_locally_served(self):
         page, _ = self.get("/")
         voice, kind = self.get("/match_voice.js")
