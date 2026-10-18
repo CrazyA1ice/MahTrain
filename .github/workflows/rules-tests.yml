@@ -182,7 +182,7 @@ jobs:
           assert set(p)=={'challenge','challenge_no_pressure'}
           for row in p.values():
               assert 0<=row['actual_changed']<=row['would_change']<=row['decisions']
-               assert all(0<=row[k]<=row['decisions'] for k in ('effective_ties','pressure_present','pressure_discriminates'))
+              assert all(0<=row[k]<=row['decisions'] for k in ('effective_ties','pressure_present','pressure_discriminates'))
           assert Path('/tmp/mahtrain-m312-pressure.csv').is_file()
           assert '弱风险规则触发诊断' in html
           o=d['official_score_analysis']
