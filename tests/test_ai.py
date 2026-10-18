@@ -10,6 +10,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 
 from mahtrain_core.ai import AI_LEVELS, MahjongAgent, visible_tiles
 from mahtrain_core.efficiency import shanten_13, analyze_discards
+from mahtrain_core.ai import challenge_discard_scores
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.rules import TILE_INDEX, is_legal_win
 from test_four_player_claims import deal_for_ron, staged_game
@@ -157,9 +158,48 @@ class MahjongAIUnitTests(unittest.TestCase):
             "challenge",seed=42,seat=dealer).discard(view)
         self.assertIn(proposed,hand)
         options=analyze_discards(hand,missing_suit="p",visible_tiles=[])
-        scores={x["discard"]:(x["shanten"],-x["effective_tile_count"])
+        scores={x["discard"]:x["shanten"]
                 for x in options["candidates"]}
-        self.assertEqual(scores[proposed],min(scores.values()))
+        self.assertEqual(scores[proposed], min(scores.values()))
+        ranking=challenge_discard_scores(view)
+        self.assertEqual(proposed,ranking[0]["discard"])
+        self.assertTrue(all(x["shanten"] == ranking[0]["shanten"]
+                            for x in ranking))
+        self.assertTrue(all(ranking[i]["score"] >= ranking[i+1]["score"]
+                            for i in range(len(ranking)-1)))
+
+    def test_challenge_considers_real_tenpai_fan_and_remaining_copies(self):
+        # Four complete groups plus an orphan: after the orphan cut, only
+        # another m5 completes the pair. Winning multiplier is rule-scored,
+        # not guessed from the number of distinct wait types.
+        dealer=FourPlayerOpening(42).dealer
+        hand=["m1","m2","m3","m4","m5","m6","m7","m8","m9",
+              "p2","p3","p4","m5","p9"]
+        game=staged_game({dealer:hand},{dealer:"s"})
+        view=game.private_view(dealer)
+        rank=challenge_discard_scores(view)
+        matching=next(item for item in rank if item["discard"]=="p9")
+        self.assertEqual(matching["shanten"],0)
+        self.assertGreater(matching["effective_tile_count"],0)
+        self.assertGreaterEqual(matching["expected_fan_weighted_copies"],
+                                matching["effective_tile_count"])
+        self.assertEqual(MahjongAgent("challenge",seed=42,seat=dealer).discard(view),
+                         rank[0]["discard"])
+        hidden={**view,"opponent_hands":[["m1"]*13]*3,"future_wall":["p9"]*55}
+        self.assertEqual(challenge_discard_scores(hidden),rank,
+                         "hidden wall and opponent hands must never influence ranking")
+
+    def test_challenge_keeps_nonregression_even_when_shapes_are_valuable(self):
+        dealer=FourPlayerOpening(42).dealer
+        game=staged_game({dealer:["m1","m1","m2","m3","m3","m4","m5","m6",
+                                  "s2","s3","s5","s6","s8","s9"]},
+                         {dealer:"p"})
+        view=game.private_view(dealer)
+        cuts=challenge_discard_scores(view)
+        best=min(x["shanten"] for x in cuts)
+        self.assertTrue(all(x["shanten"]==best for x in cuts))
+        self.assertEqual(cuts[0]["discard"],
+                         MahjongAgent("challenge",seed=99,seat=dealer).discard(view))
 
 
 
