@@ -42,12 +42,17 @@ assert.equal(nodes["match-stats-metrics"].children[1].children[1].textContent,"+
 assert.equal(nodes["match-stats-metrics"].children[3].children[1].textContent,"33.3%");
 const plot=nodes["match-stats-cumulative"].children[0];
 assert.equal(plot.tagName,"svg");
-assert.equal(plot.attributes.role,"img");
+assert.equal(plot.attributes.role,"group");
 assert.ok(plot.attributes["aria-label"].includes("-13到+4"));
 const poly=plot.children.find(x=>x.tagName==="polyline");
 assert.equal(poly.attributes.points.split(" ").length,3);
 const dots=plot.children.filter(x=>x.tagName==="circle");
 assert.equal(dots.length,3);
+assert.equal(dots[0].attributes.tabindex,"0");
+assert.equal(dots[0].attributes.role,"img");
+assert.ok(dots[0].attributes["aria-label"].includes("第1局"));
+assert.ok(dots[0].attributes["aria-label"].includes("单局净额 -9"));
+assert.ok(dots[2].attributes["aria-label"].includes("截至该局累计 +4"));
 assert.ok(dots[0].children[0].textContent.includes("单局净额 -9"));
 assert.ok(dots[2].children[0].textContent.includes("截至该局累计 +4"));
 const rows=nodes["match-stats-outcomes"].children;
@@ -77,6 +82,7 @@ const manyPlot=nodes["match-stats-cumulative"].children[0];
 assert.equal(manyPlot.tagName,"svg");
 const thirtyDots=manyPlot.children.filter(x=>x.tagName==="circle");
 assert.equal(thirtyDots.length,30);
+assert.ok(thirtyDots.every((dot,i)=>dot.attributes.tabindex==="0" && dot.attributes["aria-label"].includes("第"+(i+1)+"局")));
 assert.ok(manyPlot.children.find(x=>x.tagName==="polyline")
   .attributes.points.split(" ").every(pair=>
     pair.split(",").every(n=>Number.isFinite(Number(n)))));
