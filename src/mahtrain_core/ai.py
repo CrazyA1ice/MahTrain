@@ -117,15 +117,16 @@ def _reweight_bounded_risk(rows: list[dict[str, Any]],
         item["sampled_ron_hits"] = 0
         item["sampled_mean_loss"] = 0.0
         updated.append(item)
-    # Full hidden-world generation adds time. Only activate when the match is
-    # late or some other active seat has >=2 exposed melds.
-    wall = view.get("wall_count")
-    late = type(wall) is int and wall <= 24
+    # A random 13-tile opponent hand is almost never actually tenpai;
+    # blind late-wall Monte Carlo added cost but changed no cuts in our
+    # 25-match paired probe. Sample only if a live opponent has at least
+    # TWO publicly exposed melds, shortening the concealed wait structure.
+    # Retain the M3.53 public-risk prior for everybody else and all misses.
     exposed = any(
         seat != view["seat"] and not view["won"][seat] and len(groups) >= 2
         for seat, groups in enumerate(view["melds"])
     )
-    if (late or exposed) and len(updated) >= 2:
+    if exposed and len(updated) >= 2:
         close = sorted(updated, key=lambda x: (
             -x["score"], -x["effective_tile_count"],
             TILE_INDEX[x["discard"]]))[:3]
