@@ -60,7 +60,11 @@ const Tex: any = {
     this._atlasTexture = tex;
     // 异步加载高清素材图集, 完成后覆盖占位并刷新纹理
     // 所有牌面 faceMat 共享同一 atlas source, 只需一次 needsUpdate 即可全部更新
-    this._loadAtlasImage(ctx, tex);
+    // The upstream large PNG cannot be re-distributed via the connected
+    // GitHub text-only import. Keep Queju's own high-quality procedural
+    // tile atlas in MahTrain mode; standalone Queju remains unchanged.
+    if (new URLSearchParams(location.search).get('mahtrain') !== '1')
+      this._loadAtlasImage(ctx, tex);
     return tex;
   },
 
