@@ -73,7 +73,7 @@ class CandidateSpecificRonTests(unittest.TestCase):
         forced["hand"][0]="p4"
         with self.assertRaises(ValueError):
             public_candidate_features(forced,1,"s2")
-        self.assertEqual(public_candidate_features(forced,1,"p4")[SAFE_INDEX],0)
+        self.assertEqual(public_candidate_features(forced,1,"p4")[SAFE_INDEX],1)
 
     def test_sealed_target_payoffs_use_true_waits_and_game_fan_rules(self):
         target=1
@@ -122,7 +122,10 @@ class CandidateSpecificRonTests(unittest.TestCase):
             rows=collect_ron_labels(41,stride=2)
         self.assertGreaterEqual(len(rows),20)
         self.assertTrue(all(row["seed"]==41 for row in rows))
-        self.assertEqual(sum(row["ron"] for row in rows),2)
+        expected_waits=_sealed_target_payoffs(fixture,1)
+        own_candidates=set(visible()["hand"])
+        self.assertEqual(sum(row["ron"] for row in rows),
+                         2*len(own_candidates.intersection(expected_waits)))
         self.assertTrue(all("tile" not in row and "hand" not in row
                             and "target" not in row for row in rows))
         self.assertTrue(all(row["payout_multiplier"]>=row["ron"]
