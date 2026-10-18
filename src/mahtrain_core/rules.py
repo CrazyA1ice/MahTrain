@@ -291,6 +291,8 @@ def score_win(
         ("kong_bloom", "kong_bloom"),
         ("kong_discard_ron", "kong_discard_ron"),
         ("rob_added_kong", "rob_added_kong"),
+        ("sea_bottom_draw", "sea_bottom_draw"),
+        ("river_bottom_ron", "river_bottom_ron"),
     ):
         if ctx.get(field):
             bonuses.append((label, 1))
@@ -298,6 +300,8 @@ def score_win(
         "kong_bloom", "kong_discard_ron", "rob_added_kong"
     )) > 1:
         raise ValueError("mutually exclusive kong win events")
+    if ctx.get("sea_bottom_draw") and ctx.get("river_bottom_ron"):
+        raise ValueError("last-wall draw and last-wall discard wins are exclusive")
     if roots:
         bonuses.append(("roots", roots))
 
