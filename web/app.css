@@ -2537,3 +2537,20 @@
   overflow:hidden!important;
   overscroll-behavior:none;
 }
+
+/* Chrome measured at 320px: when each AI's OUTER seat was 48px,
+   bottom/top 14-column river overflowed by 19px and each side river's 4th
+   column by 11px. Reserve enough central board width instead of masking the
+   missing columns with overflow:hidden. The edge AI seats remain distinct. */
+@media(min-width:320px) and (max-width:359px){
+  .match-board{
+    grid-template-columns:30px minmax(0,1fr) 30px;
+  }
+  .match-seat--left,.match-seat--right{
+    padding-inline:0!important;
+  }
+  .match-seat--left .match-seat-name,
+  .match-seat--right .match-seat-name{
+    font-size:8px;
+  }
+}
