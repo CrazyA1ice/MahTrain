@@ -286,3 +286,51 @@ jobs:
           name: ai-tenpai-calibration-pilot-py311
           path: /tmp/mahtrain-m356.json
           if-no-files-found: warn
+
+  candidate-ron-calibration-pilot:
+    # Research ONLY: evaluates true candidate-specific ron labels inside CI;
+    # public-facing assets contain only seed-aggregated calibration metrics.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fit candidate risk on four seeds and test on three disjoint seeds
+        run: |
+          python examples/evaluate_discard_ron_risk.py --seed-start 100 --train-seeds 4 --test-seeds 3 --stride 6 --json-out /tmp/mahtrain-m357.json
+      - name: Verify candidate ron risk metrics and private hand exclusion
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('/tmp/mahtrain-m357.json').read_text(encoding='utf8'))
+          assert r['protocol']=='offline_candidate_ron_seed_split_v1'
+          assert r['status']=='exploratory_offline_no_model_deployment'
+          assert len(r['train_seeds'])==4 and len(r['test_seeds'])==3
+          assert set(r['train_seeds']).isdisjoint(r['test_seeds'])
+          assert r['train_n']>0 and r['test_n']>0
+          assert r['actionable_train_n']>0
+          assert not r['contains_private_hands'] and not r['can_claim_generalization']
+          assert len(r['by_test_seed'])==3
+          for key in ('baseline','candidate'):
+              metrics=r[key]
+              assert metrics['n']==r['test_n']
+              assert metrics['ron_events']==r['test_ron_events']
+              assert 0<=metrics['brier']<=1 and metrics['log_loss']>=0
+              assert metrics['payout_multiplier_mse']>=0
+              assert sum(b['n'] for b in metrics['reliability'])==r['test_n']
+          forbidden=('raw_observations','opponent_hands','future_wall',
+                     'candidate_tile','target_seat','hidden_waits','_hands')
+          assert all(key not in r for key in forbidden)
+          print('M3.57 offline report privacy and held-out calibration: PASS')
+          PY
+      - name: Archive only aggregate candidate risk metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-candidate-ron-calibration-pilot-py311
+          path: /tmp/mahtrain-m357.json
+          if-no-files-found: warn
