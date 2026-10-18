@@ -42,7 +42,7 @@ export interface CFG {
 const CFG: CFG = {
   table: { outerSize: 23.0, holeSize: 3.4, feltHeight: 0.4, woodHeight: 0.8, rimWidth: 0.5 },
   tile: { w: 0.8, h: 1.1, d: 0.5, gap: 0.015, radius: 0.05 },
-  wall: { offset: 7.6, perSide: 17, layers: 2 },
+  wall: { offset: 7.6, perSide: params.get('mahtrain') === '1' ? 14 : 17, layers: 2 },
   dice: { size: 0.45, trayBottomY: -0.77, glassY: 0.35 },
   anim: {
     deal: 60, // 发牌每张间隔 60ms (客户端参考, 实际由服务器 dealStep 控制)
