@@ -398,3 +398,53 @@ jobs:
           name: ai-frozen-ron-m359-paired-py311
           path: /tmp/mahtrain-m359.json
           if-no-files-found: warn
+
+  real-browser-match-layout:
+    # M3.61: actual Chromium layout boxes; a fake DOM cannot catch clipping.
+    # Screenshot artifacts are stress fixtures, not possible match states.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install lightweight browser driver
+        run: |
+          npm install --no-save --no-package-lock playwright-core@1.56.1
+          if ! command -v google-chrome >/dev/null 2>&1 \
+            && ! command -v google-chrome-stable >/dev/null 2>&1 \
+            && ! command -v chromium >/dev/null 2>&1 \
+            && ! command -v chromium-browser >/dev/null 2>&1; then
+            npx playwright-core install --with-deps chromium
+          fi
+      - name: Validate fixed-layout geometry in a real browser
+        run: |
+          export MAHTRAIN_HISTORY_DB=/tmp/m361_history.sqlite3
+          export MAHTRAIN_MATCH_DB=/tmp/m361_match.sqlite3
+          python web_server.py >/tmp/m361_server.log 2>&1 &
+          server=$!
+          trap 'kill "$server" || true' EXIT
+          python - <<'PY'
+          import time, urllib.request
+          for i in range(100):
+              try:
+                  urllib.request.urlopen('http://127.0.0.1:8765/',timeout=1)
+                  break
+              except OSError:
+                  time.sleep(.1)
+          else:
+              raise RuntimeError('MahTrain local server failed to start')
+          PY
+          node tests/test_match_layout_browser.js
+      - name: Archive viewport geometry and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m361-match-layout-browser-screenshots
+          path: test-artifacts/match-layout/
+          if-no-files-found: warn
