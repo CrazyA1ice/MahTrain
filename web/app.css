@@ -2544,7 +2544,7 @@
    missing columns with overflow:hidden. The edge AI seats remain distinct. */
 @media(min-width:320px) and (max-width:359px){
   .match-board{
-    grid-template-columns:22px minmax(0,1fr) 22px;
+    grid-template-columns:30px minmax(0,1fr) 30px;
   }
   .match-seat--left,.match-seat--right{
     padding-inline:0!important;
@@ -2560,5 +2560,22 @@
   .match-seat--right .match-seat-avatar{
     flex:0 0 18px;width:18px;height:18px;
     font-size:8px;border-width:1px;
+  }
+}
+
+/* Container-equalized tracks fix Chromium's 320px measured 5px/4px
+   intrinsic grid overflow. The NUMBER of slots is immutable; their width
+   is solved from the tray box before discards, not by intrinsic content.
+   Never let fixed intrinsic track sizes silently disappear under clipping. */
+@media(max-width:700px){
+  .match-board .match-river--top .match-river-tiles,
+  .match-board .match-river--bottom .match-river-tiles{
+    width:100%!important;
+    grid-template-columns:repeat(14,minmax(0,1fr));
+  }
+  .match-board .match-river--left .match-river-tiles,
+  .match-board .match-river--right .match-river-tiles{
+    width:100%!important;
+    grid-template-columns:repeat(4,minmax(0,1fr));
   }
 }
