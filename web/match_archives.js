@@ -33,7 +33,7 @@
     $("match-archives-compare").disabled=compared.length!==2;
     if(compared.length!==2)return;
     const a=compared[0],b=compared[1];
-    const title=el("strong","","已完成对局比较 · 0号正式净额（胡牌 + 已入账流局）");
+    const title=el("strong","","已完成对局比较 · 0号正式净额（含新版已计价杠钱）");
     panel.append(title);
     for(const match of compared){
       panel.append(el("p","",
@@ -46,7 +46,7 @@
       "两局正式积分差额："+sign(
         (a.settled_b0??a.win_b0)-(b.settled_b0??b.win_b0))+
       " · 胡牌部分差额："+sign(a.win_b0-b.win_b0)+
-      "（第一局减第二局；正式积分=胡牌+已入账方案A流局赔付，不含模拟杠钱）"));
+      "（第一局减第二局；新版正式净额含已计价杠钱，旧版试验杠钱不追溯计入）"));
   }
   function renderScorecard(board){
     const status=$("match-scorecard-status");
@@ -288,7 +288,7 @@
       const score=$("match-archives-balances");score.replaceChildren();
       report.win_ledger.balances.forEach((n,i)=>score.append(
         el("span","match-archive-balance",i+"号胡牌已入账 "+sign(n)+
-          "（独立杠钱试验额 "+
+          (report.kong_included?"（已计入杠钱 ":"（旧局试验杠钱 ")+
           sign(report.kong_balances[i])+"）")));
       const exhaustive=report.exhaustive_settlement;
       if(exhaustive){
@@ -298,12 +298,11 @@
             i+"号"+sign(n)).join(" · "):
           "流局异常牌形待核验，未执行流局赔付");
         score.append(status);
-        if(exhaustive.posted){
-          score.append(el("p","review-footnote",
-            "正式已入账合计："+report.settled_balances.map((n,i)=>
-              i+"号"+sign(n)).join(" · ")+"（不含独立模拟杠钱）"));
-        }
       }
+      score.append(el("p","review-footnote",
+        "本局正式净额："+report.settled_balances.map((n,i)=>
+          i+"号"+sign(n)).join(" · ")+
+        (report.kong_included?"（包含本局杠钱）":"（旧局试验杠钱未计入）")));
       const wins=$("match-archives-wins");wins.replaceChildren();
       for(const w of report.win_ledger.wins)wins.append(el("p","",
         w.winner+"号"+(winType[w.kind]||"胡牌")+
