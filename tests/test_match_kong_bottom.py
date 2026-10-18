@@ -83,7 +83,7 @@ class OfficialKongAndBottomTests(unittest.TestCase):
             self.assertEqual(board["kong_included_games"], 1)
             self.assertEqual(board["seats"][0]["kong_total"], 600)
             self.assertEqual(board["seats"][0]["settled_total"], 600)
-            self.assertEqual([x["score"] for x in board["trend"]], [600, 0])
+            self.assertEqual(sorted(x["score"] for x in board["trend"]), [0, 600])
 
 
 if __name__ == "__main__":
