@@ -30,6 +30,9 @@ const output=path.join(process.cwd(),"test-artifacts","match-layout");
 fs.mkdirSync(output,{recursive:true});
 
 function check(report,w,label){
+  // The application explicitly supports 320px as its narrowest viewport.
+  assert.ok(w>=320,"supported layout audit starts at 320px");
+  assert.equal(report.viewportDebug.bodyMinWidth,"320px");
   assert.ok(report.board.width>0, w+" "+label+": zero board width");
   assert.ok(report.board.left>=-1, w+" "+label+": board starts offscreen");
   assert.ok(report.board.right<=w+1,
