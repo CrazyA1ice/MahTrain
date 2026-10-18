@@ -48,6 +48,9 @@ try{
   assert.equal(table.seats,4,'show four actual players');
   assert.ok(table.choices>=13,'render 3D game plus Sichuan exchange choices');
   assert.match(table.title,/MahTrain/);
+  const screenshots=path.resolve('frontend_3d/test-artifacts');
+  fs.mkdirSync(screenshots,{recursive:true});
+  await page.screenshot({path:path.join(screenshots,'queju-opening-3d.png'),fullPage:true});
 
   // Actual server-authoritative exchange (not mocked JS state).
   const choices=await page.locator('.mahtrain-exchange-choices button').allTextContents();
