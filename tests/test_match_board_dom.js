@@ -764,7 +764,6 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(dom["match-round-report"].hidden,false);
   assert.equal(dom["match-wall-count"].textContent,"52");
-  console.log("M351 DEBUG",JSON.stringify({last:requests.slice(-3),error:dom["match-error"].textContent,bursts:dom["match-score-bursts"].children.map(x=>x.textContent),request:dom["match-request-status"].textContent,report:dom["match-round-report"].hidden}));
   assert.equal(dom["match-score-bursts"].hidden,false,
     "playback-off mode still shows the posted HU score delta");
   assert.equal(dom["match-score-bursts"].children.length,2);
