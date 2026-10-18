@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
@@ -201,6 +202,21 @@ class MahjongAIUnitTests(unittest.TestCase):
         self.assertEqual(cuts[0]["discard"],
                          MahjongAgent("challenge",seed=99,seat=dealer).discard(view))
 
+
+
+    def test_single_best_cut_clears_previous_turn_ranking_cache(self):
+        dealer=FourPlayerOpening(42).dealer
+        hand=["m1","m1","m2","m3","m3","m4","m5","m6",
+              "s2","s3","s5","s6","s8","s9"]
+        game=staged_game({dealer:hand},{dealer:"p"})
+        view=game.private_view(dealer)
+        agent=MahjongAgent("challenge",seed=42,seat=dealer)
+        agent._last_discard_scores=[{"discard":"stale-private-value"}]
+        with patch("mahtrain_core.ai._cut_shanten",
+                   side_effect=lambda _h,_m,_s,t: 0 if t=="m1" else 1):
+            self.assertEqual(agent.discard(view),"m1")
+        self.assertIsNone(agent._last_discard_scores,
+                          "a forced/single-choice move must not reuse prior EV")
 
 
 if __name__=="__main__":
