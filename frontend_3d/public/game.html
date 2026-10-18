@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>雀局 · 联机麻将</title>
+<title>MahTrain · 雀局 Three.js 四人血战</title>
+<link rel="stylesheet" href="/src/mahtrain-ui.css" />
 <style>
   :root{--bg:#14100c;--accent:#d4a04c;--fg:#f4ead8;--muted:#8a7c68;}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -182,7 +183,7 @@
   <div class="corner bl"></div><div class="corner br"></div>
   <div class="topbar">
     <div class="brand">
-      <div class="ch">雀　局</div>
+      <div class="ch">血 战 · MahTrain</div>
       <div class="en">M A H J O N G &nbsp;·&nbsp; L A N</div>
     </div>
     <div class="meta">
@@ -280,16 +281,6 @@
       <div class="t"></div><div class="t"></div></div>
     <p id="loaderText">连 接 中</p>
   </div>
-
-<!-- A1: 模块拆分后, importmap 仅用于非 Vite 开发模式 (npm start).
-     Vite 构建时通过 alias 解析 three/cannon-es, 会清空此 importmap -->
-<script type="importmap">
-{"imports":{
-  "three":"/vendor/three/three.module.js",
-  "three/addons/":"/vendor/three/addons/",
-  "cannon-es":"/vendor/cannon-es/cannon-es.js"
-}}
-</script>
 
 <!-- A1: 主入口拆分到 /src/main.ts, 各模块按职责分离 (P3-2: .mjs → .ts) -->
 <script type="module" src="/src/main.ts"></script>
