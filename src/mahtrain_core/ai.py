@@ -95,7 +95,8 @@ def _cut_shanten(hand: Sequence[str], melds: Sequence[Mapping[str, str]],
 
 
 def challenge_discard_scores(view: Mapping[str, Any],
-                             cuts: Sequence[str] | None = None) -> list[dict[str, Any]]:
+                             cuts: Sequence[str] | None = None,
+                             *, use_pressure: bool = True) -> list[dict[str, Any]]:
     """Rank own 14-tile cuts by *public-information* next-draw value.
 
     This is a bounded one-step heuristic, not a perfect-information oracle:
@@ -160,7 +161,7 @@ def challenge_discard_scores(view: Mapping[str, Any],
             if not melds:
                 value += 0.08 * max(0, pairs - 3)
             expected *= value
-        pressure = public_suit_pressure(tile, view)
+        pressure = public_suit_pressure(tile, view) if use_pressure else 0
         # Opponent open suits are evidence of risk, not proof of tenpai.
         risk_multiplier = max(0.72, 1 - (0.055 if wall_late else 0.025) * pressure)
         result.append({
@@ -323,7 +324,7 @@ class MahjongAgent:
         # effective-copy count against expected winning fan or shape potential.
         # The old ablation remains unchanged for comparable prior experiments.
         if self.level == "challenge_no_pressure":
-            ranked = challenge_discard_scores(view, best)
+            ranked = challenge_discard_scores(view, best, use_pressure=False)
             return ranked[0]["discard"]
         return challenge_discard_scores(view, best)[0]["discard"]
 
@@ -350,6 +351,6 @@ class AblationMahjongAgent(MahjongAgent):
 
     def policy_description(self) -> str:
         return {
-            "challenge_no_ukeire": "向听优先；移除有效进张排序，向听并列时仅使用公开副露压力",
-            "challenge_no_pressure": "向听、公开有效进张优先；移除副露花色压力平局规则",
+            "challenge_no_ukeire": "历史对照：向听优先，移除有效进张排序，仅保留公开副露压力",
+            "challenge_no_pressure": "期望收益评分但移除公开副露压力，用于隔离风险项作用",
         }[self.level]
