@@ -306,9 +306,15 @@ def run_candidate_ron_pilot(train_seeds: Sequence[int],
             "ron_events":m["ron_events"],
             "brier_delta":round(m["brier"]-b["brier"],8),
         })
+    from .ai_ron_stratified import analyze_ron_validation
+    strata=analyze_ron_validation(
+        test, fitted, actionable_prior=smoothed_prior,
+        conditional_multiplier=mean_multiplier
+    )
     return {
         "protocol":PROTOCOL,
         "status":"exploratory_offline_no_model_deployment",
+        "stratified_validation":strata,
         "train_seeds":train_ids,"test_seeds":test_ids,
         "sample_unit":"legal_cut_x_active_opponent_x_turn",
         "features":list(NAMES),
