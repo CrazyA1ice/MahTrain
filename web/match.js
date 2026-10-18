@@ -916,7 +916,7 @@
           " · 流局赔付已入账":"")+
         " · 本局合计 "+signedScore(state.settled_balances?.[id]??0)));
       seatCard.append(el("small","",
-        kong?.base===null?"旧局杠钱未计价":
+        kong?.base==null?"旧局杠钱未计价":
         "杠钱底分 "+kong.base+" · 已计入本局合计"));
       summary.append(seatCard);
     }
