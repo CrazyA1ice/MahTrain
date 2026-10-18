@@ -214,6 +214,96 @@ async function main(){
       check(report,spec.width,"full-river");
       console.log("M3.61 real Chrome "+spec.width+
         "px: no river clipping / no overlap / 14 hand tiles PASS");
+      // M3.62: Test progressive placement on the REAL Chrome grid, not
+      // just an already-full 56-slot synthetic river. From 0 -> 1 -> 13 ->
+      // 14 -> 15 -> 56 cards, its outer tray / opponent seat / hand bounds
+      // must not shift by a pixel (including the first row wrap). At #6
+      // an already-claimed physical discard leaves a stable empty slot.
+      // The stress fixture is re-built, never sent to the server.
+      if([320,390,701,1024].includes(spec.width)){
+        let reference=null;
+        for(const count of [0,1,13,14,15,28,56]){
+          const step=await page.evaluate((count)=>{
+            const slots=[];
+            function bounds(node){
+              const r=node.getBoundingClientRect();
+              return [r.left,r.top,r.width,r.height].map(v=>
+                Math.round(v*100)/100);
+            }
+            for(let seat=0;seat<4;seat++){
+              const tray=document.querySelector(
+                "#match-river-"+seat+" .match-river-tiles"
+              );
+              const river=document.getElementById("match-river-"+seat);
+              tray.replaceChildren();
+              for(let n=0;n<count;n++){
+                const r=Math.floor(n/14),c=n%14;
+                const pos=seat===0?[r+1,c+1]:
+                  seat===2?[4-r,14-c]:
+                  seat===3?[c+1,4-r]:[14-c,r+1];
+                const cell=document.createElement("div");
+                cell.className="match-river-cell";
+                cell.style.gridRow=String(pos[0]);
+                cell.style.gridColumn=String(pos[1]);
+                cell.dataset.riverIndex=String(n);
+                if(n===5){
+                  cell.classList.add("is-claimed");
+                  const placeholder=document.createElement("span");
+                  placeholder.className="match-river-claimed";
+                  placeholder.textContent="已取走";
+                  cell.append(placeholder);
+                }else{
+                  const tile=document.createElement("div");
+                  tile.className="tile";
+                  tile.append(document.createElement("span"));
+                  cell.append(tile);
+                }
+                tray.append(cell);
+              }
+              const occupied=new Set(Array.from(tray.children).map(el=>
+                el.style.gridRow+":"+el.style.gridColumn));
+              slots.push({
+                seat,count:tray.children.length,
+                unique:occupied.size,
+                tray:bounds(tray),river:bounds(river),
+                noScroll:getComputedStyle(tray).overflowY==="hidden",
+                claimed:count<=5||(
+                  tray.children[5].classList.contains("is-claimed") &&
+                  !tray.children[5].querySelector(".tile")
+                ),
+              });
+            }
+            return {
+              slots,board:bounds(document.getElementById("match-board")),
+              hand:bounds(document.getElementById("match-hand")),
+            };
+          },count);
+          assert.ok(step.slots.every(x=>x.count===count &&
+            x.unique===count && x.noScroll && x.claimed),
+            spec.width+"px "+count+" discards: fixed slot contract failed");
+          const geometry={board:step.board,hand:step.hand,
+            slots:step.slots.map(x=>({seat:x.seat,tray:x.tray,river:x.river}))};
+          if(reference===null)reference=geometry;
+          else {
+            for(const key of ["board","hand"]){
+              assert.deepEqual(geometry[key],reference[key],
+                spec.width+"px "+count+": "+key+" shifted during discarding");
+            }
+            for(let seat=0;seat<4;seat++){
+              assert.deepEqual(geometry.slots[seat],reference.slots[seat],
+                spec.width+"px "+count+": river "+seat+" shifted");
+            }
+          }
+          if([0,14,56].includes(count)){
+            await page.screenshot({
+              path:path.join(output,"width-"+spec.width+"-discards-"+count+".png"),
+              fullPage:true,animations:"disabled",
+            });
+          }
+        }
+        console.log("M3.62 real Chrome "+spec.width+
+          "px: progressive empty/1/13/14/15/28/56 fixed positions PASS");
+      }
     }
   }finally{
     await browser.close();
