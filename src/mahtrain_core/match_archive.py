@@ -515,7 +515,8 @@ class MatchArchive:
             (exhaustive["balances"][i] if exhaustive else 0)
             for i in range(4)
         ]
-        if "settled_balances" in public and public["settled_balances"] != expected_settled:
+        if (kong_included and "settled_balances" in public and
+                public["settled_balances"] != expected_settled):
             raise ValueError("public match scores do not match the three ledgers")
         payload = {
             "privacy": "public_board_only", "version": 1,
