@@ -41,8 +41,15 @@ function applyReconnectState(m: ServerMsg) {
   restorePhase(m);
   restoreDice(m);
   restoreMyHand(m);
-  restoreOppHands(m);
-  restoreMelds(m);
+  // MahTrain's counts are already NET of open melds. Restore exposed
+  // tiles before the remaining backs so Queju doesn't consume them twice.
+  if (new URLSearchParams(location.search).get('mahtrain') === '1') {
+    restoreMelds(m);
+    restoreOppHands(m);
+  } else {
+    restoreOppHands(m);
+    restoreMelds(m);
+  }
   restoreDiscards(m);
   restoreWallConsumption(m); // 根据已发手牌消耗牌墙
   restoreLastDiscard(m); // .4: 恢复最后弃牌高亮
@@ -233,7 +240,7 @@ function restoreMelds(m: any) {
       const objs: any[] = [];
       const prevKinds = handState.meldGroups[s].map((g: any) => g.kind);
       md.tiles.forEach((tv: any, col: any) => {
-        const isBack = md.kind === 'ckong' && (col === 0 || col === 3);
+        const isBack = md.hidden === true || (md.kind === 'ckong' && (col === 0 || col === 3));
         const obj = obtainTileObj(s, tv, isBack);
         setEmissive(obj.mesh, EMISSIVE.OFF);
         layFlatTile(obj, s, meldAlong(s, slot, col, prevKinds));
@@ -250,6 +257,9 @@ function restoreDiscards(m: any) {
   for (let s = 0; s < 4; s++) {
     const arr = m.discards[s] || [];
     arr.forEach((tile: any, idx: any) => {
+      // Null marks a physically CLAIMED discard; retain its original
+      // positional index without reintroducing a phantom face.
+      if (!tile || tile.claimed === true) return;
       const id = tile.id ?? ++handState.myIdCounter;
       const obj = createStandTile(tile.type, tile.value, id);
       sceneRefs.seatPivot!.add(obj.mesh);
