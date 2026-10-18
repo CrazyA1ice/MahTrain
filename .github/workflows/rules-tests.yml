@@ -245,3 +245,44 @@ jobs:
             /tmp/mahtrain-m313.json
             /tmp/mahtrain-m313.csv
           if-no-files-found: warn
+
+  tenpai-calibration-pilot:
+    # M3.56 offline diagnostic ONLY: never deploy coefficients to live AI.
+    # True concealed hand labels exist transiently inside this CI runner,
+    # but only aggregate out-of-seed Brier/reliability bins are exported.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Evaluate true tenpai on disjoint self-play shuffle seeds
+        run: |
+          python examples/evaluate_tenpai_calibration.py --seed-start 70 --train-seeds 2 --test-seeds 1 --stride 5 --json-out /tmp/mahtrain-m356.json
+      - name: Validate privacy-safe report and calibration denominators
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('/tmp/mahtrain-m356.json').read_text(encoding='utf8'))
+          assert d['protocol']=='offline_tenpai_seed_split_pilot_v1'
+          assert d['status']=='exploratory_only_no_online_deployment'
+          assert set(d['train_seeds']).isdisjoint(d['test_seeds'])
+          assert d['train_n']>0 and d['test_n']>0
+          assert not d['contains_hidden_hands'] and not d['can_claim_improvement']
+          for key in ('baseline','candidate'):
+              row=d[key]
+              assert row['n']==d['test_n']
+              assert sum(x['count'] for x in row['reliability'])==row['n']
+              assert 0<=row['brier']<=1 and row['log_loss']>=0
+          assert 'raw_observations' not in d and 'opponent_hands' not in d
+          PY
+      - name: Archive aggregate calibration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-tenpai-calibration-pilot-py311
+          path: /tmp/mahtrain-m356.json
+          if-no-files-found: warn

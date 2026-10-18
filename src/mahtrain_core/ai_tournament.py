@@ -10,7 +10,7 @@ from __future__ import annotations
 from collections import defaultdict
 from statistics import mean
 from time import perf_counter_ns
-from typing import Any
+from typing import Any, Callable
 
 from .ai import (AI_LEVELS, ABLATION_VARIANTS, MahjongAgent,
                  AblationMahjongAgent, visible_tiles)
@@ -263,7 +263,9 @@ def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict
 
 def simulate_match(seed: int, rotation: int = 0,
                    *, max_actions: int = 800,
-                   lineup: list[str] | None = None) -> dict[str, Any]:
+                   lineup: list[str] | None = None,
+                   offline_observer: Callable[[FourPlayerOpening], None] | None = None
+                   ) -> dict[str, Any]:
     if type(seed) is not int or not 0 <= seed < 2**32:
         raise ValueError("seed must be an unsigned 32-bit integer")
     if type(max_actions) is not int or not 40 <= max_actions <= 5000:
@@ -305,6 +307,13 @@ def simulate_match(seed: int, rotation: int = 0,
     for _ in range(max_actions):
         if game.phase in ("wall_exhausted","finished"):
             break
+        # Offline-only research probe, invoked before any agent action.
+        # Not used by web_server; deliberately never appended to the public
+        # trace, replay, network output or saved match archive.
+        if offline_observer is not None and game.phase in (
+            "await_discard", "dealer_discard"
+        ):
+            offline_observer(game)
         _take_action(game,agents,trace,durations)
         frames.append(public_replay_frame(game,trace[-1]))
     else:
