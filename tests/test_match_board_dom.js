@@ -573,7 +573,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.equal(dom["match-table-settlement"].hidden,false);
   assert.ok(dom["match-table-self-summary"].textContent.includes("-8"));
-  assert.ok(dom["match-table-self-summary"].textContent.includes("仅含已确认胡牌"));
+  assert.ok(dom["match-table-self-summary"].textContent.includes("包含已确认胡牌和杠钱积分"));
   const scores=dom["match-table-scores"];
   assert.equal(scores.children.length,4);
   assert.ok(descendants(scores,x=>x.textContent==="-8").length===2);
