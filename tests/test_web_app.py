@@ -1351,7 +1351,7 @@ class WebUI(unittest.TestCase):
         self.assertNotIn(b'id="match-large-tiles-toggle"',page)
         self.assertNotIn(b"match-large-tiles-toggle",script)
         self.assertNotIn(b"is-large-tiles",script)
-        self.assertIn(b"SIDE_RIVER_LANE_SIZE=8",script)
+        self.assertIn(b"SIDE_RIVER_LANE_SIZE=RIVER_PER_ROW",script)
         self.assertIn(b"match-river-lane",script)
         self.assertIn(b"data-discard-order",script)
         self.assertIn(b'const decision=$("match-decision")',script)
@@ -1367,6 +1367,26 @@ class WebUI(unittest.TestCase):
                       b"width:49px;height:68px",
                       b"width:34px;height:46px"):
             self.assertIn(token,css)
+
+    def test_m360_fixed_four_seat_rivers_no_vertical_scroll(self):
+        page,_=self.get("/")
+        js,_=self.get("/match.js")
+        css,_=self.get("/app.css")
+        self.assertIn(b"const RIVER_PER_ROW=14, RIVER_ROWS=4, RIVER_CAPACITY=56;",js)
+        self.assertIn(b"function riverSlot(seat,index)",js)
+        self.assertIn(b"gridRow=String(slot.row)",js)
+        self.assertIn(b"gridColumn=String(slot.column)",js)
+        self.assertIn(b"data-river-row",js)
+        self.assertIn(b"data-river-column",js)
+        self.assertIn(b"grid-template-columns:repeat(14,var(--river-h-cell))",css)
+        self.assertIn(b"grid-template-rows:repeat(4,var(--river-h-row))",css)
+        self.assertIn(b"grid-template-columns:repeat(4,var(--river-side-cell))",css)
+        self.assertIn(b"grid-template-rows:repeat(14,var(--river-side-row))",css)
+        self.assertIn(b"overflow:hidden!important;overscroll-behavior:none;",css)
+        self.assertIn(b"grid-template-rows:140px 962px 206px 210px",css)
+        self.assertIn(b"grid-template-rows:99px 614px 199px 185px",css)
+        self.assertIn("四家牌河各预留56个格位".encode(),page)
+        self.assertIn("预留14张牌与摸牌空间".encode(),page)
 
     def test_m340_sequential_ai_and_desktop_assets(self):
         page,_=self.get("/")
