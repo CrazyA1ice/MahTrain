@@ -271,7 +271,7 @@
           <h3>四人血战 · 四边牌桌人机对战</h3>
           <small>一炮多响 / 碰 / 明暗补杠 / 抢杠胡 / 已胡退出</small>
         </div>
-        <p class="review-intro">你操作0号座位，另外三家使用入门、进阶、挑战三档<strong>可复现的启发式策略AI</strong>（非训练模型）。AI只使用自己的暗手与公开牌，不偷看别家的手牌或牌墙；胡牌与符合方案A的流局查花猪/查大叫均已正式记账；可选杠钱仍是单独模拟分。<strong>其他尚未确认的血战细则仍未实现</strong>。</p>
+        <p class="review-intro">你操作0号座位，另外三家使用入门、进阶、挑战三档<strong>可复现的启发式策略AI</strong>（非训练模型）。AI只使用自己的暗手与公开牌，不偷看别家的手牌或牌墙；胡牌与符合方案A的流局查花猪/查大叫均已正式记账；杠钱默认使用房间系数计分，明杠/暗杠/补杠纳入本局净收益，杠上炮对应杠钱会冲销。<strong>其他尚未确认的血战细则仍未实现</strong>。</p>
         <div class="table-demo-toolbar">
           <label>房间系数 <input id="match-coefficient" type="number" min="1" max="1000000" value="100"/></label>
           <label>番数封顶 <input id="match-fan-cap" type="number" min="0" max="12" value="3"/></label>
@@ -283,16 +283,16 @@
           </label>
           <span class="match-self-draw-help">例：2番自摸、三家付款；加底每家5倍底分，加番每家8倍底分。点炮不变。</span>
           <label>1号AI <select id="match-ai-1" aria-label="1号AI难度">
-            <option value="basic" selected>入门</option><option value="advanced">进阶</option><option value="challenge">挑战</option>
+            <option value="basic">入门</option><option value="advanced">进阶</option><option value="challenge" selected>挑战</option>
           </select></label>
           <label>2号AI <select id="match-ai-2" aria-label="2号AI难度">
-            <option value="basic">入门</option><option value="advanced" selected>进阶</option><option value="challenge">挑战</option>
+            <option value="basic">入门</option><option value="advanced">进阶</option><option value="challenge" selected>挑战</option>
           </select></label>
           <label>3号AI <select id="match-ai-3" aria-label="3号AI难度">
             <option value="basic">入门</option><option value="advanced">进阶</option><option value="challenge" selected>挑战</option>
           </select></label>
-          <label class="match-kong-toggle"><input id="match-enable-kong" type="checkbox"/> 启用独立杠钱模拟</label>
-          <label>杠钱底分 <input id="match-kong-base" type="number" min="1" max="1000000" value="100" disabled/></label>
+          <label class="match-kong-toggle"><input id="match-enable-kong" type="checkbox"/> 自定义杠钱底分</label>
+          <label>杠钱底分（默认跟随房间系数） <input id="match-kong-base" type="number" min="1" max="1000000" value="100" disabled/></label>
           <button id="match-new" type="button" class="primary">随机开始一局</button>
         </div>
         <div class="match-extras">
@@ -502,7 +502,7 @@
           <h3>四人血战 · 本地已完成对局档案</h3>
           <button id="match-archives-refresh" type="button" class="review-control">刷新对局档案</button>
         </div>
-        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。胡牌及符合方案 A 的流局赔付分别正式入账；杠钱仍为单独的试验积分，不参与正式战绩。</p>
+        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。胡牌、已结算杠钱与符合方案 A 的流局赔付均计入新对局正式净收益；历史旧局的试验杠钱不追溯计入。</p>
         <p id="match-archives-message" aria-live="polite"></p>
         <div id="match-archives-summary" class="match-archives-summary"></div>
         <section class="match-scorecard" aria-labelledby="match-scorecard-title">
@@ -520,7 +520,7 @@
                 <div id="match-stats-outcomes" class="match-stats-outcomes"></div>
               </section>
             </div>
-            <p class="match-stats-footnote">正式净额＝胡牌积分＋已正式入账的方案 A 流局赔付；不含试验杠钱。不同房间底分的数值不可直接代表牌技高低。折线起点是所显示首局当时的历史累计，并非截取区间从零开始。</p>
+            <p class="match-stats-footnote">正式净额＝胡牌积分＋本局已计价杠钱＋已正式入账的方案 A 流局赔付；旧版本试验杠钱不追溯计入。不同房间底分的数值不可直接代表牌技高低。折线起点是所显示首局当时的历史累计，并非截取区间从零开始。</p>
           </div>
           <div id="match-scorecard-seats" class="match-scorecard-seats"></div>
           <div class="match-scorecard-trend-head">

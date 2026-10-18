@@ -33,7 +33,7 @@
     $("match-archives-compare").disabled=compared.length!==2;
     if(compared.length!==2)return;
     const a=compared[0],b=compared[1];
-    const title=el("strong","","已完成对局比较 · 0号正式净额（胡牌 + 已入账流局）");
+    const title=el("strong","","已完成对局比较 · 0号正式净额（含新版已计价杠钱）");
     panel.append(title);
     for(const match of compared){
       panel.append(el("p","",
@@ -46,7 +46,7 @@
       "两局正式积分差额："+sign(
         (a.settled_b0??a.win_b0)-(b.settled_b0??b.win_b0))+
       " · 胡牌部分差额："+sign(a.win_b0-b.win_b0)+
-      "（第一局减第二局；正式积分=胡牌+已入账方案A流局赔付，不含模拟杠钱）"));
+      "（第一局减第二局；新版正式净额含已计价杠钱，旧版试验杠钱不追溯计入）"));
   }
   function renderScorecard(board){
     const status=$("match-scorecard-status");
@@ -286,11 +286,19 @@
       $("match-archives-export").href=uri(archiveId);
       $("match-archives-export").download="mahtrain_"+archiveId+".json";
       const score=$("match-archives-balances");score.replaceChildren();
-      report.win_ledger.balances.forEach((n,i)=>score.append(
-        el("span","match-archive-balance",i+"号胡牌已入账 "+sign(n)+
-          "（独立杠钱试验额 "+
-          sign(report.kong_balances[i])+"）")));
       const exhaustive=report.exhaustive_settlement;
+      // Pre-settled_b0 JSON may have no combined total. Reconstruct ONLY
+      // previously official HU + posted draw, never promote trial kongs.
+      const official=Array.isArray(report.settled_balances)&&
+        report.settled_balances.length===4?report.settled_balances:
+        report.win_ledger.balances.map((n,i)=>n+
+          (exhaustive?.posted?exhaustive.balances[i]:0));
+      report.win_ledger.balances.forEach((n,i)=>score.append(
+        el("span","match-archive-balance",
+          i+"号正式净额 "+sign(official[i])+
+          "（胡牌 "+sign(n)+"；"+
+          (report.kong_included?"已入账杠钱 ":"旧局试验杠钱 ")+
+          sign(report.kong_balances?.[i]||0)+"）")));
       if(exhaustive){
         const status=el("p","match-net",
           exhaustive.posted?
@@ -298,11 +306,6 @@
             i+"号"+sign(n)).join(" · "):
           "流局异常牌形待核验，未执行流局赔付");
         score.append(status);
-        if(exhaustive.posted){
-          score.append(el("p","review-footnote",
-            "正式已入账合计："+report.settled_balances.map((n,i)=>
-              i+"号"+sign(n)).join(" · ")+"（不含独立模拟杠钱）"));
-        }
       }
       const wins=$("match-archives-wins");wins.replaceChildren();
       for(const w of report.win_ledger.wins)wins.append(el("p","",

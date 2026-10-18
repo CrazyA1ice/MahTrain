@@ -1453,11 +1453,12 @@ class WebUI(unittest.TestCase):
             with self.subTest(settings=settings),self.assertRaises(HTTPError):
                 self.post({"action":"match_new","seed":42,**settings})
 
-    def test_m33_optional_kong_base_is_not_automatically_equal_to_room_coefficient(self):
+    def test_m351_web_match_prices_kong_by_room_default_but_allows_custom_base(self):
         default=self.post({"action":"match_new","seed":42,
                            "room_coefficient":300})
         m=default["match"]
-        self.assertIsNone(m["kong_ledger"]["base"])
+        self.assertEqual(m["kong_ledger"]["base"],300)
+        self.assertTrue(m["kong_included"])
         self.assertEqual(m["kong_ledger"]["balances"],[0]*4)
         self.assertEqual(m["combined_balances"],m["win_ledger"]["balances"])
         self.assertIsNone(m["exhaustive_review"])
@@ -1466,6 +1467,7 @@ class WebUI(unittest.TestCase):
         m2=explicit["match"]
         self.assertEqual(m2["kong_ledger"]["base"],25)
         self.assertEqual(m2["kong_ledger"]["mode"],"simulated_explicit_base")
+        self.assertEqual(m2["settled_balances"],m2["combined_balances"])
         self.assertTrue(m2["kong_ledger"]["zero_sum"])
         self.assertEqual(m2["kong_ledger"]["balances"],[0]*4)
         self.assertNotIn("_wall",str(m2))
@@ -1476,6 +1478,8 @@ class WebUI(unittest.TestCase):
         self.assertIn(b'id="match-kong-base"',markup)
         self.assertIn(b"match-exhaustive-review",script)
         self.assertIn(b"match-kong-ledger",script)
+        self.assertIn("自定义杠钱底分".encode(),markup)
+        self.assertIn(b"match-table-scores",markup)
         self.assertIn(b"kong_base",script)
         self.assertIn("javascript",mime)
         for bad in (0,-1,True,1.4,"10",10**6+1):
@@ -1549,7 +1553,7 @@ class WebUI(unittest.TestCase):
         created=self.post({"action":"match_new","seed":42})
         self.assertEqual(
             [x["difficulty"] for x in created["match"]["ai_opponents"]],
-            ["basic","advanced","challenge"])
+            ["challenge","challenge","challenge"])
         with self.assertRaises(HTTPError):
             self.post({"action":"match_discard",
                        "match_token":created["match_token"],"seat":2,"tile":"m1"})

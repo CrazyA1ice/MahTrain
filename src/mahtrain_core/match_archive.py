@@ -128,6 +128,7 @@ _MAIN_PATTERNS = frozenset((
 ))
 _BONUS_NAMES = frozenset((
     "kong_bloom", "kong_discard_ron", "rob_added_kong", "roots",
+    "sea_bottom_draw", "river_bottom_ron",
 ))
 _WIN_KINDS = frozenset(("ron", "rob_kong", "self_draw"))
 
@@ -300,7 +301,10 @@ def _archived_score_components(report: dict) -> tuple[list[int], list[int]]:
             raise ValueError("missing verified terminal board")
         clean = sanitize_exhaustive_settlement(terminal, board)
         draw = clean["balances"]
-    expected = [a + b for a, b in zip(hu, draw)]
+    # Earlier archived trial kong scores must NEVER be retroactively counted.
+    # Only M3.51+ snapshots explicitly enrolled in official kong settlement do.
+    kong = _archived_kong_component(report)
+    expected = [a + b + c for a, b, c in zip(hu, draw, kong)]
     # Pre-M3.26 JSON can have no explicit 'settled_balances'; for old
     # matches that means HU was the only officially posted payment.
     if "settled_balances" in report:
@@ -308,6 +312,17 @@ def _archived_score_components(report: dict) -> tuple[list[int], list[int]]:
         if declared != expected:
             raise ValueError("archived official totals disagree with ledgers")
     return hu, draw
+
+
+def _archived_kong_component(report: dict) -> list[int]:
+    included = report.get("kong_included", False)
+    if type(included) is not bool:
+        raise ValueError("invalid archived kong-inclusion marker")
+    if not included:
+        return [0] * 4
+    if report.get("kong_priced") is not True:
+        raise ValueError("official kong scores require an explicit priced ledger")
+    return _balances(report.get("kong_balances"), "archived kong balances")
 
 
 _AI_LEVELS = frozenset(("basic", "advanced", "challenge"))
@@ -491,6 +506,18 @@ class MatchArchive:
         base = kong.get("base")
         if base is not None and (type(base) is not int or not 1 <= base <= 10**6):
             raise ValueError("invalid kong base")
+        # Old synthetic/legacy snapshots have no kong-inclusion marker.
+        kong_included = public.get("kong_included", False)
+        if type(kong_included) is not bool or (kong_included and base is None):
+            raise ValueError("invalid official kong settlement marker")
+        expected_settled = [
+            ledger["balances"][i] + kong_balances[i] * int(kong_included) +
+            (exhaustive["balances"][i] if exhaustive else 0)
+            for i in range(4)
+        ]
+        if (kong_included and "settled_balances" in public and
+                public["settled_balances"] != expected_settled):
+            raise ValueError("public match scores do not match the three ledgers")
         payload = {
             "privacy": "public_board_only", "version": 1,
             "phase": public["phase"], "dealer": public["dealer"],
@@ -506,18 +533,13 @@ class MatchArchive:
             "final_board": safe_board,
             "win_ledger": ledger,
             "exhaustive_settlement": exhaustive,
-            "settled_balances": [
-                ledger["balances"][i] + (
-                    exhaustive["balances"][i] if exhaustive else 0
-                ) for i in range(4)
-            ],
+            "settled_balances": expected_settled,
             "kong_balances": kong_balances,
-            "kong_priced": kong.get("base") is not None,
-            "note": (
-                "胡牌及已核验方案A流局赔付已分别入账；杠钱仍属可选试验积分。"
-                if exhaustive and exhaustive["posted"] else
-                "胡牌余额已入账；流局待核验或未触发赔付；杠钱仅为可选试验积分。"
-            ),
+            "kong_priced": base is not None,
+            "kong_included": kong_included,
+            "note": ("胡牌、杠钱及已确认流局赔付计入正式净额。"
+                     if kong_included else
+                     "历史兼容模式：杠钱仅为试验积分，不计入正式净额。"),
         }
         archive_id = secrets.token_urlsafe(18)
         stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -572,7 +594,8 @@ class MatchArchive:
         """
         if type(trend_limit) is not int or not 1 <= trend_limit <= 100:
             raise ValueError("trend limit must be from 1 to 100")
-        totals = [[0] * 4 for _ in range(3)]  # HU, draw, official
+        totals = [[0] * 4 for _ in range(4)]  # HU, draw, kong, official
+        kong_included_games = 0
         pos = [0] * 4
         neg = [0] * 4
         ties = [0] * 4
@@ -592,13 +615,16 @@ class MatchArchive:
                 try:
                     report = json.loads(row["record_json"])
                     hu, draw = _archived_score_components(report)
+                    kong = _archived_kong_component(report)
                     lineup = _archive_ai_lineup(report)
                     rules = _archive_scoring_rules(report)
                 except (ValueError, TypeError, KeyError, IndexError,
                         json.JSONDecodeError):
                     skipped += 1
                     continue
-                official = [a + b for a, b in zip(hu, draw)]
+                official = [a + b + c for a, b, c in zip(hu, draw, kong)]
+                if report.get("kong_included") is True:
+                    kong_included_games += 1
                 if lineup is None:
                     missing_ai += 1
                 else:
@@ -612,7 +638,8 @@ class MatchArchive:
                 for seat in range(4):
                     totals[0][seat] += hu[seat]
                     totals[1][seat] += draw[seat]
-                    totals[2][seat] += official[seat]
+                    totals[2][seat] += kong[seat]
+                    totals[3][seat] += official[seat]
                     if official[seat] > 0:
                         pos[seat] += 1
                     elif official[seat] < 0:
@@ -635,14 +662,16 @@ class MatchArchive:
             "valid_games": valid,
             "excluded_games": skipped,
             "scope": "all_saved_completed_games",
-            "kong_included": False,
+            "kong_included": kong_included_games > 0,
+            "kong_included_games": kong_included_games,
             "seats": [{
                 "seat": seat,
                 "hu_total": totals[0][seat],
                 "draw_total": totals[1][seat],
-                "settled_total": totals[2][seat],
+                "kong_total": totals[2][seat],
+                "settled_total": totals[3][seat],
                 "average_settled": (
-                    round(totals[2][seat] / valid, 2) if valid else 0
+                    round(totals[3][seat] / valid, 2) if valid else 0
                 ),
                 "positive_games": pos[seat],
                 "negative_games": neg[seat],

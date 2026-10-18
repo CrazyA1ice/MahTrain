@@ -2301,3 +2301,40 @@
 .match-resume-tools[hidden]{display:none!important}
 .match-resume-tools p{margin:0;flex:1;font-size:13px;line-height:1.6}
 .match-resume-tools button:disabled{cursor:wait;opacity:.6}
+
+
+/* M3.51: a reserved-size table, not content-sized river grid rows.
+   New discards wrap INSIDE a bounded river tray and can be scrolled there.
+   Neither the board nor the central claim dialog shifts vertically. */
+.match-board { align-content:stretch; }
+.match-board-center { min-height:0; max-height:100%; height:100%; overflow:hidden; }
+.match-board .match-seat { min-height:0; max-height:100%; overflow:hidden; }
+.match-board .match-river { min-height:0; max-height:100%; overflow:hidden; }
+.match-board .match-river .match-river-tiles {
+  box-sizing:border-box; min-height:0; max-height:100%;
+  flex:1 1 auto; overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:none; overscroll-behavior:contain;
+}
+.match-board .match-river .match-river-tiles::-webkit-scrollbar{display:none}
+.match-board .match-table-settlement {
+  min-height:0; max-height:100%; overflow-y:auto;
+  overscroll-behavior:contain; scrollbar-width:thin;
+}
+@media(min-width:701px){
+  .match-board{
+    grid-template-rows:146px 640px 208px 215px;
+  }
+  .match-board-center{
+    grid-template-rows:116px minmax(0,1fr) 116px;
+    grid-template-columns:minmax(0,1fr) minmax(88px,.57fr) minmax(0,1fr);
+  }
+  .match-board .match-seat--bottom #match-hand{min-height:0}
+}
+@media(max-width:700px){
+  .match-board{grid-template-rows:102px 342px 180px 185px}
+  .match-board-center{grid-template-rows:88px minmax(0,1fr) 88px}
+  .match-board .match-river--left .match-river-tiles,
+  .match-board .match-river--right .match-river-tiles{
+    max-height:100%;overflow-y:auto;
+  }
+}

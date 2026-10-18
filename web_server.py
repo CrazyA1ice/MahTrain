@@ -528,7 +528,7 @@ def _process(action: str, payload: dict) -> dict:
             seed=payload["seed"] if manual_seed else _automatic_match_seed()
             if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
                 raise ValueError("实验室四人对局种子须为0至2^32-1")
-            levels=payload.get("ai_levels",["basic","advanced","challenge"])
+            levels=payload.get("ai_levels",["challenge","challenge","challenge"])
             if (type(levels) is not list or len(levels)!=3 or
                 any(type(level) is not str or level not in AI_LEVELS
                     for level in levels)):
@@ -543,7 +543,8 @@ def _process(action: str, payload: dict) -> dict:
                 seed,
                 room_coefficient=payload.get("room_coefficient",100),
                 fan_cap=payload.get("fan_cap",3),
-                kong_base=payload.get("kong_base"),
+                kong_base=payload.get("kong_base",
+                    payload.get("room_coefficient",100)),
                 self_draw_mode=self_draw_mode,
             )
             agents={
