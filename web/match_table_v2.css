@@ -6,6 +6,7 @@
  * This is an independently maintained table stylesheet. Its #match-board
  * scope intentionally overrides earlier generic components in app.css.
  */
+@media(min-width:701px){
 #match-board.match-board--riichi{
   --rv-w:clamp(18px,2.20vw,31px);
   --rv-h:clamp(20px,2.45vw,31px);
@@ -478,6 +479,7 @@
   #match-board .match-seat--right .match-tile-back{
     width:18px;height:16px;flex-basis:16px;
   }
+}
 }
 @media(max-width:700px){
   /* Phones retain the proven 56-slot compact layout and hand panning.
