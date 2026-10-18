@@ -18,7 +18,7 @@ from collections import Counter
 from typing import Any, Mapping, Sequence
 
 from .efficiency import shanten_13, effective_draws
-from .rules import TILE_INDEX, TILES, SUITS, score_win
+from .rules import TILE_INDEX, TILES, SUITS, score_win, winning_tiles
 
 AI_LEVELS = ("basic", "advanced", "challenge")
 # Evaluation-only controlled variants; not advertised as player difficulty tiers.
@@ -137,11 +137,16 @@ def challenge_discard_scores(view: Mapping[str, Any],
         expected = float(ukeire)
         value = 1.0
         if info["shanten"] == 0:
+            # Tian-ting +2 is valid only if this hypothetical cut preserves
+            # exactly the originally verified waiting set (not just tenpai).
+            candidate_tian = (verified_tian and
+                set(winning_tiles(after, melds, missing)) ==
+                set(tian.get("initial_waits", [])))
             expected = 0.0
             for item in info["effective_details"]:
                 scoring = score_win(
                     [*after, item["tile"]], melds, missing, cap=cap,
-                    context={"tian_ting_verified": verified_tian},
+                    context={"tian_ting_verified": candidate_tian},
                 )
                 expected += item["remaining"] * scoring["multiplier"]
             value = expected / ukeire if ukeire else 0.0
