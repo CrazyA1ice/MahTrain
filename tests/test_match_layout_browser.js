@@ -121,7 +121,16 @@ async function main(){
           return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,
                   width:r.width,height:r.height};
         }
-        const board=box(document.getElementById("match-board"));
+        const boardElement=document.getElementById("match-board");
+        const board=box(boardElement);
+        const computedBoard=getComputedStyle(boardElement);
+        const viewportDebug={
+          innerWidth:innerWidth,bodyMinWidth:getComputedStyle(document.body).minWidth,
+          matchNarrow:matchMedia("(min-width:320px) and (max-width:359px)").matches,
+          boardColumns:computedBoard.gridTemplateColumns,
+          riverHCell:computedBoard.getPropertyValue("--river-h-cell").trim(),
+          center:box(document.querySelector(".match-board-center")),
+        };
         const handEl=document.getElementById("match-hand");
         const handBounds=box(handEl);
         const bottomRiver=box(document.getElementById("match-river-0"));
@@ -169,7 +178,7 @@ async function main(){
           });
         }
         return {
-          board,rivers,riverHandGap:handBounds.top-bottomRiver.bottom,
+          board,viewportDebug,rivers,riverHandGap:handBounds.top-bottomRiver.bottom,
           hand:{
             clientWidth:handEl.clientWidth,scrollWidth:handEl.scrollWidth,
             overflowX:getComputedStyle(handEl).overflowX,
@@ -185,7 +194,7 @@ async function main(){
       });
       console.log("M3.61 measured "+spec.width+"px",
         JSON.stringify({
-          board:report.board,riverHandGap:report.riverHandGap,
+          board:report.board,viewportDebug:report.viewportDebug,riverHandGap:report.riverHandGap,
           hand:report.hand,
           rivers:report.rivers.map(r=>({seat:r.seat,
             size:[r.clientWidth,r.clientHeight],
