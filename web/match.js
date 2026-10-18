@@ -633,10 +633,23 @@
       root.append(el("div","match-seat-score",seatScoreText(seat)));
     }
   }
-  // In each side player's own coordinate system: screen-left river runs
-  // top-to-bottom; screen-right river runs bottom-to-top. Group into
-  // chronological vertical lanes, never reverse the authoritative entries.
-  const SIDE_RIVER_LANE_SIZE=8;
+  // M3.60: Four seat-local copies of ONE preallocated river matrix:
+  // bottom: 14 columns x 4 rows (56 physical slots, enough for the 55-wall
+  // game plus the dealer's first discard); other seats are geometric 90,
+  // 180 and 270 degree rotations of this exact row-major layout.
+  // Each discard receives its permanent grid coordinate on arrival. Claimed
+  // discards keep their position as an empty marker, never slide later tiles.
+  const RIVER_PER_ROW=14, RIVER_ROWS=4, RIVER_CAPACITY=56;
+  const SIDE_RIVER_LANE_SIZE=RIVER_PER_ROW;
+  function riverSlot(seat,index){
+    const row=Math.floor(index/RIVER_PER_ROW),column=index%RIVER_PER_ROW;
+    if(index<0||index>=RIVER_CAPACITY)throw Error("牌河超出实体牌容量");
+    if(seat===0)return {row:row+1,column:column+1};
+    if(seat===2)return {row:RIVER_ROWS-row,column:RIVER_PER_ROW-column};
+    if(seat===3)return {row:column+1,column:RIVER_ROWS-row};
+    if(seat===1)return {row:RIVER_PER_ROW-column,column:row+1};
+    throw Error("无效座位");
+  }
   function renderRiver(seat){
     const view=publicBoard();
     const root=$("match-river-"+seat);
@@ -645,6 +658,9 @@
     const tiles=el("div","match-river-tiles");
     const entries=view.discards.map((entry,index)=>({...entry,order:index}))
       .filter(entry=>entry.seat===seat);
+    // Even before the very first discard, the tray has 56 reserved positions.
+    tiles.setAttribute("data-river-capacity",String(RIVER_CAPACITY));
+    tiles.setAttribute("data-river-seat",String(seat));
     if(!entries.length){
       tiles.append(el("span","match-river-empty","尚无弃牌"));
     }
@@ -657,6 +673,17 @@
         tiles.append(lane);
       }
       const cell=el("div","match-river-cell");
+      const slot=riverSlot(seat,index);
+      cell.setAttribute("data-river-index",String(index));
+      cell.setAttribute("data-river-row",String(slot.row));
+      cell.setAttribute("data-river-column",String(slot.column));
+      // Grid coordinates, not CSS flow/wrapping, decide every tile position.
+      // The real browser uses inline placement; source-order is retained for
+      // accessibility and the existing chronological replay DOM tests.
+      if(cell.style){
+        cell.style.gridRow=String(slot.row);
+        cell.style.gridColumn=String(slot.column);
+      }
       const claimed=entry.claimed_by!==undefined;
       if(claimed){
         // A claimed discard is physically held in another player's meld,
