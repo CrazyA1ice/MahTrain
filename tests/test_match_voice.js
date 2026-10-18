@@ -92,13 +92,13 @@ assert.equal(unsupported.announceFrame({type:"discard",seat:1,publicTile:"m2"}),
 // End/failed/muted speech must release the next-turn gate; speaking a
 // public discard is ONLY the tile name, not the player identity.
 (async()=>{
-  let finishUtterance,watchdog;
+  let finishUtterance,watchdog,watchdogDelay,delayedCancels=0;
   const delayed=api.create({
     speechSynthesis:{
-      cancel(){},speak(utterance){finishUtterance=utterance;}
+      cancel(){delayedCancels++;},speak(utterance){finishUtterance=utterance;}
     },
     SpeechSynthesisUtterance:class{constructor(text){this.text=text;}},
-    setTimeout(fn){watchdog=fn;return 17;},
+    setTimeout(fn,ms){watchdog=fn;watchdogDelay=ms;return 17;},
     clearTimeout(){watchdog=null;},
   });
   let resolved=false;
@@ -117,15 +117,33 @@ assert.equal(unsupported.announceFrame({type:"discard",seat:1,publicTile:"m2"}),
     type:"discard",seat:2,publicTile:"p6"
   });
   assert.equal(finishUtterance.text,"六筒");
+  assert.equal(watchdogDelay,1300,"even legacy speech must stop below 1.5s");
+  const beforeTimeout=delayedCancels;
   watchdog();
   await stalled;
-  // The new fast-game path uses the synchronous, nonblocking API, even
-  // when a platform speech engine never invokes onend.
+  assert.ok(delayedCancels>beforeTimeout,
+    "a stalled browser voice must physically cancel, not merely unlock a promise");
+  // Normal gameplay is nonblocking, but its audio is ALSO bounded to 1.3s.
   assert.equal(delayed.announceFrame({type:"peng",seat:1,publicTile:"m7"}),true);
   assert.equal(finishUtterance.text,"碰");
+  assert.equal(watchdogDelay,1300);
+  const interruptedWatchdog=watchdog;
   assert.equal(delayed.announceFrame({type:"ming_gang",seat:1,publicTile:"m7"}),true);
   assert.equal(finishUtterance.text,"杠");
-  assert.equal(watchdog,null,"nonblocking calls never arm the speech gate");
+  assert.notEqual(watchdog,interruptedWatchdog,
+    "the new action must replace the old speech deadline");
+  const afterReplace=delayedCancels;
+  interruptedWatchdog();
+  assert.equal(delayedCancels,afterReplace,
+    "stale watchdog must not interrupt a newer public action");
+  const beforeForcedStop=delayedCancels;
+  watchdog();
+  assert.ok(delayedCancels>beforeForcedStop,
+    "nonblocking gameplay must cancel audio at the 1.3s cap");
+  assert.equal(watchdog,null);
+  assert.equal(delayed.announceFrame({type:"discard",seat:2,publicTile:"s2"}),true);
+  finishUtterance.onend();
+  assert.equal(watchdog,null,"normal speech completion must clear its deadline");
   const muted=delayed.setEnabled(false);
   assert.equal(muted,false);
   await delayed.announceFrameWait({type:"discard",seat:2,publicTile:"p4"});

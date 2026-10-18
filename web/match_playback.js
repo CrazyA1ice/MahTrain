@@ -233,6 +233,9 @@
     return frames.filter((frame,index)=>
       frame.important||index===frames.length-1);
   }
+  // Every rendered AI action is advanced before the 1.5-second budget;
+  // long kong/win emphasis and the slow preset cannot exceed this cap.
+  const MAX_VISUAL_HOLD_MS=1400;
   function createController({onFrame,onDone,onStatus,clock,clearClock}){
     if(typeof onFrame!=="function"||typeof onDone!=="function"||
         typeof onStatus!=="function")throw new TypeError("playback callbacks required");
@@ -244,13 +247,14 @@
     function schedule(){
       dwellReady=false;
       const multiplier=items[index]?.holdScale;
+      const hold=Math.min(MAX_VISUAL_HOLD_MS,Math.round(duration*(
+        Number.isFinite(multiplier)&&multiplier>=1&&multiplier<=4
+        ?multiplier:1)));
       timer=later(()=>{
         timer=null;
         dwellReady=true;
         if(gateReady)advance();
-      },Math.round(duration*(
-        Number.isFinite(multiplier)&&multiplier>=1&&multiplier<=4
-        ?multiplier:1)));
+      },hold);
     }
     function deliver(){
       const token=++generation;

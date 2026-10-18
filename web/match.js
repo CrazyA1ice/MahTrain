@@ -296,7 +296,7 @@
       if(name!=="match_new" && !announcedByPlayback && voice){
         const events=(data.match.events||[]).slice(previousEvents);
         // Audio is optional UI feedback. Never delay an already-computed AI turn
-        // until browser speechSynthesis fires onend (or its 2.5s watchdog).
+        // until browser speechSynthesis fires onend (or its 1.3s hard stop).
         voice.announceEvents(
           window.MahTrainPlayback.normalize(events,96).frames);
         syncVoiceControls();
@@ -1550,7 +1550,7 @@
     const toggleVoice=$("match-voice-enabled");
     toggleVoice.checked=!!voice?.supported;
     $("match-voice-status").textContent=voice?.supported
-      ?"使用浏览器语音合成播报已公开牌名与动作，可随时关闭"
+      ?"公开牌名与碰杠胡语音最长播报1.3秒，超时中断且不阻塞AI，可关闭"
       :"此浏览器暂不支持语音合成，仍可正常对局";
     toggleVoice.disabled=!voice?.supported;
     toggleVoice.addEventListener("change",()=>{

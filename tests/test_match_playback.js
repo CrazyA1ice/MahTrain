@@ -228,6 +228,12 @@ function fakeClock(){
   player.start(frames,()=>committed++);
   assert.deepEqual(timer.delays(),[765],
     "kong must hold longer, without consuming another server action");
+  player.setSpeed(900);
+  assert.deepEqual(timer.delays(),[1400],
+    "900ms slow playback times the kong emphasis out below 1.5 seconds");
+  player.setSpeed(450);
+  assert.deepEqual(timer.delays(),[765],
+    "a speed change must keep its bounded hold timer");
   player.pause();
   assert.equal(timer.count(),0);
   player.step();
@@ -247,6 +253,9 @@ function fakeClock(){
   assert.deepEqual(timer.delays(),[765]);
   player.setSpeed(180);
   assert.deepEqual(timer.delays(),[306]);
+  player.setSpeed(900);
+  assert.deepEqual(timer.delays(),[1400],
+    "slow kong playback still must not exceed the 1.4s cap");
   player.skip();
   assert.equal(committed,2);
   assert.equal(timer.count(),0);
