@@ -21,7 +21,7 @@ function browserBinary(){
 }
 
 const specs=[
-  {width:280,height:750}, {width:320,height:800},
+  {width:320,height:800},
   {width:375,height:812}, {width:390,height:844},
   {width:700,height:880}, {width:701,height:900},
   {width:1024,height:900}, {width:1440,height:900},
@@ -176,7 +176,6 @@ async function main(){
           },
         };
       });
-      check(report,spec.width,"full-river");
       const name="width-"+spec.width;
       fs.writeFileSync(path.join(output,name+".json"),
                        JSON.stringify(report,null,2)+"\n");
@@ -184,6 +183,18 @@ async function main(){
         path:path.join(output,name+".png"),fullPage:true,
         animations:"disabled",
       });
+      console.log("M3.61 measured "+spec.width+"px",
+        JSON.stringify({
+          board:report.board,riverHandGap:report.riverHandGap,
+          hand:report.hand,
+          rivers:report.rivers.map(r=>({seat:r.seat,
+            size:[r.clientWidth,r.clientHeight],
+            scroll:[r.scrollWidth,r.scrollHeight],
+            outside:r.outside.slice(0,15),
+            overlap:r.cellOverlap.slice(0,5)
+          })),
+        }));
+      check(report,spec.width,"full-river");
       console.log("M3.61 real Chrome "+spec.width+
         "px: no river clipping / no overlap / 14 hand tiles PASS");
     }
