@@ -14,7 +14,8 @@ from .rules import TILE_INDEX
 def diagnose_pressure_tiebreak(view: Mapping[str, Any],
                                oracle: Mapping[str, Any],
                                actual_discard: str, *,
-                               policy: str) -> dict[str, bool]:
+                               policy: str,
+                               ranking: list[dict[str, Any]] | None = None) -> dict[str, bool]:
     """Compare full EV policy vs identical EV policy without risk weights.
 
     Historical output keys are retained for compatible trend reports, but
@@ -24,7 +25,7 @@ def diagnose_pressure_tiebreak(view: Mapping[str, Any],
     """
     if policy not in ("challenge", "challenge_no_pressure"):
         raise ValueError("pressure telemetry only supports challenge variants")
-    ranked = challenge_discard_scores(view)
+    ranked = ranking if ranking is not None else challenge_discard_scores(view)
     if not ranked:
         raise ValueError("no legal challenge EV candidates")
     rows = {
@@ -37,7 +38,23 @@ def diagnose_pressure_tiebreak(view: Mapping[str, Any],
         -item["effective_tile_count"],
         TILE_INDEX[item["discard"]],
     ))["discard"]
-    pressure_choice = ranked[0]["discard"]
+    if ranking is not None and policy == "challenge_no_pressure":
+        # The cached baseline has no pressure. Rebuild its risk-weighted
+        # counterfactual from public melds without recomputing ukeire.
+        wall = view.get("wall_count")
+        late = type(wall) is int and wall <= 24
+        def risk_score(item):
+            risk = public_suit_pressure(item["discard"], view)
+            multiplier = max(0.72, 1 - (0.055 if late else 0.025) * risk)
+            return round(item["expected_fan_weighted_copies"] * multiplier, 5)
+        pressure_choice = min(ranked, key=lambda item: (
+            -risk_score(item), -item["effective_tile_count"],
+            TILE_INDEX[item["discard"]]))["discard"]
+        pressure = [public_suit_pressure(item["discard"], view)
+                    for item in ranked]
+    else:
+        pressure_choice = ranked[0]["discard"]
+        pressure = [item["public_pressure"] for item in ranked]
     expected = pressure_choice if policy == "challenge" else chosen
     if actual_discard != expected:
         raise RuntimeError("AI pressure probe disagrees with legal EV policy")
@@ -46,7 +63,6 @@ def diagnose_pressure_tiebreak(view: Mapping[str, Any],
         item for item in ranked
         if abs(item["expected_fan_weighted_copies"] - maximum) < 1e-9
     ]
-    pressure = [item["public_pressure"] for item in ranked]
     return {
         "effective_tie": len(equal_best) > 1,
         "public_pressure_present": any(value > 0 for value in pressure),
