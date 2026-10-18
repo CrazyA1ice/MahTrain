@@ -51,7 +51,7 @@ class HiddenWorldsTests(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertEqual(result["worlds"],5)
         self.assertEqual(set(result["by_tile"]),{"m1","s5"})
-        self.assertEqual(result["model"],"proposal_mc_v1")
+        self.assertEqual(result["model"],"river_conditioned_proposal_v2")
 
     def test_same_observation_same_sample_and_hidden_injection_ignored(self):
         view=live_view()
@@ -124,7 +124,7 @@ class HiddenWorldsTests(unittest.TestCase):
         info={"shanten":0,"effective_tile_count":6,
               "effective_types":["p1"],
               "effective_details":[{"tile":"p1","remaining":6}]}
-        probe={"available":True,"worlds":24,"model":"proposal_mc_v1",
+        probe={"available":True,"worlds":24,"model":"river_conditioned_proposal_v2",
                "by_tile":{"m4":{"hits":3,"mean_loss_multiplier":8.0},
                           "s4":{"hits":0,"mean_loss_multiplier":0.0}}}
         with patch("mahtrain_core.ai.effective_draws",return_value=info), \
