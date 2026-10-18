@@ -650,22 +650,48 @@
     if(seat===1)return {row:RIVER_PER_ROW-column,column:row+1};
     throw Error("无效座位");
   }
+  // Reuse the actual physical river slots between public playback frames.
+  // Rebuild only if an earlier public discard changed (claimed/won/type),
+  // playback rewound, or a different table replaced the existing DOM.
+  // Never cache/inspect an opponent's private hand or the unseen wall.
+  const riverSnapshots=new WeakMap();
   function renderRiver(seat){
     const view=publicBoard();
     const root=$("match-river-"+seat);
-    root.replaceChildren();
-    root.append(el("strong","match-river-title",seats[seat].label+"牌河"));
-    const tiles=el("div","match-river-tiles");
     const entries=view.discards.map((entry,index)=>({...entry,order:index}))
       .filter(entry=>entry.seat===seat);
-    // Even before the very first discard, the tray has 56 reserved positions.
-    tiles.setAttribute("data-river-capacity",String(RIVER_CAPACITY));
-    tiles.setAttribute("data-river-seat",String(seat));
-    if(!entries.length){
-      tiles.append(el("span","match-river-empty","尚无弃牌"));
+    // Global order matters: a new discard by ANOTHER seat can remove our
+    // previous "latest" highlight without changing our own river entries.
+    const keys=entries.map(entry=>JSON.stringify([
+      entry.order,entry.tile,entry.claimed_by,entry.won_by,entry.discard_kind,
+    ]));
+    const previous=riverSnapshots.get(root);
+    const appendOnly=!!previous && root.children.length===2 &&
+      root.children[1]===previous.tiles &&
+      previous.keys.length<=keys.length &&
+      previous.keys.every((key,index)=>key===keys[index]);
+    let tiles,cells,lane,fromIndex;
+    if(appendOnly){
+      tiles=previous.tiles;
+      cells=previous.cells;
+      lane=previous.lane;
+      fromIndex=previous.keys.length;
+      if(fromIndex===0 && entries.length)tiles.replaceChildren();
+    }else{
+      root.replaceChildren();
+      root.append(el("strong","match-river-title",seats[seat].label+"牌河"));
+      tiles=el("div","match-river-tiles");
+      // All 56 grid positions are reserved by CSS before the first discard.
+      tiles.setAttribute("data-river-capacity",String(RIVER_CAPACITY));
+      tiles.setAttribute("data-river-seat",String(seat));
+      root.append(tiles);
+      cells=[];lane=null;fromIndex=0;
+      if(!entries.length){
+        tiles.append(el("span","match-river-empty","尚无弃牌"));
+      }
     }
-    let lane=null;
-    for(const [index,entry] of entries.entries()){
+    for(let index=fromIndex;index<entries.length;index++){
+      const entry=entries[index];
       if((seat===1||seat===3)&&index%SIDE_RIVER_LANE_SIZE===0){
         lane=el("div","match-river-lane");
         lane.setAttribute("aria-label","第"+
@@ -677,17 +703,12 @@
       cell.setAttribute("data-river-index",String(index));
       cell.setAttribute("data-river-row",String(slot.row));
       cell.setAttribute("data-river-column",String(slot.column));
-      // Grid coordinates, not CSS flow/wrapping, decide every tile position.
-      // The real browser uses inline placement; source-order is retained for
-      // accessibility and the existing chronological replay DOM tests.
       if(cell.style){
         cell.style.gridRow=String(slot.row);
         cell.style.gridColumn=String(slot.column);
       }
       const claimed=entry.claimed_by!==undefined;
       if(claimed){
-        // A claimed discard is physically held in another player's meld,
-        // never show a duplicate face still lying in the river.
         cell.classList.add("is-claimed");
         cell.append(el("span","match-river-claimed","已取走"));
         cell.title="本张弃牌已被碰或杠取走";
@@ -696,8 +717,6 @@
         cell.title=tileName(entry.tile);
       }
       if(entry.won_by)cell.classList.add("is-winning-discard");
-      // Read the authoritative public classification; never infer it from
-      // another player's private latest-drawn tile.
       if(entry.discard_kind==="tsumogiri" || entry.discard_kind==="tedashi"){
         const drawCut=entry.discard_kind==="tsumogiri";
         cell.classList.add(drawCut?"is-tsumogiri":"is-tedashi");
@@ -709,8 +728,20 @@
       }
       cell.setAttribute("data-discard-order",String(entry.order));
       (lane||tiles).append(cell);
+      cells.push(cell);
     }
-    root.append(tiles);
+    const latestIndex=entries.length &&
+      entries[entries.length-1].order===view.discards.length-1
+      ?entries.length-1:-1;
+    if(appendOnly && previous.latestIndex!==latestIndex){
+      if(previous.latestIndex>=0){
+        cells[previous.latestIndex].classList.toggle("is-latest",false);
+      }
+      if(latestIndex>=0){
+        cells[latestIndex].classList.toggle("is-latest",true);
+      }
+    }
+    riverSnapshots.set(root,{keys,tiles,cells,lane,latestIndex});
   }
   function renderReadyHint(){
     const root=$("match-ready-hint");
