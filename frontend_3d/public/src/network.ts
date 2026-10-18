@@ -12,6 +12,8 @@ import { MSG } from './constants.ts';
 import { handleServer } from './handlers/index.ts';
 import { toast } from './ui.ts';
 
+let mahTrainDispatch: ((message: any) => void) | null = null;
+const mahTrainMode = new URLSearchParams(location.search).get('mahtrain') === '1';
 let retryDelay = 1000; // 初始 1s
 const MAX_RETRY_DELAY = 30000; // 上限 30s
 let intentionalClose = false; // 区分主动关闭 (page unload) 与被动关闭 (网络断开)
@@ -123,6 +125,14 @@ function updateReconnectUI(message: any, retryInSec: any) {
 }
 
 function connect() {
+  if (mahTrainMode) {
+    // Load the MahTrain-only adapter; upstream WebSocket protocol remains
+    // completely untouched for ordinary standalone Queju deployments.
+    import('./mahtrain-bridge.ts').then(({startMahTrainBridge}) => {
+      mahTrainDispatch = startMahTrainBridge(handleServer);
+    }).catch(err => toast('MahTrain 3D接入失败：' + err.message, 6000));
+    return;
+  }
   clearReconnectTimers();
   intentionalClose = false;
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -197,6 +207,10 @@ function connect() {
 }
 
 function send(obj: any) {
+  if (mahTrainMode) {
+    mahTrainDispatch?.(obj);
+    return;
+  }
   if (networkRefs.ws && networkRefs.ws.readyState === 1) {
     // M-05 修复: C→S 消息加 seq 字段 (仅对需要可靠传输的消息加 seq)
     // 简化: 所有 C→S 消息都加 seq, 服务端可选校验
