@@ -19,8 +19,8 @@ from mahtrain_core.ai_ron_calibration import run_candidate_ron_pilot
 def main() -> None:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed-start",type=int,default=100)
-    parser.add_argument("--train-seeds",type=int,default=4)
-    parser.add_argument("--test-seeds",type=int,default=3)
+    parser.add_argument("--train-seeds",type=int,default=8)
+    parser.add_argument("--test-seeds",type=int,default=6)
     parser.add_argument("--stride",type=int,default=6)
     parser.add_argument("--json-out",type=Path)
     args=parser.parse_args()
@@ -45,6 +45,14 @@ def main() -> None:
               "Payout MSE",scores["payout_multiplier_mse"])
     print("Brier delta",report["brier_delta_vs_legal_suit_prior"])
     print("Payout MSE delta",report["payout_mse_delta"])
+    strat=report["stratified_validation"]
+    ci=strat["cluster_bootstrap_brier"]
+    print("Unweighted seed-macro Brier delta",ci["seed_macro_mean_delta"])
+    print("Seed-cluster illustrative 95% bootstrap range",ci["bootstrap_95pct_range"])
+    print("Improved/worse/equal independent test seeds",
+          ci["seeds_better"],ci["seeds_worse"],ci["seeds_equal"])
+    print("Actionable cut stratum",strat["strata"]["candidate_rule"]["ron_eligible"])
+    print("WARNING: sparse positives, not an evidence of reliable real-world edge.")
     print("Warning: exploratory only; not a validated posterior or online AI.")
     if args.json_out:
         args.json_out.parent.mkdir(parents=True,exist_ok=True)
