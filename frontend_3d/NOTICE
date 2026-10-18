@@ -1,0 +1,129 @@
+雀局 · 联机麻将 (queju-mahjong-online)
+Copyright (c) 2024-2026 queju-mahjong contributors
+
+本项目基于 MIT 许可证发布，详见 LICENSE 文件。
+
+本项目使用以下第三方库，在此致谢：
+
+=== 运行时依赖 (dependencies) ===
+
+1. three.js
+   版本: ~0.180.0
+   许可证: MIT
+   版权: (c) 2010-2024 mrdoob and three.js contributors
+   主页: https://threejs.org/
+   用途: WebGL 3D 渲染引擎，用于麻将桌/牌墙/骰子的 3D 场景渲染
+
+2. cannon-es
+   版本: ~0.20.0
+   许可证: MIT
+   版权: (c) 2020 Stefan Hedman & cannon-es contributors
+   主页: https://github.com/pmndrs/cannon-es
+   用途: 物理引擎，用于刚体 transform 容器与碰撞模拟
+
+3. ws
+   版本: ~8.18.0
+   许可证: MIT
+   版权: (c) 2011 Einar Otto Stangvik <einaros@gmail.com>
+   主页: https://github.com/websockets/ws
+   用途: WebSocket 服务端实现
+
+4. esbuild
+   版本: ~0.28.1
+   许可证: MIT
+   版权: (c) 2020 Evan Wallace
+   主页: https://esbuild.github.io/
+   用途: TypeScript→JavaScript 即时转译 (开发模式)
+
+=== 开发时依赖 (devDependencies) ===
+
+5. typescript
+   版本: ~6.0.3
+   许可证: Apache-2.0
+   版权: (c) Microsoft Corporation
+   主页: https://www.typescriptlang.org/
+
+6. vite
+   版本: ~6.4.3
+   许可证: MIT
+   版权: (c) 2019-present Evan You & Vite contributors
+   主页: https://vitejs.dev/
+
+7. eslint
+   版本: ~9.39.4
+   许可证: MIT
+   版权: (c) OpenJS Foundation and contributors
+   主页: https://eslint.org/
+
+8. typescript-eslint
+   版本: ~8.61.1
+   许可证: MIT
+   版权: (c) 2019 typescript-eslint contributors
+   主页: https://typescript-eslint.io/
+
+9. prettier
+   版本: ~3.8.4
+   许可证: MIT
+   版权: (c) 2017-present Prettier
+   主页: https://prettier.io/
+
+10. husky
+    版本: ~9.1.7
+    许可证: MIT
+    版权: (c) 2017-2024 Typicode
+    主页: https://typicode.github.io/husky/
+
+11. lint-staged
+    版本: ~17.0.8
+    许可证: MIT
+    版权: (c) 2017-2024 Andrey Okonetchnikov
+    主页: https://github.com/lint-staged/lint-staged
+
+12. puppeteer
+    版本: ~23.0.0
+    许可证: Apache-2.0
+    版权: (c) 2017-2024 Google Inc.
+    主页: https://pptr.dev/
+
+13. c8
+    版本: ~10.1.3
+    许可证: MIT
+    版权: (c) 2017-2024 c8 contributors
+    主页: https://github.com/bcoe/c8
+
+14. license-checker
+    版本: ~25.0.1
+    许可证: BSD-3-Clause
+    版权: (c) 2014-2024 Jakub Gieryluk
+    主页: https://github.com/davglass/license-checker
+
+15. cross-env
+    版本: ~7.0.3
+    许可证: MIT
+    版权: (c) 2016-2024 Kent C. Dodds
+    主页: https://github.com/kentcdodds/cross-env
+
+16. @types/node / @types/three / @types/ws
+    许可证: MIT
+    版权: (c) Microsoft Corporation
+    来源: DefinitelyTyped
+    主页: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+=== 重新生成许可证清单 ===
+
+要重新生成本文件中的许可证清单，请运行：
+
+  npx license-checker --production --summary
+  npx license-checker --production --csv > third-party-licenses.csv
+
+或使用以下命令生成 JSON 格式：
+
+  npx license-checker --production --json > third-party-licenses.json
+
+=== 许可证合规说明 ===
+
+本项目所有依赖均使用 MIT、Apache-2.0 或 BSD-3-Clause 许可证，均为宽松许可证，
+允许商业使用、修改、分发、私有化使用，仅需保留版权声明。
+本项目 MIT 许可证与所有依赖许可证兼容。
+
+如发现许可证遗漏或错误，请提交 issue: https://github.com/Aixineiar/queju_mahjong/issues
