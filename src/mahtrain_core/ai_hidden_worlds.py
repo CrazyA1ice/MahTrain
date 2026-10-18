@@ -65,8 +65,10 @@ def _private_world_inputs(view: Mapping[str, Any]) -> tuple[list[str], list[tupl
                 return None
             tile = m.get("tile")
             if tile is None:
-                redacted = True
-                continue
+                # Unknown an-gang consumes four matching physical copies.
+                # Without its kind, even OTHER seats' disjoint allocations
+                # cannot be certified; decline sampling altogether.
+                return None
             if tile not in TILE_INDEX:
                 return None
             known[tile] += MELD_SIZES[m["type"]]
