@@ -1,0 +1,21 @@
+{
+  "name": "mahtrain-queju-3d-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Unmodified Queju WebGL table renderer with MahTrain Sichuan rules bridge",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite --host 127.0.0.1",
+    "test:bridge": "node --test test/mahtrain-protocol.test.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0",
+    "cannon-es": "0.20.0"
+  },
+  "devDependencies": {
+    "vite": "6.4.3",
+    "typescript": "6.0.3",
+    "playwright-core": "1.56.1"
+  }
+}

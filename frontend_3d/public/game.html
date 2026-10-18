@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MahTrain · 雀局 Three.js 四人血战</title>
+<link rel="stylesheet" href="/src/mahtrain-ui.css" />
+<style>
+  :root{--bg:#14100c;--accent:#d4a04c;--fg:#f4ead8;--muted:#8a7c68;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+    font-family:"PingFang SC","Microsoft YaHei",serif;}
+  #app{position:fixed;inset:0}
+  canvas{display:block;outline:none}
+  .topbar{position:fixed;top:0;left:0;right:0;z-index:10;
+    padding:22px 36px;display:flex;justify-content:space-between;
+    align-items:flex-start;pointer-events:none}
+  .brand .ch{font-size:34px;font-weight:900;letter-spacing:.15em;
+    background:linear-gradient(180deg,#f4d999,#d4a04c 60%,#8a5e22);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 2px 20px rgba(212,160,76,.25)}
+  .brand .en{font-size:11px;letter-spacing:.4em;color:var(--muted);
+    margin-top:4px;font-family:"Times New Roman",serif}
+  .meta{pointer-events:auto;text-align:right;font-size:12px;
+    color:var(--muted);letter-spacing:.2em;line-height:1.8}
+  .meta b{color:var(--fg);font-weight:500}
+
+  /* 右上 玩家列表 */
+  .players{position:fixed;top:64px;right:24px;z-index:11;
+    background:rgba(20,16,12,.7);backdrop-filter:blur(14px);
+    border:1px solid rgba(212,160,76,.18);border-radius:12px;
+    padding:12px 14px;min-width:180px;font-size:12px}
+  .players h5{font-size:10px;letter-spacing:.3em;color:var(--accent);
+    font-weight:600;margin-bottom:8px}
+  .pl{display:flex;justify-content:space-between;align-items:center;
+    padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.6}
+  .pl:last-child{border-bottom:none}
+  .pl .nm{color:var(--fg)}
+  .pl .nm .dir{color:var(--accent);margin-right:6px;font-weight:600}
+  .pl .nm .me{font-size:9px;color:var(--muted);margin-left:4px}
+  .pl .dice{color:var(--muted);font-variant-numeric:tabular-nums}
+  .pl.turn .nm{color:#ffe9a0}
+  .pl.turn{background:rgba(212,160,76,.08);border-radius:4px;padding-left:4px}
+  
+  .pl.disconnected{opacity:.5}
+  .pl.disconnected .nm{color:#8a7c68}
+
+  .panel{position:fixed;left:32px;bottom:28px;z-index:10;
+    background:rgba(20,16,12,.65);backdrop-filter:blur(14px);
+    border:1px solid rgba(212,160,76,.18);border-radius:14px;
+    padding:18px 22px;min-width:240px}
+  .panel h4{font-size:11px;letter-spacing:.3em;color:var(--accent);
+    font-weight:600;margin-bottom:14px}
+  .row{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:12px}
+  .row label{color:var(--muted);min-width:60px;letter-spacing:.1em}
+  .row .val{color:var(--fg);font-variant-numeric:tabular-nums;
+    min-width:42px;text-align:right}
+  input[type=range]{-webkit-appearance:none;appearance:none;flex:1;
+    height:2px;background:linear-gradient(90deg,var(--accent) 0%,
+    var(--accent) var(--p,50%),rgba(255,255,255,.1) var(--p,50%));
+    border-radius:2px;outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;
+    width:12px;height:12px;border-radius:50%;background:#f4d999;
+    border:2px solid var(--accent);cursor:pointer;
+    box-shadow:0 0 8px rgba(212,160,76,.6)}
+  .actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  .btn{flex:1;min-width:74px;padding:8px 0;font-size:11px;letter-spacing:.15em;
+    background:transparent;color:var(--fg);
+    border:1px solid rgba(212,160,76,.3);border-radius:6px;
+    cursor:pointer;transition:.25s;font-family:inherit}
+  .btn:hover:not(:disabled){background:rgba(212,160,76,.15);border-color:var(--accent);
+    color:var(--accent)}
+  .btn.active{background:rgba(212,160,76,.2);color:var(--accent);
+    border-color:var(--accent)}
+  .btn:disabled{opacity:0.4;cursor:not-allowed}
+  .btn.primary{background:linear-gradient(180deg,rgba(212,160,76,.3),rgba(212,160,76,.12));
+    border-color:var(--accent);color:#ffe9a0}
+  .hint{position:fixed;right:24px;bottom:28px;z-index:10;
+    text-align:right;font-size:11px;color:var(--muted);
+    letter-spacing:.12em;line-height:1.9;max-width:260px}
+  .hint kbd{display:inline-block;padding:2px 7px;margin:0 2px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+    border-radius:4px;font-family:inherit;font-size:10px;color:var(--fg)}
+
+  /* 中央骰子按钮 / 弹窗 */
+  .centerBtn{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    z-index:20;display:none;flex-direction:column;align-items:center;gap:10px}
+  .centerBtn.show{display:flex}
+  .centerBtn .roll{padding:18px 42px;font-size:16px;letter-spacing:.3em;
+    background:linear-gradient(180deg,rgba(200,71,58,.35),rgba(200,71,58,.15));
+    color:#ffd9d0;border:1px solid #c8473a;border-radius:10px;
+    cursor:pointer;font-family:inherit;transition:.2s}
+  .centerBtn .roll:hover{background:linear-gradient(180deg,rgba(200,71,58,.55),rgba(200,71,58,.3))}
+  .centerBtn .roll:disabled{opacity:.5;cursor:not-allowed}
+  .centerBtn .sub{font-size:11px;color:var(--muted);letter-spacing:.2em}
+  .claimBar{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);
+    z-index:30;display:none;flex-direction:column;align-items:center;gap:8px}
+  .claimBar.show{display:flex}
+  .claimBtns{display:flex;gap:12px}
+  .claimBtns button{padding:14px 28px;font-size:18px;font-weight:700;letter-spacing:.15em;
+    border-radius:10px;cursor:pointer;font-family:inherit;color:#fff;transition:.15s;
+    border:1px solid rgba(255,255,255,.3);background:linear-gradient(180deg,rgba(200,71,58,.5),rgba(160,40,30,.4))}
+  .claimBtns button:hover{filter:brightness(1.2)}
+  .claimBtns button.pass{background:linear-gradient(180deg,rgba(90,90,90,.5),rgba(60,60,60,.4))}
+  .claimBtns button.win{background:linear-gradient(180deg,rgba(212,160,76,.6),rgba(150,100,30,.5))}
+  .claimBar .sub{font-size:12px;color:var(--accent);letter-spacing:.2em}
+  .winOverlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;
+    background:rgba(10,8,6,.7);backdrop-filter:blur(6px)}
+  .winOverlay.show{display:flex}
+  .winCard{text-align:center;padding:40px 60px;border-radius:18px;
+    background:rgba(20,16,12,.9);border:1px solid var(--accent)}
+  .winTitle{font-size:48px;font-weight:900;letter-spacing:.3em;
+    background:linear-gradient(180deg,#f4d999,#d4a04c);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .winInfo{margin-top:16px;font-size:16px;color:var(--fg);letter-spacing:.1em}
+
+  
+  .restartFloat{position:fixed;left:32px;bottom:220px;z-index:40;display:none;
+    flex-direction:column;align-items:center;gap:8px}
+  .restartFloat.show{display:flex}
+  .restartFloatBtn{padding:14px 28px;font-size:14px;font-weight:700;letter-spacing:.2em;
+    background:linear-gradient(180deg,rgba(212,160,76,.4),rgba(212,160,76,.2));
+    color:#ffe9a0;border:1px solid var(--accent);border-radius:10px;
+    cursor:pointer;font-family:inherit;transition:.2s;
+    box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  .restartFloatBtn:hover:not(:disabled){background:linear-gradient(180deg,rgba(212,160,76,.6),rgba(212,160,76,.3));
+    transform:translateY(-1px)}
+  .restartFloatBtn:disabled{opacity:.5;cursor:not-allowed}
+  .restartFloatInfo{font-size:11px;color:var(--muted);letter-spacing:.15em;
+    background:rgba(20,16,12,.8);padding:4px 10px;border-radius:6px}
+
+  .toast{position:fixed;left:50%;top:32%;transform:translateX(-50%);
+    z-index:30;background:rgba(20,16,12,.85);backdrop-filter:blur(12px);
+    border:1px solid var(--accent);border-radius:10px;
+    padding:14px 28px;font-size:16px;color:#ffe9a0;letter-spacing:.15em;
+    opacity:0;transition:opacity .3s, transform .3s;pointer-events:none}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+
+  
+  .errorOverlay{position:fixed;inset:0;z-index:60;display:none;
+    align-items:center;justify-content:center;
+    background:rgba(10,8,6,.7);backdrop-filter:blur(6px)}
+  .errorOverlay.show{display:flex}
+  .errorCard{text-align:center;padding:32px 48px;border-radius:16px;
+    background:rgba(20,16,12,.95);border:1px solid #c8473a;max-width:90vw}
+  .errorTitle{font-size:24px;font-weight:900;letter-spacing:.2em;
+    color:#ff9a8a;margin-bottom:14px}
+  .errorMsg{font-size:15px;color:var(--fg);line-height:1.7;
+    letter-spacing:.05em;margin-bottom:24px}
+  .errorBtn{padding:10px 32px;font-size:13px;letter-spacing:.2em;
+    background:linear-gradient(180deg,rgba(200,71,58,.35),rgba(200,71,58,.15));
+    color:#ffd9d0;border:1px solid #c8473a;border-radius:8px;
+    cursor:pointer;font-family:inherit;transition:.2s}
+  .errorBtn:hover{background:linear-gradient(180deg,rgba(200,71,58,.55),rgba(200,71,58,.3))}
+
+  .loader{position:fixed;inset:0;z-index:50;background:var(--bg);
+    display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:18px;transition:opacity .8s}
+  .loader.hide{opacity:0;pointer-events:none}
+  .loader .tiles{display:flex;gap:6px}
+  .loader .t{width:18px;height:26px;border-radius:3px;
+    background:linear-gradient(180deg,#f4ead8,#d8c8a8);
+    border:1px solid #8a7c68;animation:flip 1.2s infinite ease-in-out}
+  .loader .t:nth-child(2){animation-delay:.15s}
+  .loader .t:nth-child(3){animation-delay:.3s}
+  .loader .t:nth-child(4){animation-delay:.45s}
+  @keyframes flip{0%,100%{transform:rotateY(0) translateY(0)}
+    50%{transform:rotateY(180deg) translateY(-8px)}}
+  .loader p{color:var(--muted);font-size:11px;letter-spacing:.3em}
+  .corner{position:fixed;width:80px;height:80px;
+    border:1px solid rgba(212,160,76,.25);pointer-events:none;z-index:5}
+  .corner.tl{top:18px;left:18px;border-right:none;border-bottom:none}
+  .corner.tr{top:18px;right:18px;border-left:none;border-bottom:none}
+  .corner.bl{bottom:18px;left:18px;border-right:none;border-top:none}
+  .corner.br{bottom:18px;right:18px;border-left:none;border-top:none}
+  @media(max-width:720px){
+    .topbar{padding:16px 20px}.brand .ch{font-size:24px}
+    .panel{left:16px;right:16px;bottom:16px;min-width:0}
+    .hint{display:none}.players{min-width:140px;right:12px;top:56px}}
+</style>
+</head>
+<body>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+  <div class="topbar">
+    <div class="brand">
+      <div class="ch">血 战 · MahTrain</div>
+      <div class="en">M A H J O N G &nbsp;·&nbsp; L A N</div>
+    </div>
+    <div class="meta">
+      <div>方位 · <b id="seatText">—</b></div>
+      <div>阶段 · <b id="statusText">连接中</b></div>
+      <div>当前 · <b id="turnText">—</b></div>
+    </div>
+  </div>
+
+  <div class="players" id="playersBox" style="display:none">
+    <h5>玩 家 列 表</h5>
+    <div id="players"></div>
+  </div>
+
+  <div id="app"></div>
+
+  <div class="panel">
+    <h4>桌 · 台 · 控 制</h4>
+    <div class="row"><label>台面色</label>
+      <input id="feltHue" type="range" min="0" max="360" value="150">
+      <span class="val" id="feltHueV">150</span></div>
+    <div class="row"><label>灯光</label>
+      <input id="lightInt" type="range" min="20" max="200" value="100">
+      <span class="val" id="lightIntV">100</span></div>
+    <div class="actions">
+      <button class="btn" id="sortSuitBtn">整理</button>
+      <button class="btn primary" id="discardBtn" disabled>打出</button>
+    </div>
+  </div>
+
+  <div class="hint">
+    <kbd>左键拖空白</kbd> 旋转视角<br>
+    <kbd>左键点手牌</kbd> 选中高亮<br>
+    <kbd>左键拖手牌</kbd> 整理(插入)<br>
+    <kbd>右键</kbd> 打出选中的牌<br>
+    <kbd>滚轮</kbd> 缩放
+  </div>
+
+  <div class="centerBtn" id="diceCenter">
+    <button class="roll" id="rollBtn">🎲 投 骰 子</button>
+    <div class="sub" id="diceSub">轮到你投骰子</div>
+  </div>
+
+  <div class="centerBtn" id="dealCenter">
+    <button class="roll" id="dealBtn">发 牌</button>
+    <button class="roll" id="testDealBtn" style="margin-top:8px;font-size:13px">测试发牌</button>
+    <select id="testScenarioSelect" style="margin-top:6px;display:block;margin-left:auto;margin-right:auto;font-size:12px;padding:3px 8px;background:rgba(0,0,0,.5);color:#d4a04c;border:1px solid rgba(212,160,76,.4);border-radius:4px;cursor:pointer">
+      <option value="default">默认 (各家成套)</option>
+      <option value="manual-pong">manual-pong (庄家碰)</option>
+      <option value="manual-kong">manual-kong (庄家明杠)</option>
+      <option value="manual-ckong">manual-ckong (庄家暗杠)</option>
+      <option value="manual-self-win">manual-self-win (庄家自摸胡)</option>
+      <option value="manual-point-win">manual-point-win (下家点炮庄家胡)</option>
+      <option value="pong">pong (原碰场景)</option>
+      <option value="kong">kong (原明杠场景)</option>
+      <option value="addkong">addkong (原续杠场景)</option>
+      <option value="ckong-win">ckong-win (暗杠后胡)</option>
+      <option value="self-win">self-win (原自摸场景)</option>
+      <option value="seven-pairs">seven-pairs (七对)</option>
+    </select>
+    <div class="sub" id="dealSub">你是庄家,请发牌</div>
+  </div>
+
+  <div class="claimBar" id="claimBar">
+    <div class="claimBtns" id="claimBtns"></div>
+    <div class="sub" id="claimSub"></div>
+  </div>
+
+  <div class="winOverlay" id="winOverlay">
+    <div class="winCard">
+      <div class="winTitle" id="winTitle">胡 牌</div>
+      <div class="winInfo" id="winInfo"></div>
+    </div>
+  </div>
+
+  
+  <div class="restartFloat" id="restartFloat">
+    <button class="restartFloatBtn" id="restartFloatBtn">再 来 一 局</button>
+    <div class="restartFloatInfo" id="restartFloatInfo">已准备 0/4</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  
+  <div class="errorOverlay" id="errorOverlay">
+    <div class="errorCard">
+      <div class="errorTitle" id="errorTitle">出错了</div>
+      <div class="errorMsg" id="errorMsg"></div>
+      <button class="errorBtn" id="errorBtn">知道了</button>
+    </div>
+  </div>
+
+  <div class="loader" id="loader">
+    <div class="tiles"><div class="t"></div><div class="t"></div>
+      <div class="t"></div><div class="t"></div></div>
+    <p id="loaderText">连 接 中</p>
+  </div>
+
+<!-- A1: 主入口拆分到 /src/main.ts, 各模块按职责分离 (P3-2: .mjs → .ts) -->
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

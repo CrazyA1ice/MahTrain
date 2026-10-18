@@ -96,6 +96,18 @@ _SUITS = ("万", "条", "筒")
 def _asset_path(url_path: str) -> Path | None:
     if url_path in _STATIC:
         return _STATIC[url_path]
+    # The entire Queju 3D front end is built independently by Vite.
+    # Serve ONLY its compiled entry/assets; never serve TypeScript source,
+    # private game state, node_modules or path traversal outside dist.
+    if url_path in ("/3d", "/3d/", "/3d/game.html"):
+        return ROOT / "frontend_3d" / "dist" / "game.html"
+    if url_path.startswith("/3d/assets/"):
+        name = url_path[len("/3d/assets/"):]
+        if (name and len(name) < 200 and
+            all(ch.isascii() and (ch.isalnum() or ch in "._-") for ch in name)
+            and name not in (".", "..")):
+            return ROOT / "frontend_3d" / "dist" / "assets" / name
+        return None
     prefix = "/assets/tiles/"
     if not url_path.startswith(prefix):
         return None

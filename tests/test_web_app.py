@@ -64,6 +64,23 @@ class WebUI(unittest.TestCase):
         with urlopen(req, timeout=10) as response:
             return json.load(response)
 
+    def test_m367_queju_3d_static_paths_are_sandboxed(self):
+        root=web_server.ROOT / "frontend_3d" / "dist"
+        self.assertEqual(web_server._asset_path("/3d/game.html"),
+                         root / "game.html")
+        self.assertEqual(web_server._asset_path("/3d/"),
+                         root / "game.html")
+        self.assertEqual(web_server._asset_path("/3d/assets/game-123.js"),
+                         root / "assets" / "game-123.js")
+        for bad in ("/3d/assets/../web_server.py",
+                    "/3d/assets/.", "/3d/assets/..",
+                    "/3d/assets/x/../y.js", "/3d/node_modules/abc.js",
+                    "/frontend_3d/public/src/main.ts"):
+            self.assertIsNone(web_server._asset_path(bad))
+        page,_=self.get("/")
+        self.assertIn(b'id="match-open-queju-3d"',page)
+        self.assertIn(b'/3d/game.html?mahtrain=1',page)
+
     def test_m366_standalone_match_table_skin_is_served(self):
         page,_=self.get("/")
         style,content_type=self.get("/match_table_v2.css")
