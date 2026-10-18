@@ -6,7 +6,9 @@ public board facts; no wall, opponents' concealed hands or opponent W0.
 
 basic:     seeded varied legal cuts / conservative calls.
 advanced:  minimum-shanten cuts, only useful peng/ming-gang.
-challenge: minimum-shanten, public ukeire, then weak open-meld pressure ties.
+challenge: minimum-shanten, remaining-copy weighted winning score / shape value,
+           then calibrated weak public-meld danger. A one-ply EV heuristic,
+           not perfect-information or provably optimal full-game search.
 All difficulty levels accept verified HU, not speculative or illegal claims.
 """
 from __future__ import annotations
@@ -15,8 +17,8 @@ import random
 from collections import Counter
 from typing import Any, Mapping, Sequence
 
-from .efficiency import shanten_13, analyze_discards
-from .rules import TILE_INDEX, TILES, SUITS
+from .efficiency import shanten_13, effective_draws
+from .rules import TILE_INDEX, TILES, SUITS, score_win
 
 AI_LEVELS = ("basic", "advanced", "challenge")
 # Evaluation-only controlled variants; not advertised as player difficulty tiers.
@@ -90,6 +92,93 @@ def _cut_shanten(hand: Sequence[str], melds: Sequence[Mapping[str, str]],
     after = list(hand)
     after.remove(discard)
     return shanten_13(after, melds, missing)
+
+
+def challenge_discard_scores(view: Mapping[str, Any],
+                             cuts: Sequence[str] | None = None) -> list[dict[str, Any]]:
+    """Rank own 14-tile cuts by *public-information* next-draw value.
+
+    This is a bounded one-step heuristic, not a perfect-information oracle:
+    unknown physical copies are estimated as uniformly accessible (opponents
+    and wall are not inspected). Never regress the minimum post-cut shanten.
+    In tenpai, compute the EXACT supported fan for EACH viable winning tile,
+    then weight 2**fan by publicly remaining copies. Before tenpai, retain
+    ukeire but reward potential seven-pairs, all-pungs and pure-suit structures.
+    Conservative public-meld risk adjusts close decisions only.
+    """
+    hand, melds, missing = _own_view(view)
+    if len(hand) + 3 * len(melds) != 14:
+        raise ValueError("challenge evaluation requires 14 effective tiles")
+    allowed = sorted(set(hand), key=TILE_INDEX.__getitem__)
+    forced = [tile for tile in allowed if tile[0] == missing]
+    if forced:
+        allowed = forced
+    if cuts is not None:
+        allowed = [tile for tile in allowed if tile in cuts]
+    if not allowed:
+        raise ValueError("no legal discard to evaluate")
+    public = visible_tiles(view)
+    cap = view.get("win_ledger", {}).get("fan_cap", 3) if view.get("win_ledger") else 3
+    if type(cap) is not int or not 0 <= cap <= 12:
+        cap = 3
+    tian = view.get("tian_ting") or {}
+    verified_tian = tian.get("eligible") is True
+    wall_count = view.get("wall_count")
+    wall_late = type(wall_count) is int and wall_count <= 24
+    result: list[dict[str, Any]] = []
+    for tile in allowed:
+        after = list(hand)
+        after.remove(tile)
+        # This tile is now visible. Missing this known fourth copy otherwise
+        # biases the effective-copy denominator and expected winning value.
+        info = effective_draws(after, melds, missing, [*public, tile])
+        ukeire = info["effective_tile_count"]
+        expected = float(ukeire)
+        value = 1.0
+        if info["shanten"] == 0:
+            expected = 0.0
+            for item in info["effective_details"]:
+                scoring = score_win(
+                    [*after, item["tile"]], melds, missing, cap=cap,
+                    context={"tian_ting_verified": verified_tian},
+                )
+                expected += item["remaining"] * scoring["multiplier"]
+            value = expected / ukeire if ukeire else 0.0
+        else:
+            own_counts = Counter(after)
+            pairs = sum(n // 2 for n in own_counts.values())
+            triples = sum(n >= 3 for n in own_counts.values())
+            physical = [*after, *(m["tile"] for m in melds for _ in range(3))]
+            suit_counts = Counter(t[0] for t in physical)
+            dominant = max(suit_counts.values()) / len(physical)
+            # These are small calibrated priors, NOT invented fan or
+            # a guarantee of eventual completion.
+            pure_possible = all(m["tile"][0] == max(suit_counts,
+                key=suit_counts.get) for m in melds)
+            value += min(0.25, max(0.0, (dominant - 0.70) * .70)) if pure_possible else 0
+            value += 0.06 * triples
+            if not melds:
+                value += 0.08 * max(0, pairs - 3)
+            expected *= value
+        pressure = public_suit_pressure(tile, view)
+        # Opponent open suits are evidence of risk, not proof of tenpai.
+        risk_multiplier = max(0.72, 1 - (0.055 if wall_late else 0.025) * pressure)
+        result.append({
+            "discard": tile,
+            "shanten": info["shanten"],
+            "effective_tile_count": ukeire,
+            "effective_types": len(info["effective_types"]),
+            "expected_fan_weighted_copies": round(expected, 5),
+            "value_multiplier": round(value, 4),
+            "public_pressure": pressure,
+            "score": round(expected * risk_multiplier, 5),
+        })
+    minimum = min(item["shanten"] for item in result)
+    return sorted(
+        (item for item in result if item["shanten"] == minimum),
+        key=lambda item: (-item["score"], -item["effective_tile_count"],
+                          TILE_INDEX[item["discard"]]),
+    )
 
 
 class MahjongAgent:
@@ -230,27 +319,19 @@ class MahjongAgent:
             return min(best, key=lambda t: (
                 public_suit_pressure(t, view), TILE_INDEX[t],
             ))
-        # Challenge: prefer maximum public-information-based effective copies.
-        # analyze_discards validates known physical counts and uses NO wall.
-        ranked = analyze_discards(
-            hand, melds, missing_suit=missing,
-            visible_tiles=visible_tiles(view),
-        )
-        candidates = {
-            entry["discard"]: entry for entry in ranked["candidates"]
-        }
-        return min(best,key=lambda t:(
-            -candidates[t]["effective_tile_count"],
-            (0 if self.level == "challenge_no_pressure"
-             else public_suit_pressure(t,view)),
-            TILE_INDEX[t],
-        ))
+        # Challenge keeps all legal minimum-shanten cuts, then trades
+        # effective-copy count against expected winning fan or shape potential.
+        # The old ablation remains unchanged for comparable prior experiments.
+        if self.level == "challenge_no_pressure":
+            ranked = challenge_discard_scores(view, best)
+            return ranked[0]["discard"]
+        return challenge_discard_scores(view, best)[0]["discard"]
 
     def policy_description(self) -> str:
         return {
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
-            "challenge":"向听及公开有效进张优先；完全相同时以公开副露花色压力做弱风险判别",
+            "challenge":"保持最少向听，按真实听口剩余张数×封顶番倍率估算收益；非听牌时结合进张、牌型潜力和公开副露风险",
         }[self.level]
 
 
