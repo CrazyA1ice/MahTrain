@@ -2544,7 +2544,7 @@
    missing columns with overflow:hidden. The edge AI seats remain distinct. */
 @media(min-width:320px) and (max-width:359px){
   .match-board{
-    grid-template-columns:30px minmax(0,1fr) 30px;
+    grid-template-columns:22px minmax(0,1fr) 22px;
   }
   .match-seat--left,.match-seat--right{
     padding-inline:0!important;
@@ -2552,5 +2552,13 @@
   .match-seat--left .match-seat-name,
   .match-seat--right .match-seat-name{
     font-size:8px;
+  }
+}
+
+@media(min-width:320px) and (max-width:359px){
+  .match-seat--left .match-seat-avatar,
+  .match-seat--right .match-seat-avatar{
+    flex:0 0 18px;width:18px;height:18px;
+    font-size:8px;border-width:1px;
   }
 }
