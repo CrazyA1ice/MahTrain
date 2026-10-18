@@ -294,7 +294,13 @@
           </select></label>
           <label class="match-kong-toggle"><input id="match-enable-kong" type="checkbox"/> 自定义杠钱底分</label>
           <label>杠钱底分（默认跟随房间系数） <input id="match-kong-base" type="number" min="1" max="1000000" value="100" disabled/></label>
-          <button id="match-new" type="button" class="primary">随机开始一局</button>
+          <a id="match-open-queju-3d" class="primary"
+             href="/3d/game.html?mahtrain=1&amp;seat=0&amp;name=MahTrain"
+             title="直接进入完整开源雀局 Three.js 3D 对战前端，由原 Python AI 和血战规则驱动"
+             style="display:inline-block;padding:10px 16px;margin:3px;text-decoration:none;border-radius:8px">
+             开始 3D 血战（雀局成熟前端）
+          </a>
+          <button id="match-new" type="button" class="primary">旧版 2D 对战（备用）</button>
         </div>
         <div class="match-extras">
           <label class="match-voice-switch"><input id="match-voice-enabled" type="checkbox" checked/> 语音播报出牌、碰、杠、胡</label>
@@ -350,12 +356,6 @@
               <label class="match-confirm-option"><input id="match-confirm-discard" type="checkbox"> 出牌二次确认</label>
             </div>
           </div>
-          <a id="match-open-queju-3d" class="primary match-again"
-             href="/3d/game.html?mahtrain=1&amp;seat=0&amp;name=MahTrain"
-             title="使用整套开源雀局 Three.js 3D 牌桌，四川血战规则仍由 MahTrain 服务器执行"
-             style="display:inline-block;margin:6px 0 10px;text-decoration:none">
-             打开雀局 3D 血战牌桌（新版前端）
-          </a>
           <button id="match-again" type="button" class="primary match-again">再来一局 · 随机开局</button>
           <div class="match-playback-settings" role="group" aria-label="AI 播放设置">
             <label>AI 动作速度
