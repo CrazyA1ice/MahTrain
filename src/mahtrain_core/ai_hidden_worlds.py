@@ -126,7 +126,8 @@ def _public_styles(view: Mapping[str, Any]) -> dict[int, dict[str, Any]]:
 
 
 def _tile_weight(tile: str, missing: str, style: Mapping[str, Any],
-                 chosen: Sequence[str], late: bool) -> float:
+                 chosen: Sequence[str], late: bool, *,
+                 chosen_counts: Mapping[str, int] | None = None) -> float:
     """Public behavioral proposal score, explicitly NOT a posterior density."""
     river = style.get("river", ())
     revealed = style.get("meld_suits", ())
@@ -139,8 +140,8 @@ def _tile_weight(tile: str, missing: str, style: Mapping[str, Any],
     if len(revealed) >= 2 and len(set(revealed)) == 1:
         score *= 1.75 if tile[0] == revealed[0] else 0.90
     if chosen and tile[0] != missing:
-        own = Counter(chosen)
-        if own[tile]:
+        own = chosen_counts if chosen_counts is not None else Counter(chosen)
+        if own.get(tile, 0):
             score *= 1.85 if own[tile] == 1 else 1.45
         rank = int(tile[1])
         neighbors = (
@@ -189,6 +190,7 @@ def _ready_hypothesis(
     available[single] -= 1
     shaped = [single]
     for _ in range(sets_needed):
+        chosen_counts = Counter(shaped)
         candidates: list[tuple[str, ...]] = []
         for tile in TILES:
             if tile[0] == missing:
@@ -203,7 +205,8 @@ def _ready_hypothesis(
         if not candidates:
             return None
         chosen = candidates[_weighted_index([
-            sum(_tile_weight(t, missing, style, shaped, late) for t in group) / 3
+            sum(_tile_weight(t, missing, style, shaped, late,
+                             chosen_counts=chosen_counts) for t in group) / 3
             for group in candidates
         ], rng)]
         for tile in chosen:
@@ -248,8 +251,10 @@ def _deal(pool: list[str], targets: list[tuple[int, int, str, list[dict[str, str
             for _ in range(size):
                 if not remaining:
                     raise ValueError("insufficient physical unknown tiles")
+                chosen_counts = Counter(hand)
                 selected = _weighted_index([
-                    _tile_weight(tile, missing, style, hand, late)
+                    _tile_weight(tile, missing, style, hand, late,
+                                 chosen_counts=chosen_counts)
                     for tile in remaining
                 ], rng)
                 hand.append(remaining.pop(selected))
