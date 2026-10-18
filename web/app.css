@@ -2437,9 +2437,9 @@
 @media(min-width:701px){
   .match-board{
     --river-h-cell:clamp(19px,2.5vw,38px);
-    --river-h-row:clamp(28px,3vw,43px);
+    --river-h-row:clamp(28px,3vw,42px);
     --river-side-cell:clamp(21px,3.25vw,44px);
-    --river-side-row:clamp(25px,2.6vw,36px);
+    --river-side-row:clamp(24px,2.5vw,35px);
     grid-template-columns:clamp(78px,9.2vw,146px)
       minmax(0,1fr) clamp(78px,9.2vw,146px);
     grid-template-rows:140px 962px 206px 210px;
@@ -2463,7 +2463,7 @@
     --river-h-cell:clamp(12px,3.35vw,21px);
     --river-h-row:clamp(21px,5vw,28px);
     --river-side-cell:clamp(15px,4.5vw,22px);
-    --river-side-row:clamp(19px,6vw,24px);
+    --river-side-row:clamp(19px,5.8vw,23px);
     grid-template-columns:clamp(48px,13.5vw,78px)
       minmax(0,1fr) clamp(48px,13.5vw,78px);
     grid-template-rows:99px 614px 199px 185px;
