@@ -726,7 +726,8 @@
     return !liveBoard && Array.isArray(state?.win_ledger?.balances) &&
       (state.win_ledger.wins.length>0 ||
        (state.exhaustive_settlement?.posted===true &&
-        state.exhaustive_settlement.entries.length>0));
+        state.exhaustive_settlement.entries.length>0) ||
+        state.kong_ledger?.balances?.some(n=>n!==0));
   }
   function signedScore(value){
     return (value>=0?"+":"")+value;
@@ -909,12 +910,14 @@
         " · 公开副露"+state.melds[id].length+"组"));
       seatCard.append(el("b","match-round-seat-balance",
         "胡牌积分 "+signedScore(ledger?.balances?.[id]??0)+
+        " · 杠钱 "+signedScore(kong?.balances?.[id]??0)+
         (state.exhaustive_settlement?.posted?
           " · 流局 "+signedScore(state.exhaustive_settlement.balances[id])+
-          " · 已入账合计 "+signedScore(state.settled_balances[id]):"")));
+          " · 流局赔付已入账":"")+
+        " · 本局合计 "+signedScore(state.settled_balances?.[id]??0)));
       seatCard.append(el("small","",
-        kong?.base===null?"独立杠钱：未启用定价":
-        "独立杠钱试验积分 "+signedScore(kong?.balances?.[id]??0)));
+        kong?.base===null?"旧局杠钱未计价":
+        "杠钱底分 "+kong.base+" · 已计入本局合计"));
       summary.append(seatCard);
     }
     renderReviewFiltered();
@@ -925,7 +928,7 @@
         " 方案A（仅未胡玩家参与）已完成流局零和结算。":
         " 牌山耗尽后的查花猪、查大叫存在待核验事项或旧局记录，流局赔付未入账。"):
         " 本局未发生流局，流局赔付未入账。")+
-      " 独立杠钱仅为可选试验积分，绝不计入胡牌余额。";
+      " 本局已计价杠钱计入净收益，胡牌流水单列。";
   }
   function renderTableSettlement(){
     const panel=$("match-table-settlement");
@@ -941,16 +944,16 @@
     const wallPending=state.phase==="wall_exhausted"&&
       state.exhaustive_settlement?.posted!==true;
     $("match-table-settlement-title").textContent=wallPending?
-      "流局待核验 · 当前仅显示胡牌已入账金额":
+      "流局待核验 · 当前显示胡牌和杠钱已入账金额":
       state.exhaustive_settlement?.posted?
-        "本局胡牌 + 流局结算 · 已入账":"本局胡牌结算 · 已入账";
+        "本局胡牌 + 杠钱 + 流局结算 · 已入账":"本局胡牌 + 杠钱结算 · 已入账";
     $("match-table-round-phase").textContent=terminal?"摸切已结束":"对局进行中";
     const myPosted=state.settled_balances?.[0]??ledger.balances[0];
     $("match-table-self-summary").textContent=
       "我的已入账积分 "+signedScore(myPosted)+" · "+
       (wallPending?"牌山耗尽 · 流局赔付待核验，不代表最终净积分":
         state.exhaustive_settlement?.posted?
-          "包含方案A已确认的流局赔付":"仅含已确认胡牌积分");
+          "包含胡牌、杠钱及方案A已确认的流局赔付":"包含已确认胡牌和杠钱积分");
     const scores=$("match-table-scores");
     scores.replaceChildren();
     for(const seat of seats){
@@ -987,10 +990,9 @@
     const kongEnabled=state.kong_ledger?.base!=null;
     $("match-table-score-note").textContent=
       (state.exhaustive_settlement?.posted?
-        "以上为胡牌 + 方案A流局已入账合计":
-        "以上仅为胡牌已入账积分")+
-      (kongEnabled?"；独立杠钱试验积分另列，不计入此栏":
-        "；不含独立杠钱")+
+        "以上为胡牌 + 杠钱 + 方案A流局已入账合计":
+        "以上为胡牌及已计价杠钱的总额")+
+      (kongEnabled?"；杠钱已计入本栏":"；本局杠钱未计价")+
       (wallPending?"；本局流局赔付待核验，当前合计不能视为最终净积分。":
         state.exhaustive_settlement?.posted?"。":"；无正式流局结算。");
   }
@@ -1304,7 +1306,7 @@
     const ledger=state.win_ledger;
     if(ledger){
       const score=el("section","match-ledger");
-      score.append(el("h4","","四家胡牌结算账本（不含杠钱）"));
+      score.append(el("h4","","四家胡牌流水（净收益另含杠钱）"));
       score.append(el("p","review-footnote",
         "房间系数"+ledger.room_coefficient+
         " · 最终番数封顶"+ledger.fan_cap+
@@ -1355,17 +1357,16 @@
           voided+"笔杠上炮作废（底分和撤销细则待确认，未产生虚构退款）。"));
       }
       score.append(el("p","review-footnote",
-        "胡牌零和流水已入账；方案A在合法流局后单独结算，独立杠钱只有明确勾选后才模拟入账。"));
+        "胡牌、已计价杠钱与合法流局赔付单独记账，共同计入本局正式收益。"));
       publicInfo.append(score);
     }
     const kongLedger=state.kong_ledger;
     if(kongLedger){
       const k=el("section","match-kong-ledger");
-      k.append(el("h4","","独立杠钱模拟与冲销流水"));
+      k.append(el("h4","","杠钱结算与冲销流水"));
       k.append(el("p","review-footnote",kongLedger.base===null
-        ?"未设置杠钱底分：不自动计价，所有杠钱为待定。"
-        :"已启用单独杠钱底分"+kongLedger.base+
-          "（仅为试验积分，不代表已确定的正式房间规则）。"));
+        ?"旧局未设置杠钱底分：杠钱尚未计价。"
+        :"本局杠钱底分 "+kongLedger.base+"；已计入本局正式净收益。"));
       k.append(el("p","review-intro",
         "四家杠钱余额："+kongLedger.balances.map(
           (n,i)=>i+"号"+(n>=0?"+":"")+n).join(" · ")));
@@ -1392,9 +1393,9 @@
         }
         k.append(details);
       }
-      const net=state.combined_balances||[0,0,0,0];
+      const net=state.settled_balances||[0,0,0,0];
       k.append(el("p","match-net",
-        "胡牌 + 流局正式结算 + 模拟杠钱余额："+net.map((n,i)=>
+        "胡牌 + 杠钱 + 流局正式净收益："+net.map((n,i)=>
           i+"号"+(n>=0?"+":"")+n).join(" · ")));
       publicInfo.append(k);
     }
@@ -1470,7 +1471,7 @@
       self_draw_mode:$("match-self-draw-mode").value,
       ai_levels:[1,2,3].map(n=>$("match-ai-"+n).value),
       kong_base:$("match-enable-kong").checked
-        ?Number($("match-kong-base").value):null,
+        ?Number($("match-kong-base").value):Number($("match-coefficient").value),
     };
     if(!alwaysRandom && $("match-lab-enabled").checked){
       const raw=$("match-seed").value.trim();
