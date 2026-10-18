@@ -12,8 +12,10 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from mahtrain_core.ai_hidden_worlds import (
-    _private_world_inputs, _deal, sample_discard_losses,
+    _private_world_inputs, _public_styles, _tile_weight,
+    _deal, sample_discard_losses,
 )
+from mahtrain_core.efficiency import shanten_13
 from mahtrain_core.ai import challenge_discard_scores
 from mahtrain_core.four_player import FourPlayerOpening
 from mahtrain_core.rules import TILES, score_win
@@ -51,7 +53,7 @@ class HiddenWorldsTests(unittest.TestCase):
         self.assertTrue(result["available"])
         self.assertEqual(result["worlds"],5)
         self.assertEqual(set(result["by_tile"]),{"m1","s5"})
-        self.assertEqual(result["model"],"proposal_mc_v1")
+        self.assertEqual(result["model"],"river_conditioned_proposal_v2")
 
     def test_same_observation_same_sample_and_hidden_injection_ignored(self):
         view=live_view()
@@ -63,6 +65,62 @@ class HiddenWorldsTests(unittest.TestCase):
         copied["match_seed"]=99999
         self.assertEqual(baseline,sample_discard_losses(["s5","m1"],copied,worlds=9))
         self.assertEqual(baseline,sample_discard_losses(["m1","s5"],view,worlds=9))
+
+    def test_river_and_open_meld_suit_condition_proposal_weights(self):
+        style={"river":("s4","s4","s6","p8","p9","s3","s9"),
+               "meld_suits":("m2","m7")}
+        # Only meld suits are accepted in the real public style builder;
+        # explicit style here uses suit letters, not made-up concealed tiles.
+        style["meld_suits"]=("m","m")
+        w_m=_tile_weight("m5","p",style,[],late=True)
+        w_s=_tile_weight("s4","p",style,[],late=True)
+        self.assertGreater(w_m,w_s)
+        self.assertLess(_tile_weight("p5","p",style,[],late=True),
+                        _tile_weight("p5","p",style,[],late=False))
+        self.assertGreater(
+            _tile_weight("m5","p",{"river":(),"meld_suits":()},["m4","m5"],False),
+            _tile_weight("m5","p",{"river":(),"meld_suits":()},[],False))
+        view=live_view()
+        view["discards"]=[{"seat":s,"tile":"s4"} for s in range(4)]
+        observed=_public_styles(view)
+        self.assertEqual(observed[2]["river"],("s4",))
+
+    def test_conditioned_ready_hypotheses_keep_all_physical_copies(self):
+        view={
+            "seat":0,
+            "hand":["m1","m2","m3","m4","m5","m6","m7",
+                    "m8","m9","s1","s2","s3","s4","s5"],
+            "own_melds":[],"hand_counts":[14,7,13,13],
+            "missing_suits":["p","m","p","s"],"won":[False]*4,
+            "melds":[[],[{"type":"peng","tile":"p1"},
+                         {"type":"peng","tile":"p2"}],[],[]],
+            "discards":[{"seat":1,"tile":"m3"},
+                        {"seat":1,"tile":"m6"},
+                        {"seat":2,"tile":"m9"}],
+            "wall_count":17,
+        }
+        inputs=_private_world_inputs(view)
+        self.assertIsNotNone(inputs)
+        pool, targets=inputs
+        diagnostic={"ready_hypotheses":0}
+        sample=_deal(pool,targets,random.Random(9),late=True,
+                     evidence=_public_styles(view),world_index=0,
+                     diagnostics=diagnostic)
+        self.assertGreaterEqual(diagnostic["ready_hypotheses"],1)
+        all_assigned=[tile for _,cards,_,_ in sample for tile in cards]
+        self.assertFalse(Counter(all_assigned)-Counter(pool))
+        physically_known=Counter(view["hand"])
+        physically_known.update({"p1":3,"p2":3,"m3":1,"m6":1,"m9":1})
+        physically_known.update(all_assigned)
+        self.assertLessEqual(max(physically_known.values()),4)
+        opponent=next((cards,suit,groups) for seat,cards,suit,groups
+                      in sample if seat==1)
+        self.assertEqual(shanten_13(opponent[0],opponent[2],opponent[1]),0)
+        result=sample_discard_losses(["p8","s8"],view,worlds=12)
+        self.assertTrue(result["available"])
+        self.assertGreater(result["ready_hypotheses"],0)
+        self.assertLessEqual(result["ready_hypotheses"],12)
+        self.assertTrue(all(row["hits"]<=12*3 for row in result["by_tile"].values()))
 
     def test_budget_validation_and_absent_observation_fallback(self):
         view=live_view()
@@ -124,7 +182,7 @@ class HiddenWorldsTests(unittest.TestCase):
         info={"shanten":0,"effective_tile_count":6,
               "effective_types":["p1"],
               "effective_details":[{"tile":"p1","remaining":6}]}
-        probe={"available":True,"worlds":24,"model":"proposal_mc_v1",
+        probe={"available":True,"worlds":24,"model":"river_conditioned_proposal_v2",
                "by_tile":{"m4":{"hits":3,"mean_loss_multiplier":8.0},
                           "s4":{"hits":0,"mean_loss_multiplier":0.0}}}
         with patch("mahtrain_core.ai.effective_draws",return_value=info), \
