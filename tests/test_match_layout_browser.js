@@ -64,7 +64,8 @@ function check(report,w,label){
       report.board.bottom<=report.viewportDebug.innerHeight+1,
       w+" board must be completely visible when scrolled into view");
     assert.equal(report.safeLayout?.allVisible,true,
-      w+" all four river/meld/missing zones must fit their own seats");
+      w+" all four river/meld/missing zones must fit their own seats; "+
+      (report.safeLayout?.visibilityIssues||[]).join(", "));
     assert.equal(report.safeLayout?.promptInsideCenter,true,
       w+" exchange prompt must stay inside the central safe bay");
     assert.equal(report.safeLayout?.promptOverlaps.length,0,
@@ -268,25 +269,33 @@ async function main(){
             ".match-board .match-missing-flag:not([hidden])"))
         ];
         let allVisible=true;
+        const visibilityIssues=[];
         for(let seat=0;seat<4;seat++){
           const holder=document.getElementById("match-seat-"+seat);
           const seatBox=box(holder);
           const flag=seat===0
             ?document.getElementById("match-self-missing-flag")
             :holder.querySelector(".match-missing-flag");
-          if(!flag||flag.hidden||!inside(box(flag),seatBox))allVisible=false;
+          if(!flag||flag.hidden||!inside(box(flag),seatBox)){
+            allVisible=false;visibilityIssues.push("seat"+seat+":flag");
+          }
           const melds=seat===0
             ?document.getElementById("match-self-melds")
             :holder.querySelector(".match-seat-melds");
           if(!melds||melds.querySelectorAll(".match-seat-meld").length!==4||
-             !inside(box(melds),seatBox))allVisible=false;
+             !inside(box(melds),seatBox)){
+            allVisible=false;visibilityIssues.push("seat"+seat+":meld-rack");
+          }
           for(const tile of melds?.querySelectorAll(".tile")||[]){
-            if(!inside(box(tile),seatBox))allVisible=false;
+            if(!inside(box(tile),seatBox)){
+              allVisible=false;visibilityIssues.push("seat"+seat+":meld-tile");
+            }
           }
         }
         const promptBox=prompt?box(prompt):null;
         const safeLayout={
-          allVisible,promptInsideCenter:!!promptBox&&inside(promptBox,safeBox),
+          allVisible,visibilityIssues,
+          promptInsideCenter:!!promptBox&&inside(promptBox,safeBox),
           promptOverlaps:promptBox?vulnerable
             .filter(item=>overlaps(promptBox,box(item)))
             .map(item=>item.id||item.className):[],
