@@ -1064,10 +1064,18 @@ class WebUI(unittest.TestCase):
                      "match-table-round-phase"):
             self.assertEqual(page.count(
                 ('id="%s"' % item).encode()),1)
+        # M3.65: live exchange/reaction controls are INSIDE the central
+        # wall bay; final settlements are below the whole four-seat table.
+        self.assertLess(page.index(b'id="match-wall"'),
+                        page.index(b'id="match-controls"'))
+        self.assertLess(page.index(b'id="match-controls"'),
+                        page.index(b'id="match-seat-0"'))
         self.assertLess(page.index(b'id="match-seat-0"'),
+                        page.index(b'id="match-ready-hint"'))
+        self.assertLess(page.index(b'id="match-ready-hint"'),
                         page.index(b'id="match-table-settlement"'))
         self.assertLess(page.index(b'id="match-table-settlement"'),
-                        page.index(b'id="match-controls"'))
+                        page.index(b'id="match-round-report"'))
         for token in (b"renderTableSettlement",b"settlementAvailable",
                       b"match-seat-meld--",b"win_ledger.balances",
                       b"match-table-score-note",b"kong_ledger"):
