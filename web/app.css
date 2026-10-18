@@ -2338,3 +2338,160 @@
     max-height:100%;overflow-y:auto;
   }
 }
+
+
+/* M3.60: FIXED FOUR-SIDED TABLE. Build the complete 56-slot river footprint
+   before the first discard: 14 x 4 from the owner, rotated 90/180/270deg.
+   No river scrollbars, reflow, lane wraps or river/hand collisions.
+   The only intentional small-screen horizontal scrolling remains the human
+   concealed hand, which cannot be legible as 14 large tiles on a phone. */
+.match-board-scroll{
+  overflow-x:clip;overflow-y:visible;
+}
+.match-board{
+  box-sizing:border-box;width:100%;max-width:100%;min-width:0;
+  align-content:start;overflow:hidden;
+}
+.match-board-center{
+  overflow:hidden;min-width:0;min-height:0;height:100%;max-height:100%;
+  grid-template-areas:"rt rt rt" "rl wall rr" "rb rb rb";
+}
+.match-board .match-river{
+  box-sizing:border-box;min-width:0;min-height:0;max-height:100%;
+  display:flex;flex-direction:column;align-items:center;overflow:hidden;
+  flex-shrink:0;
+}
+.match-board .match-river .match-river-tiles{
+  display:grid!important;box-sizing:border-box;
+  flex:0 0 auto;min-width:0;min-height:0;max-width:100%;max-height:100%;
+  overflow:hidden!important;overscroll-behavior:none;
+  direction:ltr;flex-direction:initial!important;
+  grid-auto-flow:row;align-content:center;justify-content:center;
+  gap:3px;
+  scrollbar-width:none;
+}
+.match-board .match-river .match-river-lane{
+  display:contents!important;
+}
+.match-board .match-river--top .match-river-tiles,
+.match-board .match-river--bottom .match-river-tiles{
+  width:max-content;
+  grid-template-columns:repeat(14,var(--river-h-cell));
+  grid-template-rows:repeat(4,var(--river-h-row));
+}
+.match-board .match-river--left .match-river-tiles,
+.match-board .match-river--right .match-river-tiles{
+  width:max-content;
+  grid-template-columns:repeat(4,var(--river-side-cell));
+  grid-template-rows:repeat(14,var(--river-side-row));
+}
+.match-board .match-river .match-river-cell,
+.match-board .match-river .match-river-cell.is-claimed{
+  box-sizing:border-box;min-width:0;min-height:0;width:100%;height:100%;
+  max-width:100%;max-height:100%;overflow:visible;
+  display:flex;align-items:center;justify-content:center;
+  margin:0;padding:0;direction:ltr;
+}
+.match-board .match-river .match-river-cell .tile{
+  box-sizing:border-box;min-width:0;min-height:0;
+  width:calc(100% - 2px);height:calc(100% - 2px);
+  max-width:100%;max-height:100%;padding:1px;
+  flex:0 0 auto;border-radius:3px;
+}
+.match-board .match-river--left .match-river-cell .tile,
+.match-board .match-river--right .match-river-cell .tile{
+  /* A 90°-rotated rectangle occupies height x width in its fixed slot. */
+  width:calc(var(--river-side-row) - 4px);
+  height:calc(var(--river-side-cell) - 4px);
+  max-width:none;max-height:none;
+  transform-origin:center;
+}
+.match-board .match-river--left .match-river-cell .tile{transform:rotate(90deg)}
+.match-board .match-river--right .match-river-cell .tile{transform:rotate(-90deg)}
+.match-board .match-river--top .match-river-cell .tile{transform:rotate(180deg)}
+.match-board .match-river--bottom .match-river-cell .tile{transform:none}
+.match-board .match-river-cell.is-latest{outline-offset:-1px}
+.match-board .match-river .match-river-claimed{
+  font-size:clamp(7px,.75vw,10px);overflow-wrap:anywhere;
+}
+.match-board .match-seat--bottom{
+  box-sizing:border-box;width:100%;min-width:0;
+  height:100%;min-height:0;max-height:100%;
+  justify-content:center;overflow:hidden;
+}
+.match-board .match-seat--bottom #match-hand{
+  box-sizing:border-box;min-width:0;max-width:100%;
+  width:100%;min-height:100px;
+  flex-wrap:nowrap;align-items:center;justify-content:center;
+  overflow-x:hidden;overflow-y:hidden;
+  margin:4px 0 8px;padding:17px 8px 12px;
+}
+/* Keep the 14th (drawn) tile on its own right edge, with no vertical spill. */
+.match-board .match-seat--bottom #match-hand .tile{
+  box-sizing:border-box;width:clamp(28px,3.6vw,54px);
+  height:clamp(43px,5vw,73px);flex:0 0 auto;
+}
+.match-board .match-seat--bottom #match-hand .tile.match-new-draw{
+  margin-left:clamp(5px,1vw,16px);
+}
+@media(min-width:701px){
+  .match-board{
+    --river-h-cell:clamp(19px,2.5vw,38px);
+    --river-h-row:clamp(28px,3vw,42px);
+    --river-side-cell:clamp(21px,3.25vw,44px);
+    --river-side-row:clamp(24px,2.5vw,35px);
+    grid-template-columns:clamp(78px,9.2vw,146px)
+      minmax(0,1fr) clamp(78px,9.2vw,146px);
+    grid-template-rows:140px 962px 206px 210px;
+    gap:7px;padding:10px;border-width:8px;
+  }
+  .match-board-center{
+    grid-template-columns:minmax(0,1fr) minmax(88px,.47fr) minmax(0,1fr);
+    grid-template-rows:196px 556px 196px;
+    gap:7px;
+  }
+  .match-board .match-river--left .match-river-tiles,
+  .match-board .match-river--right .match-river-tiles{
+    align-content:center;
+  }
+  .match-board .match-seat--bottom #match-hand{
+    flex:0 0 auto;
+  }
+}
+@media(max-width:700px){
+  .match-board{
+    --river-h-cell:clamp(12px,3.35vw,21px);
+    --river-h-row:clamp(21px,5vw,25px);
+    --river-side-cell:clamp(15px,4.5vw,22px);
+    --river-side-row:clamp(19px,5.8vw,23px);
+    grid-template-columns:clamp(48px,13.5vw,78px)
+      minmax(0,1fr) clamp(48px,13.5vw,78px);
+    grid-template-rows:99px 614px 199px 185px;
+    padding:5px;gap:4px;border-width:5px;
+  }
+  .match-board-center{
+    grid-template-columns:minmax(0,1fr) minmax(54px,.9fr) minmax(0,1fr);
+    grid-template-rows:120px 366px 120px;
+    gap:3px;
+  }
+  .match-board .match-river{padding:1px;gap:2px}
+  .match-board .match-river-title{font-size:9px;line-height:11px}
+  .match-board .match-river .match-river-tiles{gap:2px}
+  .match-board .match-river .match-river-cell .tile{padding:0}
+  .match-board .match-river--left .match-river-cell .tile,
+  .match-board .match-river--right .match-river-cell .tile{
+    width:calc(var(--river-side-row) - 3px);
+    height:calc(var(--river-side-cell) - 3px);
+  }
+  .match-board .match-seat--bottom #match-hand{
+    justify-content:flex-start;overflow-x:auto;overflow-y:hidden;
+    min-height:95px;scroll-snap-type:x proximity;
+    padding:15px 3px 12px;
+  }
+  .match-board .match-seat--bottom #match-hand .tile{
+    width:51px;height:70px;flex-shrink:0;
+  }
+  .match-board .match-seat--bottom #match-hand .tile.match-new-draw{
+    margin-left:14px;
+  }
+}

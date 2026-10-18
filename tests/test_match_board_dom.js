@@ -9,7 +9,7 @@ const path=require("node:path");
 class Node {
   constructor(tag="div"){
     this.tagName=tag;this.children=[];this.className="";this.textContent="";
-    this.attributes={};this.handlers={};this.disabled=false;this.hidden=false;
+    this.attributes={};this.handlers={};this.style={};this.disabled=false;this.hidden=false;
     this.value="";this.title="";
     this.classes=new Set();
     this.classList={
@@ -950,10 +950,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     x.className==="match-self-win-preview"),false,
     "a nonwinning/old round must not retain the prior quote");
 
-  // M3.44: each owner-oriented side river retains chronological source
-  // order, grouped in 8-tile VERTICAL lanes for desktop. CSS makes the left
-  // lanes top-to-bottom and right lanes bottom-to-top, without reversing
-  // source history, hidden hands, claimed removals or latest highlighting.
+  // M3.60: every river is the same 14 x 4 owner-relative grid, rotated
+  // geometrically; the 56 slots are reserved before any tile appears.
+  // Side owner lanes contain 14 chronological discards before column wrap.
   const lateral=[];
   for(let i=0;i<17;i++){
     lateral.push({seat:3,tile:"m"+(i%9+1),
@@ -967,14 +966,59 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     const root=dom["match-river-"+seat];
     const riverTiles=root.children.find(x=>x.className==="match-river-tiles");
     assert.deepEqual(riverTiles.children.map(x=>x.className),
-      ["match-river-lane","match-river-lane","match-river-lane"]);
-    assert.deepEqual(riverTiles.children.map(x=>x.children.length),[8,8,1]);
+      ["match-river-lane","match-river-lane"]);
+    assert.deepEqual(riverTiles.children.map(x=>x.children.length),[14,3]);
+    assert.equal(riverTiles.attributes["data-river-capacity"],"56");
     const indexed=riverTiles.children.flatMap(lane=>
       lane.children.map(cell=>Number(cell.attributes["data-discard-order"])));
     assert.deepEqual(indexed,lateral.map((e,i)=>e.seat===seat?i:null)
       .filter(x=>x!==null));
-    assert.equal(riverTiles.children[2].children[0].classList.contains(
+    assert.equal(riverTiles.children[1].children[2].classList.contains(
       "is-latest"),seat===1);
+    const first=riverTiles.children[0].children[0];
+    const fourteenth=riverTiles.children[0].children[13];
+    const fifteenth=riverTiles.children[1].children[0];
+    assert.equal(first.style.gridRow,seat===3?"1":"14");
+    assert.equal(fourteenth.style.gridRow,seat===3?"14":"1");
+    assert.equal(fifteenth.style.gridColumn,seat===3?"3":"2");
+  }
+  // A fully populated owner river (56 maximum physical discards) must
+  // use exactly the preallocated cells without adding rows, scrolling,
+  // rotating chronology backwards or moving an earlier claimed slot.
+  // Slot index is independent of GLOBAL discard order.
+  const orientations={
+    0:[[1,1],[1,14],[2,1],[4,14]],
+    2:[[4,14],[4,1],[3,14],[1,1]],
+    3:[[1,4],[14,4],[1,3],[14,1]],
+    1:[[14,1],[1,1],[14,2],[1,4]],
+  };
+  for(const seat of [0,1,2,3]){
+    startMatch={...base,discards:Array.from({length:56},(_,i)=>({
+      seat,tile:"m"+(i%9+1),
+      ...(i===5?{claimed_by:(seat+1)%4}:{})
+    }))};
+    dom["match-new"].handlers.click();
+    await settle();
+    const river=dom["match-river-"+seat];
+    const tray=river.children.find(x=>x.className==="match-river-tiles");
+    const cells=tray.children.flatMap(x=>x.className==="match-river-lane"?
+      x.children:[x]).filter(x=>x.className==="match-river-cell");
+    assert.equal(cells.length,56,"every tile occupies a reserved slot");
+    assert.equal(tray.attributes["data-river-capacity"],"56");
+    for(const [n,position] of [[0,orientations[seat][0]],
+                              [13,orientations[seat][1]],
+                              [14,orientations[seat][2]],
+                              [55,orientations[seat][3]]]){
+      assert.deepEqual([Number(cells[n].style.gridRow),
+                        Number(cells[n].style.gridColumn)],position);
+    }
+    const unique=new Set(cells.map(c=>
+      c.style.gridRow+":"+c.style.gridColumn));
+    assert.equal(unique.size,56,"slots never overlap or reflow");
+    assert.equal(cells[5].classList.contains("is-claimed"),true);
+    assert.equal(descendants(cells[5],x=>x.tile==="m6").length,0,
+      "claimed discard occupies its original place but not a duplicate tile");
+    assert.equal(cells[55].classList.contains("is-latest"),true);
   }
   assert.equal(dom["match-decision"].hidden,true,
     "normal discard phase must not block the table with a reaction panel");
