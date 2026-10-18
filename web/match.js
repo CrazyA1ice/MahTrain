@@ -15,6 +15,97 @@
   let backColor="jade";
   let playback=null,liveBoard=null,voice=null;
   const MAX_REVIEW_STEPS=512;
+  const MATCH_SESSION_KEY="mahtrain.match.session.v1";
+  const activeMatch=()=>state&&!["finished","wall_exhausted"].includes(state.phase);
+  // sessionStorage is scoped to this tab, not durable disk or synced across
+  // devices. Store ONLY the opaque session token, never hands, walls or seed.
+  function savedMatchToken(){
+    try{return window.sessionStorage?.getItem(MATCH_SESSION_KEY)||null}
+    catch(_){return null}
+  }
+  function saveMatchToken(){
+    try{
+      if(activeMatch()&&token)window.sessionStorage?.setItem(MATCH_SESSION_KEY,token);
+      else window.sessionStorage?.removeItem(MATCH_SESSION_KEY);
+    }catch(_){/* private browsing may disable Web Storage */}
+  }
+  function clearSavedMatchToken(){
+    try{window.sessionStorage?.removeItem(MATCH_SESSION_KEY)}
+    catch(_){/* no storage access */}
+  }
+  function syncHomeMatchHint(){
+    const label=$("home-match-state");
+    if(label)label.textContent=activeMatch()?"已有对局界面，点击继续查看":"";
+  }
+  async function resumeMatch(){
+    if(busy)return;
+    const stored=savedMatchToken();
+    const tools=$("match-resume-tools");
+    if(!stored){tools.hidden=true;return}
+    busy=true;
+    tools.hidden=false;
+    $("match-resume-message").textContent="正在恢复上次对局…";
+    $("match-resume-retry").disabled=true;
+    $("match-error").textContent="";
+    let pendingContinue=false;
+    try{
+      const response=await fetch("/api/action",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","X-MahTrain":"1"},
+        body:JSON.stringify({action:"match_resume",match_token:stored}),
+      });
+      const data=await response.json();
+      if(!response.ok){
+        const error=new Error(data.error||"恢复对局失败");
+        error.expired=response.status===400 &&
+          /失效|不存在|未初始化/.test(error.message);
+        throw error;
+      }
+      if(data.match_token!==stored||!data.match||data.match.seat!==0)
+        throw new Error("服务器返回的对局身份不一致，已停止恢复");
+      // Never replay or speak the previous public actions as NEW events.
+      playback?.cancel();
+      $("match-playback").hidden=true;
+      $("match-motion").hidden=true;
+      voice?.reset();
+      syncVoiceControls();
+      token=stored;state=data.match;
+      choice.clear();pendingDiscard=null;
+      dismissedKongKey=null;kongPromptReopened=false;
+      liveBoard=null;reviewHistory=[];reviewDropped=0;reviewSelected=null;
+      const snapshot=window.MahTrainPlayback.openingFrame(state);
+      if(snapshot)appendReviewFrames([{
+        ...snapshot,type:"state",label:"恢复时的当前公开状态",
+      }]);
+      pendingContinue=state.needs_continue===true;
+      saveMatchToken();
+      syncHomeMatchHint();
+      render();
+      tools.hidden=true;
+      $("match-request-status").textContent=
+        "已恢复原对局 · 历史语音不会重复播放，复盘从恢复时的公开状态继续";
+    }catch(err){
+      if(err.expired){
+        clearSavedMatchToken();
+        tools.hidden=true;
+        $("match-error").textContent="上次对局会话已失效，请开始新局。";
+      }else{
+        tools.hidden=false;
+        $("match-resume-message").textContent=
+          "原对局暂时无法连接，未新开局。请检查网络后点击重新连接。";
+        $("match-error").textContent=err.message||String(err);
+      }
+    }finally{
+      busy=false;
+      $("match-resume-retry").disabled=false;
+      if(pendingContinue&&token===stored){
+        setTimeout(()=>{
+          if(!busy&&token===stored&&state?.needs_continue===true)
+            action("match_continue");
+        },0);
+      }
+    }
+  }
   function syncVoiceControls(){
     const on=!!voice?.getEnabled();
     $("match-voice-speed").disabled=!on;
@@ -139,6 +230,9 @@
       }
       token=data.match_token;state=data.match;choice.clear();
       kongPromptReopened=false;
+      saveMatchToken();
+      syncHomeMatchHint();
+      $("match-resume-tools").hidden=true;
       needsContinue=data.match.needs_continue===true;
       pendingDiscard=null;
       if(name==="match_new"){
@@ -188,7 +282,11 @@
       // One AI transition per request: never submit the next transition
       // before visual playback and speech have both reached their ends.
       if(needsContinue && token && (name==="match_new"||requestToken===token)){
-        setTimeout(()=>{if(!busy)action("match_continue");},0);
+        const expectedToken=token;
+        setTimeout(()=>{
+          if(!busy&&token===expectedToken&&state?.needs_continue===true)
+            action("match_continue");
+        },0);
       }
     }
   }
@@ -1417,6 +1515,10 @@
     });
     $("match-new").addEventListener("click",()=>startNewGame(false));
     $("match-again").addEventListener("click",()=>startNewGame(true));
+    $("match-resume-retry").addEventListener("click",()=>resumeMatch());
+    // The route hub is initialized later; no navigation or new-game
+    // mutation occurs while restoring, and stale sessions are recoverable.
+    void resumeMatch();
   }
   window.MahTrainMatch={init};
 })();
