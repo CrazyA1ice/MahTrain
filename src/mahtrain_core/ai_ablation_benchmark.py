@@ -83,9 +83,17 @@ def _pressure_totals(games: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
                 for w in game["winners"]
             )
     for level, stats in totals.items():
-        if not (0 <= stats["actual_changed"] <= stats["would_change"]
-                <= stats["pressure_discriminates"]
-                <= stats["effective_ties"] <= stats["decisions"]):
+        # Since M3.52, expected-fan scores need not be EXACT ties, and
+        # M3.53 public dingque / river risk may change a cut without a
+        # two-meld color-concentration difference. The original chained
+        # inequalities were only valid for the retired tie-break policy.
+        # Preserve counters as separate observational measures, ensuring
+        # each remains bounded rather than manufacturing a strict nesting.
+        n = stats["decisions"]
+        if not (0 <= stats["actual_changed"] <= stats["would_change"] <= n
+                and all(0 <= stats[k] <= n for k in (
+                    "effective_ties", "pressure_present",
+                    "pressure_discriminates"))):
             raise RuntimeError("inconsistent pressure telemetry for "+level)
     return totals
 
