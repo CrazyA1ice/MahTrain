@@ -115,7 +115,7 @@ class HiddenWorldsTests(unittest.TestCase):
         self.assertLessEqual(max(physically_known.values()),4)
         opponent=next((cards,suit,groups) for seat,cards,suit,groups
                       in sample if seat==1)
-        self.assertEqual(shanten_13(*opponent),0)
+        self.assertEqual(shanten_13(opponent[0],opponent[2],opponent[1]),0)
         result=sample_discard_losses(["p8","s8"],view,worlds=12)
         self.assertTrue(result["available"])
         self.assertGreater(result["ready_hypotheses"],0)
