@@ -318,6 +318,10 @@
             <p>只影响“随机开始一局”：勾选后可复现同一洗牌。点击“再来一局”始终使用全新随机种子；进行中的牌墙和其他玩家暗牌不会公开。</p>
           </details>
         </div>
+        <div id="match-resume-tools" class="match-resume-tools" hidden>
+          <p id="match-resume-message" role="status" aria-live="polite">正在检查上次未结束的对局…</p>
+          <button id="match-resume-retry" type="button" class="review-control">重新连接原对局</button>
+        </div>
         <p id="match-error" class="review-attention" aria-live="polite"></p>
         <div id="match-stage" hidden>
           <h4 id="match-title"></h4>
