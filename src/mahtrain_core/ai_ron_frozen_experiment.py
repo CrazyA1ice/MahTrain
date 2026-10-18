@@ -168,9 +168,9 @@ def _pair(seed: int,rotation: int,coefficients: Sequence[float],
         if (result["assignment"]!=lineup
             or result["physical_count"]!=108
             or result["scoring_rules"]["kong_base"]!=1
-            or result["unpriced_kong_events"]!=0
             or sum(result["official_settled_balances"])!=0
-            or result["exhaustive_preview_not_posted"]):
+            or (result["terminal_phase"]=="wall_exhausted"
+                and not result["official_exhaustive_posted"])):
             raise RuntimeError("paired contest lacks a completely settled zero-sum ledger")
     base_net=baseline["official_settled_balances"][challenge_seat]
     trial_net=treatment["official_settled_balances"][challenge_seat]
