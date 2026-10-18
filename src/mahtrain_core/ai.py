@@ -19,6 +19,7 @@ from typing import Any, Mapping, Sequence
 
 from .efficiency import shanten_13, effective_draws
 from .rules import TILE_INDEX, TILES, SUITS, score_win, winning_tiles
+from .ai_table_read import read_discard_threat, discard_survival_factor
 
 AI_LEVELS = ("basic", "advanced", "challenge")
 # Evaluation-only controlled variants; not advertised as player difficulty tiers.
@@ -105,7 +106,8 @@ def challenge_discard_scores(view: Mapping[str, Any],
     In tenpai, compute the EXACT supported fan for EACH viable winning tile,
     then weight 2**fan by publicly remaining copies. Before tenpai, retain
     ukeire but reward potential seven-pairs, all-pungs and pure-suit structures.
-    Conservative public-meld risk adjusts close decisions only.
+    Bounded public river, dingque, exposed meld and wall-stage risk adjusts
+    close decisions only; never guesses an opponent concealed hand.
     """
     hand, melds, missing = _own_view(view)
     if len(hand) + 3 * len(melds) != 14:
@@ -167,8 +169,13 @@ def challenge_discard_scores(view: Mapping[str, Any],
                 value += 0.08 * max(0, pairs - 3)
             expected *= value
         pressure = public_suit_pressure(tile, view) if use_pressure else 0
-        # Opponent open suits are evidence of risk, not proof of tenpai.
-        risk_multiplier = max(0.72, 1 - (0.055 if wall_late else 0.025) * pressure)
+        # A prior matching discard does not make a tile absolutely safe in
+        # Sichuan blood-battle; report is a threat INDEX, not P(ron).
+        readout = read_discard_threat(tile, view) if use_pressure else None
+        risk_multiplier = (
+            discard_survival_factor(tile, view, pressure)
+            if use_pressure else 1.0
+        )
         result.append({
             "discard": tile,
             "shanten": info["shanten"],
@@ -177,6 +184,9 @@ def challenge_discard_scores(view: Mapping[str, Any],
             "expected_fan_weighted_copies": round(expected, 5),
             "value_multiplier": round(value, 4),
             "public_pressure": pressure,
+            "table_threat_index": readout["risk_index"] if readout else 0.0,
+            "dingque_safe_seats": readout["dingque_safe_seats"] if readout else 0,
+            "survival_factor": risk_multiplier,
             "score": round(expected * risk_multiplier, 5),
         })
     minimum = min(item["shanten"] for item in result)
@@ -342,7 +352,7 @@ class MahjongAgent:
         return {
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
-            "challenge":"保持最少向听，按真实听口剩余张数×封顶番倍率估算收益；非听牌时结合进张、牌型潜力和公开副露风险",
+            "challenge":"保持最少向听，听牌时按可见剩余张数×番值比较；再结合公开弃牌顺序、定缺、副露、牌山阶段与放铳风险指数",
         }[self.level]
 
 
