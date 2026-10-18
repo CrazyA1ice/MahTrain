@@ -345,3 +345,56 @@ jobs:
           name: ai-candidate-ron-m358-stratified-py311
           path: /tmp/mahtrain-m358.json
           if-no-files-found: warn
+
+  frozen-ron-paired-research:
+    # M3.59: OFFLINE model frozen after training seed clusters;
+    # independent cross-policy validation and complete priced-ledger A/B.
+    # Only aggregate research data is archived. No live policy changes.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Train/freeze public ron model and run cross-policy + paired games
+        run: |
+          python examples/evaluate_frozen_ron_policy.py --seed-start 140 --train-seeds 6 --cross-seeds 2 --paired-seeds 2 --stride 3 --json-out /tmp/mahtrain-m359.json
+      - name: Verify isolated seeds, full settlement, legal outcomes and privacy
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('/tmp/mahtrain-m359.json').read_text(encoding='utf8'))
+          assert r['protocol']=='offline_frozen_ron_cross_policy_paired_v1'
+          assert r['status']=='offline_shadow_only_not_live'
+          train=set(r['train_seeds']); cross=set(r['cross_test_seeds'])
+          paired=set(r['paired_test_seeds'])
+          assert len(train)==6 and len(cross)==2 and len(paired)==2
+          assert not train&cross and not train&paired and not cross&paired
+          assert r['training_samples']>0
+          assert len(r['frozen_model_fingerprint'])==16
+          assert set(r['cross_policy'])=={'four_policy','no_pressure'}
+          for name,metric in r['cross_policy'].items():
+              assert metric['samples']>0 and metric['eligible']>0
+              assert len(metric['seed_deltas'])==2
+              assert metric['cluster_bootstrap']['seed_clusters']==2
+          p=r['paired']
+          assert p['game_pairs']==8 and p['full_rule_kong_base']==1
+          assert p['seat_rotations']==4
+          assert p['baseline_net_sum']+p['paired_net_delta']==p['treatment_net_sum']
+          assert p['total_changed_discards']<=p['total_risk_aware_decisions']
+          assert len(p['by_shuffle_seed'])==2
+          assert p['seed_bootstrap_net_delta']['seed_clusters']==2
+          assert not r['contains_private_hands'] and not r['contains_row_level_predictions']
+          assert not r['online_policy_modified'] and not r['can_claim_superior_policy']
+          print('M3.59 frozen risk cross-policy/paired full-ledger pilot: PASS')
+          PY
+      - name: Archive ONLY aggregate cross-policy and paired net-score report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-frozen-ron-m359-paired-py311
+          path: /tmp/mahtrain-m359.json
+          if-no-files-found: warn

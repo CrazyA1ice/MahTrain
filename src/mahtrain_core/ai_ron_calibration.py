@@ -91,7 +91,8 @@ def _sealed_target_payoffs(game: FourPlayerOpening,
     }
 
 
-def collect_ron_labels(seed: int, *, stride: int = 4
+def collect_ron_labels(seed: int, *, stride: int = 4,
+                       lineup: list[str] | None = None
                        ) -> list[dict[str, Any]]:
     """Simulate one match, collect only public features + sealed numeric labels."""
     if type(seed) is not int or not 0 <= seed < 2**32:
@@ -129,7 +130,10 @@ def collect_ron_labels(seed: int, *, stride: int = 4
                     "payout_multiplier": multiplier,
                 })
 
-    simulate_match(seed, rotation=seed%3, offline_observer=probe)
+    options = {"offline_observer": probe}
+    if lineup is not None:
+        options["lineup"] = lineup
+    simulate_match(seed, rotation=seed%3, **options)
     return result
 
 

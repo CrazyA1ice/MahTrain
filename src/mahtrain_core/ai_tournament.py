@@ -264,7 +264,9 @@ def public_replay_frame(game: FourPlayerOpening, action: dict[str, Any]) -> dict
 def simulate_match(seed: int, rotation: int = 0,
                    *, max_actions: int = 800,
                    lineup: list[str] | None = None,
-                   offline_observer: Callable[[FourPlayerOpening], None] | None = None
+                   offline_observer: Callable[[FourPlayerOpening], None] | None = None,
+                   offline_agent_overrides: dict[int, Any] | None = None,
+                   offline_kong_base: int | None = None
                    ) -> dict[str, Any]:
     if type(seed) is not int or not 0 <= seed < 2**32:
         raise ValueError("seed must be an unsigned 32-bit integer")
@@ -278,7 +280,13 @@ def simulate_match(seed: int, rotation: int = 0,
                 for level in lineup) or len(set(lineup))!=4):
             raise ValueError("independent lineup needs 4 distinct AI policies")
         assignment=list(lineup)
-    game=FourPlayerOpening(seed)  # Kong payouts remain unpriced by default.
+    # Defaults preserve public simulation behaviour. Offline research can
+    # explicitly enable the official kong ledger so its paired score measures
+    # complete current-rule net balances, not Hu-only legacy approximations.
+    if offline_kong_base is not None and (type(offline_kong_base) is not int
+                                          or offline_kong_base < 0):
+        raise ValueError("offline kong base must be a nonnegative integer")
+    game=FourPlayerOpening(seed, kong_base=offline_kong_base)
     agents={
         seat:(ShapeBaselineAgent(seed=seed,seat=seat)
               if assignment[seat]=="baseline" else
@@ -287,6 +295,14 @@ def simulate_match(seed: int, rotation: int = 0,
               MahjongAgent(assignment[seat],seed=seed,seat=seat))
         for seat in range(4)
     }
+    if offline_agent_overrides is not None:
+        for seat, agent in offline_agent_overrides.items():
+            if (type(seat) is not int or seat not in range(4)
+                or assignment[seat] != "challenge"
+                or not isinstance(agent, MahjongAgent)
+                or agent.level != "challenge" or agent.seat != seat):
+                raise ValueError("offline overrides require a matching challenge agent")
+            agents[seat] = agent
     trace=[]
     frames=[]
     durations=defaultdict(list)
