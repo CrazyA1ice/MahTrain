@@ -119,6 +119,13 @@ assert.equal(unsupported.announceFrame({type:"discard",seat:1,publicTile:"m2"}),
   assert.equal(finishUtterance.text,"六筒");
   watchdog();
   await stalled;
+  // The new fast-game path uses the synchronous, nonblocking API, even
+  // when a platform speech engine never invokes onend.
+  assert.equal(delayed.announceFrame({type:"peng",seat:1,publicTile:"m7"}),true);
+  assert.equal(finishUtterance.text,"碰");
+  assert.equal(delayed.announceFrame({type:"ming_gang",seat:1,publicTile:"m7"}),true);
+  assert.equal(finishUtterance.text,"杠");
+  assert.equal(watchdog,null,"nonblocking calls never arm the speech gate");
   const muted=delayed.setEnabled(false);
   assert.equal(muted,false);
   await delayed.announceFrameWait({type:"discard",seat:2,publicTile:"p4"});
