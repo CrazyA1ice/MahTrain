@@ -328,10 +328,13 @@ class MahjongAgent:
         # Challenge keeps all legal minimum-shanten cuts, then trades
         # effective-copy count against expected winning fan or shape potential.
         # The old ablation remains unchanged for comparable prior experiments.
-        if self.level == "challenge_no_pressure":
-            ranked = challenge_discard_scores(view, best, use_pressure=False)
-            return ranked[0]["discard"]
-        return challenge_discard_scores(view, best)[0]["discard"]
+        ranked = challenge_discard_scores(
+            view, best, use_pressure=self.level != "challenge_no_pressure"
+        )
+        # Share this authorized observation with offline instrumentation;
+        # never enumerate all candidate draws a second time for telemetry.
+        self._last_discard_scores = ranked
+        return ranked[0]["discard"]
 
     def policy_description(self) -> str:
         return {
