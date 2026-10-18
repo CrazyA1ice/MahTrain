@@ -145,7 +145,12 @@ async function perform(command){
         board=read.match;render();schedule();
       }catch(error){message(error)}
     }
-  }finally{pending=false}
+  }finally{
+    // Controls are rendered while the HTTP command is pending; they must
+    // be re-enabled AFTER the authoritative response has been accepted.
+    pending=false;
+    if(board)controls();
+  }
 }
 export function startMahTrainBridge(accept){
   emit=accept;
