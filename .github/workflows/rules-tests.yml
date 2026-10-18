@@ -298,23 +298,34 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Fit candidate risk on four seeds and test on three disjoint seeds
+      - name: M3.58 train on eight shuffle seeds and validate six disjoint seeds
         run: |
-          python examples/evaluate_discard_ron_risk.py --seed-start 100 --train-seeds 4 --test-seeds 3 --stride 6 --json-out /tmp/mahtrain-m357.json
+          python examples/evaluate_discard_ron_risk.py --seed-start 100 --train-seeds 8 --test-seeds 6 --stride 6 --json-out /tmp/mahtrain-m358.json
       - name: Verify candidate ron risk metrics and private hand exclusion
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
-          r=json.loads(Path('/tmp/mahtrain-m357.json').read_text(encoding='utf8'))
+          r=json.loads(Path('/tmp/mahtrain-m358.json').read_text(encoding='utf8'))
           assert r['protocol']=='offline_candidate_ron_seed_split_v1'
           assert r['status']=='exploratory_offline_no_model_deployment'
-          assert len(r['train_seeds'])==4 and len(r['test_seeds'])==3
+          assert len(r['train_seeds'])==8 and len(r['test_seeds'])==6
           assert set(r['train_seeds']).isdisjoint(r['test_seeds'])
           assert r['train_n']>0 and r['test_n']>0
           assert r['actionable_train_n']>0
           assert not r['contains_private_hands'] and not r['can_claim_generalization']
-          assert len(r['by_test_seed'])==3
+          s=r['stratified_validation']
+          assert s['protocol']=='candidate_ron_public_strata_seed_cluster_v1'
+          assert not s['has_hidden_hands'] and not s['row_level_predictions_exported']
+          assert len(s['by_seed'])==6
+          assert s['overall']['n']==r['test_n']
+          assert s['strata']['candidate_rule']['ron_eligible']['n']==r['candidate']['actionable_n']
+          assert sum(x['n'] for x in s['strata']['wall_stage'].values())==r['test_n']
+          assert sum(x['n'] for x in s['strata']['target_public_melds'].values())==r['test_n']
+          assert sum(x['n'] for x in s['strata']['candidate_rule'].values())==r['test_n']
+          assert s['cluster_bootstrap_brier']['seed_clusters']==6
+          assert len(s['cluster_bootstrap_brier']['bootstrap_95pct_range'])==2
+          assert len(r['by_test_seed'])==6
           for key in ('baseline','candidate'):
               metrics=r[key]
               assert metrics['n']==r['test_n']
@@ -325,12 +336,12 @@ jobs:
           forbidden=('raw_observations','opponent_hands','future_wall',
                      'candidate_tile','target_seat','hidden_waits','_hands')
           assert all(key not in r for key in forbidden)
-          print('M3.57 offline report privacy and held-out calibration: PASS')
+          print('M3.58 public-stratified seed-cluster held-out validation: PASS')
           PY
       - name: Archive only aggregate candidate risk metrics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ai-candidate-ron-calibration-pilot-py311
-          path: /tmp/mahtrain-m357.json
+          name: ai-candidate-ron-m358-stratified-py311
+          path: /tmp/mahtrain-m358.json
           if-no-files-found: warn
