@@ -72,7 +72,7 @@
       const {points,lo,hi,zeroY}=makeLinePoints(history);
       const svg=d.createElementNS(NS,"svg");
       svg.setAttribute("viewBox","0 0 720 240");
-      svg.setAttribute("role","img");
+      svg.setAttribute("role","group");
       svg.setAttribute("aria-label",
         "最近"+history.length+"局正式累计积分走势，从"+
         sign(points[0].value)+"到"+sign(points.at(-1).value));
@@ -104,6 +104,11 @@
         const day=String(history[i].created_at||"").slice(0,10);
         title.textContent=day+" · 单局净额 "+
           sign(history[i].score)+" · 截至该局累计 "+sign(p.value);
+        // SVG title is mouse-only in many browsers. Make each point
+        // keyboard focusable with a complete screen-reader description.
+        dot.setAttribute("tabindex","0");
+        dot.setAttribute("role","img");
+        dot.setAttribute("aria-label","第"+(i+1)+"局 · "+title.textContent);
         dot.append(title);svg.append(dot);
       });
       for(const [i,anchor] of [[0,"start"],[history.length-1,"end"]]){
