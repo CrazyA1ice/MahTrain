@@ -354,6 +354,28 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
       "a claim on another seat must not rebuild river "+seat);
   }
 
+  // A new discard from another seat must move the global latest marker
+  // without changing our earlier physical cells or invalidating any tray.
+  const claimedOwnTray=dom["match-river-0"].children[1];
+  const priorGlobalLatest=descendants(dom["match-river-0"],x=>
+    x.className==="match-river-cell").at(-1);
+  const priorSideTray=dom["match-river-1"].children[1];
+  startMatch={...startMatch,discards:[...startMatch.discards,
+    {seat:1,tile:"s9",discard_kind:"tedashi"}]};
+  dom["match-new"].handlers.click();
+  await settle();
+  assert.equal(dom["match-river-0"].children[1],claimedOwnTray);
+  assert.equal(dom["match-river-1"].children[1],priorSideTray);
+  assert.equal(priorGlobalLatest.classList.contains("is-latest"),false,
+    "the old global latest must be unhighlighted when seat 1 discards");
+  const sideCells=descendants(dom["match-river-1"],x=>
+    x.className==="match-river-cell");
+  assert.equal(sideCells.length,2);
+  assert.equal(sideCells[1].classList.contains("is-latest"),true);
+  assert.equal(sideCells[1].attributes["data-discard-order"],"4");
+  assert.equal(descendants(dom["match-river-1"],x=>
+    x.className==="match-discard-kind"&&x.textContent==="手切").length,1);
+
   // Same-valued physical copy: own old m1 and freshly drawn m1 must be
   // separate clickable cards. Only the far-right card is marked drawn.
   const duplicated=[...hand];duplicated[1]="m1";
