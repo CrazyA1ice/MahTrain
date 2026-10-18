@@ -2842,7 +2842,7 @@
     --river-side-cell:clamp(19px,2.25vw,32px);
     --river-side-row:clamp(16px,1.8vw,20px);
     --tenhou-h-band:calc(4 * var(--river-h-row) + 19px);
-    --tenhou-side-band:calc(14 * var(--river-side-row) + 25px);
+    --tenhou-side-band:calc(14 * var(--river-side-row) + 38px);
     --tenhou-mid:calc(2 * var(--tenhou-h-band) + var(--tenhou-side-band) + 10px);
     grid-template-areas:". top ." "left center right" "bottom bottom bottom";
     grid-template-columns:clamp(72px,8.8vw,126px) minmax(0,1fr)
@@ -2951,7 +2951,7 @@
     justify-content:center;overflow-x:hidden;
   }
   .match-board .match-seat--bottom #match-hand .tile{
-    width:clamp(28px,3.45vw,46px);
+    width:clamp(22px,3.2vw,46px);
     height:clamp(43px,5vw,64px);
     flex:0 0 auto;
   }
