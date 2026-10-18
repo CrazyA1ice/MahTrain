@@ -2997,3 +2997,12 @@
   .match-board #match-decision .match-decision-hint{font-size:8px}
   .match-board .match-seat--bottom #match-hand .tile{border-radius:3px}
 }
+
+/* Alternate deep-night table, still within the Tenhou-inspired palette. */
+#match-board.is-midnight-felt{
+  background:
+    radial-gradient(ellipse at 50% 43%,rgba(90,129,205,.27),transparent 67%),
+    repeating-linear-gradient(145deg,rgba(185,211,255,.012) 0 2px,transparent 2px 5px),
+    linear-gradient(145deg,#162854,#0d1c40 59%,#08162e);
+  border-color:#111a32;
+}
