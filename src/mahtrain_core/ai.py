@@ -301,6 +301,8 @@ class MahjongAgent:
         return None
 
     def discard(self, view: Mapping[str, Any]) -> str:
+        # No stale ranking may survive an early single-choice/forced cut.
+        self._last_discard_scores = None
         hand, melds, missing = _own_view(view)
         if view["phase"] not in ("await_discard","dealer_discard"):
             raise ValueError("AI discard requires own discard phase")
