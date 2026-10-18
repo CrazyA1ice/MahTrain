@@ -44,35 +44,57 @@
   // Speech is entirely client-side and receives only public playback frames.
   // A manual repeat replays the last sanitized spoken phrase, not match state.
   const RATES=Object.freeze({slow:0.85,normal:1.12,fast:1.35});
+  // Time-bounded speech is optional feedback, never an AI decision gate.
+  // Leave some margin under 1500ms for event-loop dispatch on active tabs.
+  const MAX_SPEECH_MS=1300;
   function create(env){
     const host=env||{};
     const synth=host.speechSynthesis;
     const Utterance=host.SpeechSynthesisUtterance;
     const supported=!!(synth&&typeof synth.speak==="function"&&typeof Utterance==="function");
     let enabled=supported,rate="normal",lastText="";
-    let pendingFinish=null;
+    let pendingFinish=null,activeSpeechFinish=null;
     const later=typeof host.setTimeout==="function"
       ?host.setTimeout.bind(host):setTimeout;
     const cancelLater=typeof host.clearTimeout==="function"
       ?host.clearTimeout.bind(host):clearTimeout;
     function clear(){
-      // Explicit skips/mutes must release the playback gate as well as audio.
+      // Stop outstanding speech AND its timer so a stale watchdog cannot
+      // inadvertently cancel a newer action's spoken tile.
       if(pendingFinish)pendingFinish();
+      if(activeSpeechFinish)activeSpeechFinish();
       if(supported&&typeof synth.cancel==="function")synth.cancel();
     }
     function speakText(text){
       if(!enabled||!supported||!text)return false;
       try{
-        // Interrupt stale speech, especially during fast public playback.
+        // A new publicly visible action immediately interrupts old speech.
         clear();
         const speech=new Utterance(text);
         speech.lang="zh-CN";
         speech.rate=RATES[rate];
         speech.volume=0.95;
+        let watchdog=null,finished=false;
+        function finish(){
+          if(finished)return;
+          finished=true;
+          if(watchdog!==null)cancelLater(watchdog);
+          if(activeSpeechFinish===finish)activeSpeechFinish=null;
+        }
+        activeSpeechFinish=finish;
+        speech.onend=finish;
+        speech.onerror=finish;
+        watchdog=later(()=>{
+          if(finished)return;
+          finish();
+          // Cancelling the actual speech engine is essential: merely
+          // clearing a Promise would still let a 3-second voice run.
+          if(typeof synth.cancel==="function")synth.cancel();
+        },MAX_SPEECH_MS);
         synth.speak(speech);
         lastText=text;
         return true;
-      }catch(_error){return false;}
+      }catch(_error){clear();return false;}
     }
     function speakTextWait(text){
       if(!supported||!enabled||!text)return Promise.resolve();
@@ -97,7 +119,10 @@
           lastText=text;
           // Some engines never fire onend after a background tab or failed
           // voice. Unlock interaction rather than freezing the table.
-          watchdog=later(finish,2500);
+          watchdog=later(()=>{
+            try{if(typeof synth.cancel==="function")synth.cancel();}
+            finally{finish();}
+          },MAX_SPEECH_MS);
           synth.speak(speech);
         }catch(_error){finish();}
       });
