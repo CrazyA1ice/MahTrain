@@ -69,6 +69,14 @@ function check(report,w,label){
       w+" exchange prompt must stay inside the central safe bay");
     assert.equal(report.safeLayout?.promptOverlaps.length,0,
       w+" exchange prompt overlays a hand, river, exposed meld or missing badge");
+    assert.ok(report.safeLayout?.safeBox.width<=205,
+      w+" center counter must be compact; no giant empty square");
+    assert.ok(report.safeLayout?.safeBox.height<=320,
+      w+" center counter or controls must stay inside the reserved central band");
+    assert.equal(report.safeLayout?.tableSkin,"riichi",
+      w+" match board should load the standalone table skin");
+    assert.equal(report.safeLayout?.handBackground,"rgba(0, 0, 0, 0)",
+      w+" the own hand should sit directly on the felt, not a colored bar");
   }else{
     assert.equal(report.hand.overflowX,"auto",
       w+" mobile may scroll only the own hand horizontally");
@@ -283,6 +291,9 @@ async function main(){
             .filter(item=>overlaps(promptBox,box(item)))
             .map(item=>item.id||item.className):[],
           safeBox,promptBox,handBox,
+          tableSkin:document.getElementById("match-board").classList
+            .contains("match-board--riichi")?"riichi":"legacy",
+          handBackground:getComputedStyle(handEl).backgroundColor,
         };
         return {
           board,viewportDebug,rivers,safeLayout,
