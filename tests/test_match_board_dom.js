@@ -913,7 +913,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-voice-enabled"].checked=false;
   dom["match-voice-enabled"].handlers.change();
   const spoken=speechCalls.filter(x=>x.kind==="speak").map(x=>x.text);
-  assert.ok(spoken.some(x=>x.includes("打")||x.includes("暗杠")||x.includes("自摸")),
+  assert.ok(spoken.some(x=>x==="碰"||x==="杠"||x==="胡"||/[一二三四五六七八九][万条筒]/.test(x)),
     "public live actions should be spoken");
   assert.ok(spoken.every(x=>!x.includes("hidden-")&&!x.includes("secret-")));
   // M3.39: preview comes ONLY from the authorized server-supplied quote;
