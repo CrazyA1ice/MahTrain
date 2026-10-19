@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/m368-majiang-ui-2d
+      - feat/m369-classic-hu-score-voice
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -88,13 +89,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'feat/m368-majiang-ui-2d'
+        if: github.event_name == 'push' && github.ref_name == 'feat/m369-classic-hu-score-voice'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.68): publish original Majiang 2D UI compiled browser bundle'
-            git pull --rebase origin feat/m368-majiang-ui-2d
-            git push origin HEAD:feat/m368-majiang-ui-2d
+            git commit -m 'build(M3.69): ship spoken hu and four-player settlement frontend'
+            git pull --rebase origin feat/m369-classic-hu-score-voice
+            git push origin HEAD:feat/m369-classic-hu-score-voice
           fi
