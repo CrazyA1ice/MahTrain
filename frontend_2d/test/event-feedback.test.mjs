@@ -57,8 +57,7 @@ test("two actual winners get one multi-ron banner, exact patterns and totals",()
  assert.match(cue.title,/一炮多响.*自己、2号AI/);
  assert.match(cue.detail,/清一色.*\+800/);
  assert.match(cue.detail,/对对胡.*\+400/);
- assert.equal(liveActionCue(steps,current,current),null===undefined?null:
-  liveActionCue(steps,current,current).kind&&"never");
+ assert.equal(liveActionCue([],current,current),null);
 });
 test("a server-published win without ledger delta still displays event cue",()=>{
  const w=liveActionCue(frame({type:"self_draw_win",seat:1}),empty,empty);
