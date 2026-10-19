@@ -85,3 +85,26 @@ test('no mutation of the Python source snapshot',()=>{
  assert.deepEqual(v,before);
  assert.throws(()=>convertView({seat:1,hand:[],hand_counts:[1,2,3,4]}));
 });
+
+test("56 original discard positions per seat preserve each claimed gap and original ordering",()=>{
+ const v=clone();
+ const holes=[5,13,24,41];
+ v.discards=[];
+ for(let n=0;n<56;n++)for(let seat=0;seat<4;seat++){
+  const entry={seat,tile:"mps"[(n+seat)%3]+String(1+(n+seat)%9)};
+  if(n===holes[seat])entry.claimed_by=(seat+1)%4;
+  v.discards.push(entry);
+ }
+ const original=structuredClone(v.discards);
+ const converted=convertView(v);
+ for(let seat=0;seat<4;seat++){
+  assert.equal(converted.rivers[seat]._pai.length,56);
+  assert.equal(converted.rivers[seat].claimed.length,56);
+  assert.deepEqual(converted.rivers[seat].claimed.flatMap(
+    (flag,index)=>flag?[index]:[]),[holes[seat]]);
+  assert.equal(converted.rivers[seat]._pai[55],
+   "mps"[(55+seat)%3]+String(1+(55+seat)%9));
+ }
+ assert.deepEqual(v.discards,original,
+  "rendering must not edit public Python discard history");
+});
