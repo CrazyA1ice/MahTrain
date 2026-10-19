@@ -74,6 +74,8 @@ function clearCue(){
   const name=el("classic-player-"+seat);
   name.classList.remove("classic-action-active","classic-action-win");
  }
+ // Recover the available board height when the nonblocking cue expires.
+ resize();
 }
 function displayCue(cue){
  if(!cue)return;
