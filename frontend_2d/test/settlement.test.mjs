@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- summarizeSettlement,recentWins,publicActions,winTitle,nonZeroBreakdown,signed,
+ summarizeSettlement,recentWins,publicActions,winTitle,nonZeroBreakdown,signed,patternLabel,
 } from '../src/settlement.mjs';
 const snapshot=()=>({
  phase:'finished',won:[true,false,true,false],
@@ -96,4 +96,26 @@ test('public voice action normalization does not expose private hands or wall',(
  assert.ok(!JSON.stringify(actions).includes('privateHand'));
  assert.ok(!JSON.stringify(actions).includes('"wall"'));
  assert.equal(signed(-100),'-100');assert.equal(signed(200),'+200');
+});
+
+
+test('genuine Sichuan rule codes are displayed in readable Chinese, never re-scored',()=>{
+ const patterns={
+  pinghu:'平胡',seven_pairs:'七对',pure_seven_pairs:'清七对',
+  dragon_seven_pairs:'龙七对',pure_dragon_seven_pairs:'清龙七对',
+  golden_hook:'金钩钓',pure_suit:'清一色',
+  all_pungs:'对对胡',pure_all_pungs:'清对对胡',
+  heaven_win:'天胡',earth_win:'地胡',tian_ting:'天听',
+  roots:'根',kong_bloom:'杠上花',kong_discard_ron:'杠上炮',
+  rob_added_kong:'抢杠胡',sea_bottom_draw:'海底捞月',
+  river_bottom_ron:'海底炮'
+ };
+ for(const [raw,expected] of Object.entries(patterns))
+  assert.equal(patternLabel(raw),expected,raw);
+ const v=snapshot();v.win_ledger.wins[0].main_pattern='seven_pairs';
+ v.win_ledger.wins[0].effective_fan=2;
+ assert.match(winTitle(v.win_ledger.wins[0]),/七对.*2番/);
+ assert.doesNotMatch(winTitle(v.win_ledger.wins[0]),/seven_pairs/);
+ assert.equal(v.win_ledger.wins[0].main_pattern,'seven_pairs',
+   'the original Python ledger code must stay unchanged');
 });
