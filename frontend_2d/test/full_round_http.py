@@ -16,8 +16,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/"src"))
 from mahtrain_core.ai import MahjongAgent
 
 ORIGIN=os.environ.get("MAHTRAIN_TEST_ORIGIN","http://127.0.0.1:8765")
-ARTIFACTS=Path("frontend_2d/test-artifacts")
-ARTIFACTS.mkdir(parents=True,exist_ok=True)
+EVIDENCE=Path("/tmp/mahtrain-classic-authenticated-round.json")
 
 def post(payload: dict) -> dict:
     data=json.dumps(payload,ensure_ascii=False).encode("utf8")
@@ -184,7 +183,7 @@ def main():
     payload={"summary":summary,"token":summary["token"],
              "terminal":view,"sequence":record,
              "all_runs":[x[0] for x in completed]}
-    (ARTIFACTS/"real-http-full-round.json").write_text(
+    EVIDENCE.write_text(
         json.dumps(payload,ensure_ascii=False,indent=2),encoding="utf8")
     print("FULL ROUND REAL WIN COVERAGE:", "covered" if summary["win_count"] else
           "not_observed_in_the_tested_seeds",flush=True)
