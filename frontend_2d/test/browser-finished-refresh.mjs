@@ -98,7 +98,7 @@ try{
  assert.ok(requests.every(x=>x.token==="completed-token"),
   "no phantom match_new during finished-game reload");
 
- await page.locator("#classic-actions-buttons button").getByText("再来一局").click();
+ await page.getByRole("button",{name:"再来一局"}).click();
  await page.waitForFunction(key=>{
   return sessionStorage.getItem(key)==="fresh-token" &&
    document.getElementById("classic-result-report").hidden;
