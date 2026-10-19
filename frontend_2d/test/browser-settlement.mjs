@@ -92,6 +92,24 @@ try{
  await first.click();await first.click();
  await page.waitForFunction(()=>!document.querySelector('#classic-result-report').hidden,
   null,{timeout:15000});
+ const activity=await page.evaluate(()=>{
+  const cue=document.querySelector('#classic-live-action');
+  const river=document.querySelector('#classic-board-host').getBoundingClientRect();
+  const geom=cue.getBoundingClientRect();
+  return {
+   title:cue.querySelector('#classic-live-action-title')?.textContent,
+   kind:cue.dataset.kind,visible:!cue.hidden,above:geom.bottom<=river.top+1,
+   winners:[0,2].every(i=>document.querySelector(
+    '#classic-player-'+i).classList.contains('classic-action-win')),
+   losers:[1,3].every(i=>!document.querySelector(
+    '#classic-player-'+i).classList.contains('classic-action-win')),
+  };
+ });
+ assert.equal(activity.kind,'win','show a real confirmed HU action');
+ assert.match(activity.title,/一炮多响/);
+ assert.equal(activity.above,true,'activity strip does not cover rivers');
+ assert.equal(activity.winners,true,'both winners highlighted on their real seats');
+ assert.equal(activity.losers,true,'losers do not receive false HU badges');
  const audit=await page.evaluate(()=>{
   const report=document.querySelector('#classic-result-report');
   const ticker=document.querySelector('#classic-win-announcement');
