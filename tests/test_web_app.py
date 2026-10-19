@@ -64,6 +64,23 @@ class WebUI(unittest.TestCase):
         with urlopen(req, timeout=10) as response:
             return json.load(response)
 
+    def test_m368_genuine_majiang_classic_static_routes(self):
+        root=web_server.ROOT / "frontend_2d" / "dist"
+        self.assertEqual(web_server._asset_path("/classic/game.html"),
+                         root / "game.html")
+        self.assertEqual(web_server._asset_path("/classic/img/m1.gif"),
+                         root / "img/m1.gif")
+        self.assertEqual(web_server._asset_path("/classic/assets/main-abc.js"),
+                         root / "assets/main-abc.js")
+        for bad in ("/classic/img/../secret","/classic/assets/..",
+                    "/classic/assets/./foo","/classic/package.json",
+                    "/frontend_2d/src/main.js"):
+            self.assertIsNone(web_server._asset_path(bad))
+        home,_=self.get("/")
+        self.assertIn(b'id="match-open-majiang-classic"',home)
+        self.assertIn(b'/classic/game.html',home)
+        self.assertIn(b'id="match-open-queju-3d"',home)
+
     def test_m367_queju_3d_static_paths_are_sandboxed(self):
         root=web_server.ROOT / "frontend_3d" / "dist"
         self.assertEqual(web_server._asset_path("/3d/game.html"),
