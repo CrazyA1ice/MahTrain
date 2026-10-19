@@ -1,0 +1,20 @@
+{
+  "name": "mahtrain-majiang-ui-classic",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build:css": "stylus upstream-css/classic.styl -o src/majiang-upstream.css",
+    "build": "npm run build:css && vite build",
+    "test:bridge": "node --test test/bridge.test.mjs"
+  },
+  "dependencies": {
+    "@kobalab/majiang-ui": "1.6.1",
+    "jquery": "3.7.1"
+  },
+  "devDependencies": {
+    "stylus": "0.64.0",
+    "vite": "6.4.3",
+    "playwright-core": "1.56.1"
+  }
+}
