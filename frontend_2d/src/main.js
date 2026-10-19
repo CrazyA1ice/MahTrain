@@ -150,7 +150,7 @@ async function api(cmd){
  }else Object.assign(payload,{ai_levels:["challenge","challenge","challenge"],
   self_draw_mode:"add_base"});
  const response=await fetch("/api/action",{method:"POST",
-  headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  headers:{"Content-Type":"application/json","X-MahTrain":"1"},body:JSON.stringify(payload)});
  const result=await response.json();
  if(!response.ok)throw Error(result.error||"服务器拒绝操作");
  if(typeof result.match_token!=="string"||result.match?.seat!==0)
