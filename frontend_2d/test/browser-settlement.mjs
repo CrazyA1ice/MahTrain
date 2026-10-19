@@ -79,6 +79,14 @@ try{
  assert.equal(response.status(),200);
  await page.waitForFunction(()=>document.querySelector('.shoupai.main img[data-hand-index]'));
  const voice=page.locator('#classic-voice-toggle');
+ console.log('VOICE INIT',await page.evaluate(()=>({
+  label:document.getElementById('classic-voice-toggle').textContent,
+  pressed:document.getElementById('classic-voice-toggle').getAttribute('aria-pressed'),
+  engine:!!window.MahTrainMatchVoice,
+  utteranceType:typeof window.SpeechSynthesisUtterance,
+  synthType:typeof window.speechSynthesis,
+  canSpeak:typeof window.speechSynthesis?.speak,
+ })));
  assert.equal(await voice.getAttribute('aria-pressed'),'true');
  const first=page.locator('.shoupai.main img[data-hand-index="0"]');
  await first.click();await first.click();
