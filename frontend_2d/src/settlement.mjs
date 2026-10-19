@@ -1,13 +1,23 @@
 /* Read-only accounting: the Python ledger is the ONLY scoring authority. */
 export const WIN_KIND=Object.freeze({self_draw:"自摸",ron:"点炮胡",rob_kong:"抢杠胡"});
 export const KONG_KIND=Object.freeze({ming_gang:"明杠",an_gang:"暗杠",bu_gang:"补杠"});
+export const PATTERN_ZH=Object.freeze({
+ pinghu:"平胡",seven_pairs:"七对",pure_seven_pairs:"清七对",
+ dragon_seven_pairs:"龙七对",pure_dragon_seven_pairs:"清龙七对",
+ golden_hook:"金钩钓",all_pungs:"对对胡",pure_all_pungs:"清对对胡",
+ pure_suit:"清一色",heaven_win:"天胡",earth_win:"地胡",
+ tian_ting:"天听",kong_bloom:"杠上花",kong_discard_ron:"杠上炮",
+ rob_added_kong:"抢杠胡",sea_bottom_draw:"海底捞月",
+ river_bottom_ron:"海底炮",roots:"根",
+});
+export const patternLabel=key=>PATTERN_ZH[key]||String(key??"未命名番型");
 export const TERMINAL=new Set(["finished","wall_exhausted"]);
 export const signed=n=>typeof n==="number"&&Number.isSafeInteger(n)
   ?(n>0?"+":"")+String(n):"未计价";
 export const seatName=n=>n===0?"自己":n+"号AI";
 export function winTitle(win){
  return seatName(win.winner)+" "+(WIN_KIND[win.kind]||"胡牌")+
-  " · "+(win.main_pattern||"已胡牌")+" · "+(win.effective_fan??0)+
+  " · "+patternLabel(win.main_pattern||"已胡牌")+" · "+(win.effective_fan??0)+
   "番 · 实收"+signed(win.total_received);
 }
 function balances(ledger){
