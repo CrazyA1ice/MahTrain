@@ -4,6 +4,7 @@ on:
     branches:
       - feat/m368-majiang-ui-2d
       - feat/m370-classic-live-action-feedback
+      - feat/m371-classic-real-full-round-audit
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -22,7 +23,7 @@ permissions:
 jobs:
   classic-real-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 23
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -80,6 +81,10 @@ jobs:
           PY
           node frontend_2d/test/browser-smoke.mjs
           node frontend_2d/test/browser-settlement.mjs
+      - name: Replay two entire REAL seeded Sichuan games via Python HTTP and audit settlement
+        run: python frontend_2d/test/full_round_http.py
+      - name: Restore genuine finished match in real Majiang UI and verify displayed score
+        run: node frontend_2d/test/browser-real-round.mjs
       - name: Archive real classic Majiang screenshots
         if: always()
         uses: actions/upload-artifact@v4
@@ -89,13 +94,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'feat/m370-classic-live-action-feedback'
+        if: github.event_name == 'push' && github.ref_name == 'feat/m371-classic-real-full-round-audit'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.70): ship public event feedback and final settlement scroll'
-            git pull --rebase origin feat/m370-classic-live-action-feedback
-            git push origin HEAD:feat/m370-classic-live-action-feedback
+            git commit -m 'build(M3.71): real match audit and classic terminal score report'
+            git pull --rebase origin feat/m371-classic-real-full-round-audit
+            git push origin HEAD:feat/m371-classic-real-full-round-audit
           fi
