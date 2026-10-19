@@ -105,8 +105,10 @@ function audit(s,n){
    assert.ok(box.left>=s.board.left-1&&box.right<=s.board.right+1&&
     box.top>=s.board.top-1&&box.bottom<=s.board.bottom+1,
     "tile inside table seat "+seat+" index "+i);
-   for(const meld of r.melds)assert.ok(!overlap(box,meld),
-    "tile vs own meld seat "+seat+" index "+i);
+   for(const meld of r.melds){
+    if(overlap(box,meld))console.error("MELD INTERSECTION",JSON.stringify({seat,index:i,tile:box,meld,river:r.root,score:s.score,allMelds:r.melds}));
+    assert.ok(!overlap(box,meld),"tile vs own meld seat "+seat+" index "+i);
+   }
    assert.match(r.tileCodes[i],/^[mps][1-9]$/);
   }
   const first=r.coords[0],next=r.coords[1],row=r.coords[14];
