@@ -6,14 +6,14 @@ import MajiangHe from "@kobalab/majiang-ui/lib/he.js";
 import {SESSION_KEY,convertView,choiceAction} from "./bridge.mjs";
 import {publicActions,recentWins,winTitle} from "./settlement.mjs";
 import {renderSettlement} from "./report.mjs";
-import {liveActionCue} from "./event-feedback.mjs";
+import {seatOutcome} from "./seat-status.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
 const TURN=new Set(["dealer_discard","await_discard"]);
 const DONE=new Set(["finished","wall_exhausted"]);
 const el=id=>document.getElementById(id);
 let token=null,state=null,pai=null,busy=false,timer=null,voice=null;
-let cueTimeout=null,terminalScrollTimeout=null;
+let terminalScrollTimeout=null;
 const selected=new Set();
 function status(t){el("classic-status").textContent=t}
 function initializeVoice(){
@@ -63,38 +63,6 @@ function announceResponse(previous,current,steps,isRestore){
  repeat.disabled=!voice.canRepeat();
 }
 
-function clearCue(){
- if(cueTimeout!==null)clearTimeout(cueTimeout);
- cueTimeout=null;
- const panel=el("classic-live-action");
- panel.hidden=true;panel.removeAttribute("data-kind");
- el("classic-live-action-title").textContent="";
- el("classic-live-action-detail").textContent="";
- for(let seat=0;seat<4;seat++){
-  const name=el("classic-player-"+seat);
-  name.classList.remove("classic-action-active","classic-action-win");
- }
- // Recover the available board height when the nonblocking cue expires.
- resize();
-}
-function displayCue(cue){
- if(!cue)return;
- clearCue();
- const panel=el("classic-live-action");
- panel.hidden=false;
- panel.dataset.kind=cue.kind;
- el("classic-live-action-title").textContent=cue.title;
- el("classic-live-action-detail").textContent=cue.detail;
- for(const seat of cue.seats){
-  const name=el("classic-player-"+seat);
-  if(!name)continue;
-  name.classList.add("classic-action-active");
-  if(cue.kind==="win")name.classList.add("classic-action-win");
- }
- // Visual feedback is time bounded and NEVER delays the Python AI continuation.
- cueTimeout=setTimeout(clearCue,cue.kind==="win"?1650:1000);
- resize();
-}
 function saved(){try{return sessionStorage.getItem(SESSION_KEY)}catch{return null}}
 function store(){try{
  if(token&&state&&!DONE.has(state.phase))sessionStorage.setItem(SESSION_KEY,token);
@@ -111,11 +79,9 @@ function setupImages(){
 }
 function resize(){
  const width=window.innerWidth-12;
- const extra=["classic-win-announcement","classic-live-action"].reduce((sum,id)=>{
-  const node=el(id);
-  return sum+(!node.hidden?node.getBoundingClientRect().height+10:0);
- },0);
- const height=window.innerHeight-el("classic-toolbar").getBoundingClientRect().height-45-extra;
+ // The classic table is sized ONLY from viewport/toolbar geometry. Public
+ // discard/kong/win events MUST NOT affect the table position or its scale.
+ const height=window.innerHeight-el("classic-toolbar").getBoundingClientRect().height-45;
  const scale=Math.max(.31,Math.min(1.32,width/800,height/680));
  el("classic-board-host").style.width=800*scale+"px";
  el("classic-board-host").style.height=680*scale+"px";
@@ -159,11 +125,30 @@ function draw(){
   });
   const missing=state.missing_suits?.[s];
   const suffix=missing?" · 缺"+SUIT[missing]:" · 待定缺";
-  el("classic-player-"+s).textContent=(s===0?"自己":s+"号AI")+suffix+
-    (state.won?.[s]?" · 已胡":"");
-  el("classic-score-"+s).textContent=s+"号"+suffix+" · "+
-    state.hand_counts[s]+"张";
-  el("classic-score-"+s).classList.toggle("lunban",state.turn===s);
+  const plate=el("classic-player-"+s);
+  const outcome=seatOutcome(state,s);
+  plate.replaceChildren();
+  const playerName=document.createElement("span");
+  playerName.className="classic-seat-name";
+  playerName.textContent=(s===0?"自己":s+"号AI")+suffix;
+  plate.append(playerName);
+  plate.classList.toggle("classic-seat-won",outcome.won);
+  if(outcome.won){
+   const badge=document.createElement("span");
+   badge.className="classic-won-badge";
+   badge.textContent=outcome.label;
+   badge.title=outcome.detail;
+   badge.setAttribute("aria-label",outcome.detail);
+   plate.append(badge);
+  }
+  // The fixed-size black central scoreboard retains the Hu pattern, not
+  // a dynamically inserted announcement that pushes the entire table.
+  const score=el("classic-score-"+s);
+  score.textContent=s+"号"+(outcome.won?
+   " · 已胡 "+outcome.center:suffix+" · "+state.hand_counts[s]+"张");
+  score.title=outcome.won?outcome.detail:"";
+  score.classList.toggle("classic-score-won",outcome.won);
+  score.classList.toggle("lunban",state.turn===s);
  }
  el("classic-wall-count").textContent=String(state.wall_count??"—");
  el("classic-dealer").textContent=String(state.dealer??"—")+"号";
@@ -269,14 +254,13 @@ async function submit(cmd){
   const result=await api(cmd);
   token=result.match_token;state=result.match;selected.clear();
   if(cmd.action==="match_new"){
-   voice?.reset();clearCue();
+   voice?.reset();
    if(terminalScrollTimeout!==null)clearTimeout(terminalScrollTimeout);
   }
   store();
   draw();
   const restoring=cmd.action==="match_resume";
   announceResponse(previous,state,result.match.public_steps,restoring);
-  displayCue(liveActionCue(result.match.public_steps,previous,state,restoring));
   if(previous && !DONE.has(previous.phase) && DONE.has(state.phase) &&
      !restoring){
    if(terminalScrollTimeout!==null)clearTimeout(terminalScrollTimeout);
