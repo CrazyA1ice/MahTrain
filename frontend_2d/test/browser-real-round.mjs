@@ -8,7 +8,7 @@ import {execFileSync} from "node:child_process";
 import {chromium} from "playwright-core";
 import {patternLabel} from "../src/settlement.mjs";
 const evidence=JSON.parse(fs.readFileSync(
- "frontend_2d/test-artifacts/real-http-full-round.json","utf8"));
+ "/tmp/mahtrain-classic-authenticated-round.json","utf8"));
 const terminal=evidence.terminal;
 const seatRows=terminal.settled_balances;
 function chrome(){
