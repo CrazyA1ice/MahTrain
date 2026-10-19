@@ -25,7 +25,7 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
    rotations retain the original players' self-perspective reading order. */
 #board>.board .he{height:135px;overflow:visible}
 #board>.board .he.main{transform:translate(253px,437px)}
-#board>.board .he.xiajia{transform:translate(690px,487px) rotate(270deg)}
+#board>.board .he.xiajia{transform:translate(675px,487px) rotate(270deg)}
 #board>.board .he.duimian{transform:translate(547px,248px) rotate(180deg)}
 #board>.board .he.shangjia{transform:translate(251px,193px) rotate(90deg)}
 #board>.board .he .dapai{
