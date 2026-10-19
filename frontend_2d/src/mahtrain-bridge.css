@@ -17,7 +17,17 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
 #board{width:800px;height:680px;position:absolute;left:0;top:0;transform-origin:top left;display:block}
 #board>.board{height:680px;max-width:800px;box-shadow:0 12px 32px #0008}
 /* Full 56-slot river matrix in original rotated .he physical regions. */
+/* The original Majiang rivers were positioned for 6x3 tiles, not MahTrain's
+   14x4 grid. Reserve four NONOVERLAPPING quadrants around the scoreboard
+   (score = [260,540]x[260,420] at native 800x680 geometry).
+   The `dapai` starts 12px after its original li-zhi/header region.
+   All coordinates are ORIGINAL 800x680 table coordinates; 90/180/270
+   rotations retain the original players' self-perspective reading order. */
 #board>.board .he{height:135px;overflow:visible}
+#board>.board .he.main{transform:translate(253px,437px)}
+#board>.board .he.xiajia{transform:translate(690px,487px) rotate(270deg)}
+#board>.board .he.duimian{transform:translate(547px,248px) rotate(180deg)}
+#board>.board .he.shangjia{transform:translate(251px,193px) rotate(90deg)}
 #board>.board .he .dapai{
  display:grid;grid-template-columns:repeat(14,20px);
  grid-template-rows:repeat(4,29px);
