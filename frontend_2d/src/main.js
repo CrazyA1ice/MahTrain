@@ -65,7 +65,11 @@ function announceResponse(previous,current,steps,isRestore){
 
 function saved(){try{return sessionStorage.getItem(SESSION_KEY)}catch{return null}}
 function store(){try{
- if(token&&state&&!DONE.has(state.phase))sessionStorage.setItem(SESSION_KEY,token);
+ // A completed 四川血战 match is still a valid read-only archive view.
+ // Keep its same-tab token until the player EXPLICITLY starts another game,
+ // otherwise refreshing after Hu silently opens an unrelated fresh round and
+ // loses the final settlement and every persistent winner marker.
+ if(token&&state)sessionStorage.setItem(SESSION_KEY,token);
  else sessionStorage.removeItem(SESSION_KEY);
 }catch{}}
 function setupImages(){

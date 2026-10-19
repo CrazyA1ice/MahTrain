@@ -167,7 +167,12 @@ def main():
     for seed in (8407,8419):
         summary,view,record=finish_round(seed)
         completed.append((summary,view,record))
-        print("REAL HTTP COMPLETED",json.dumps(summary,ensure_ascii=False),flush=True)
+        # The bearer match token is needed by the next Chromium step, but
+        # must stay in the private /tmp evidence file, NEVER in public CI logs.
+        safe_summary={k:v for k,v in summary.items()
+                      if k not in ("token","match_archive_id")}
+        print("REAL HTTP COMPLETED",json.dumps(
+            safe_summary,ensure_ascii=False),flush=True)
     # Broaden coverage by using LEGAL advanced AI decisions for both the
     # human and opponents; still only sees seat-zero authorized private view.
     # Stop after the first genuine posted Hu, or after six honest attempts.
