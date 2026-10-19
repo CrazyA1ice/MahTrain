@@ -4,7 +4,7 @@ on:
     branches:
       - feat/m368-majiang-ui-2d
       - feat/m370-classic-live-action-feedback
-      - feat/m371-classic-real-full-round-audit
+      - fix/m373-fixed-classic-table-permanent-hu
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -81,6 +81,7 @@ jobs:
           PY
           node frontend_2d/test/browser-smoke.mjs
           node frontend_2d/test/browser-settlement.mjs
+          node frontend_2d/test/browser-fixed-table.mjs
           python frontend_2d/test/full_round_http.py
           node frontend_2d/test/browser-real-round.mjs
       - name: Archive real classic Majiang screenshots
@@ -92,13 +93,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'feat/m371-classic-real-full-round-audit'
+        if: github.event_name == 'push' && github.ref_name == 'fix/m373-fixed-classic-table-permanent-hu'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.71): real match audit and classic terminal score report'
-            git pull --rebase origin feat/m371-classic-real-full-round-audit
-            git push origin HEAD:feat/m371-classic-real-full-round-audit
+            git commit -m 'build(M3.73): fixed 2D table geometry and persistent seat Hu flags'
+            git pull --rebase origin fix/m373-fixed-classic-table-permanent-hu
+            git push origin HEAD:fix/m373-fixed-classic-table-permanent-hu
           fi
