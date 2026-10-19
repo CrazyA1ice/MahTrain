@@ -88,28 +88,39 @@ try{
   canSpeak:typeof window.speechSynthesis?.speak,
  })));
  assert.equal(await voice.getAttribute('aria-pressed'),'true');
+ const initialLayout=await page.evaluate(()=>{
+  const board=document.querySelector("#classic-board-host").getBoundingClientRect();
+  return {top:board.top+scrollY,width:board.width,height:board.height};
+ });
  const first=page.locator('.shoupai.main img[data-hand-index="0"]');
  await first.click();await first.click();
  await page.waitForFunction(()=>!document.querySelector('#classic-result-report').hidden,
   null,{timeout:15000});
  const activity=await page.evaluate(()=>{
-  const cue=document.querySelector('#classic-live-action');
-  const river=document.querySelector('#classic-board-host').getBoundingClientRect();
-  const geom=cue.getBoundingClientRect();
+  const board=document.querySelector("#classic-board-host").getBoundingClientRect();
+  const notice=document.querySelector("#classic-win-announcement").getBoundingClientRect();
   return {
-   title:cue.querySelector('#classic-live-action-title')?.textContent,
-   kind:cue.dataset.kind,visible:!cue.hidden,above:geom.bottom<=river.top+1,
-   winners:[0,2].every(i=>document.querySelector(
-    '#classic-player-'+i).classList.contains('classic-action-win')),
-   losers:[1,3].every(i=>!document.querySelector(
-    '#classic-player-'+i).classList.contains('classic-action-win')),
+   noTransientActionStrip:document.querySelector("#classic-live-action")===null,
+   permanentWinners:[0,2].every(i=>{
+    const seat=document.querySelector("#classic-player-"+i);
+    return seat.classList.contains("classic-seat-won")&&
+      seat.querySelector(".classic-won-badge")?.textContent==="已胡"&&
+      !!seat.querySelector(".classic-won-badge")?.title;
+   }),
+   nonWinners:[1,3].every(i=>!document.querySelector(
+    "#classic-player-"+i).classList.contains("classic-seat-won")),
+   patterns:[0,2].every(i=>document.querySelector(
+    "#classic-score-"+i)?.textContent.includes(i===0?"清一色":"对对胡")),
+   winHistoryBelowBoard:notice.top>=board.bottom-1,
+   table:{top:board.top+scrollY,width:board.width,height:board.height},
   };
  });
- assert.equal(activity.kind,'win','show a real confirmed HU action');
- assert.match(activity.title,/一炮多响/);
- assert.equal(activity.above,true,'activity strip does not cover rivers');
- assert.equal(activity.winners,true,'both winners highlighted on their real seats');
- assert.equal(activity.losers,true,'losers do not receive false HU badges');
+ assert.equal(activity.noTransientActionStrip,true,"discard banners removed from page");
+ assert.equal(activity.permanentWinners,true,"both seats must retain Hu markers");
+ assert.equal(activity.nonWinners,true,"nonwinners must not receive Hu tags");
+ assert.equal(activity.patterns,true,"authoritative Hu patterns stay in fixed scoreboard");
+ assert.equal(activity.winHistoryBelowBoard,true,"win details never displace the table");
+ assert.deepEqual(activity.table,initialLayout,"Hu must not change table coordinates or scale");
  const audit=await page.evaluate(()=>{
   const report=document.querySelector('#classic-result-report');
   const ticker=document.querySelector('#classic-win-announcement');
@@ -121,7 +132,7 @@ try{
   return {
    report:report.innerText,rows:rowTexts,ticker:ticker.innerText,
    spoken:window.__spoken,voice:document.querySelector('#classic-voice-toggle').textContent,
-   independent:note.bottom<=board.top+1 && sheet.top>=board.bottom-1,
+   independent:note.top>=board.bottom-1 && sheet.top>=board.bottom-1,
   };
  });
  assert.match(audit.ticker,/自己.*清一色/);
@@ -135,6 +146,9 @@ try{
  assert.match(audit.report,/清一色/);
  assert.match(audit.report,/对对胡/);
  assert.ok(audit.spoken.some(x=>x==='胡'),'existing voice speaks only HU');
+ // Do not let a later repaint/voice tick remove the AI Hu marker.
+ await page.waitForTimeout(1900);
+ assert.equal(await page.locator("#classic-player-2 .classic-won-badge").count(),1);
  assert.equal(audit.independent,true,'neither banner nor score sheet covers four rivers');
  // A genuinely finished live round must automatically bring the final
  // accounts into view, without an extra manual click.
