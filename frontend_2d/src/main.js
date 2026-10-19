@@ -4,14 +4,64 @@ import MajiangTile from "@kobalab/majiang-ui/lib/pai.js";
 import MajiangShoupai from "@kobalab/majiang-ui/lib/shoupai.js";
 import MajiangHe from "@kobalab/majiang-ui/lib/he.js";
 import {SESSION_KEY,convertView,choiceAction} from "./bridge.mjs";
+import {publicActions,recentWins,winTitle} from "./settlement.mjs";
+import {renderSettlement} from "./report.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
 const TURN=new Set(["dealer_discard","await_discard"]);
 const DONE=new Set(["finished","wall_exhausted"]);
 const el=id=>document.getElementById(id);
-let token=null,state=null,pai=null,busy=false,timer=null;
+let token=null,state=null,pai=null,busy=false,timer=null,voice=null;
+let previousWinCount=0;
 const selected=new Set();
 function status(t){el("classic-status").textContent=t}
+function initializeVoice(){
+ // Reuse the EXISTING tested MahTrain Mandarin speech module; no remote
+ // audio downloads and no Japanese rule engine. Speech never blocks AI.
+ const factory=window.MahTrainMatchVoice;
+ voice=factory?.create?.(window)||null;
+ const toggle=el("classic-voice-toggle"),repeat=el("classic-voice-repeat");
+ const rate=el("classic-voice-rate");
+ if(!voice?.supported){
+  toggle.textContent="浏览器不支持中文语音";
+  toggle.disabled=true;repeat.disabled=true;rate.disabled=true;
+  return;
+ }
+ function sync(){
+  const enabled=voice.getEnabled();
+  toggle.textContent=enabled?"语音：开":"语音：关";
+  toggle.setAttribute("aria-pressed",String(enabled));
+  repeat.disabled=!voice.canRepeat();
+ }
+ toggle.onclick=()=>{voice.setEnabled(!voice.getEnabled());sync()};
+ repeat.onclick=()=>{voice.repeatLast();sync()};
+ rate.onchange=()=>{voice.setRate(rate.value);sync()};
+ sync();
+}
+function renderWins(){
+ const ticker=el("classic-win-announcement");
+ const wins=Array.isArray(state?.win_ledger?.wins)?state.win_ledger.wins:[];
+ ticker.hidden=!wins.length;
+ ticker.replaceChildren();
+ for(const item of wins){
+  const row=document.createElement("div");
+  row.className="classic-win-record";
+  const strong=document.createElement("strong");
+  strong.textContent=winTitle(item);
+  row.append(strong);
+  ticker.append(row);
+ }
+}
+function announceResponse(previous,current,steps,isRestore){
+ if(!voice||isRestore)return;
+ const events=publicActions(steps);
+ if(events.length)voice.announceEvents(events.slice(-1));
+ else if(recentWins(previous,current).length)
+  voice.announceEvents([{type:"self_draw_win"}]);
+ const repeat=el("classic-voice-repeat");
+ repeat.disabled=!voice.canRepeat();
+}
+
 function saved(){try{return sessionStorage.getItem(SESSION_KEY)}catch{return null}}
 function store(){try{
  if(token&&state&&!DONE.has(state.phase))sessionStorage.setItem(SESSION_KEY,token);
@@ -125,9 +175,16 @@ function draw(){
   center("轮到你出牌",buttons);
   status("点击一张手牌选中，再点同张打出；胡牌/杠在中央");
  }else if(DONE.has(state.phase)){
-  center("本局结束",[btn("再来一局",()=>void submit({action:"match_new"}),true,busy)]);
+  center("本局结束",[
+   btn("查看结算",()=>el("classic-result-report").scrollIntoView({
+    behavior:"smooth",block:"start",
+   }),true),
+   btn("再来一局",()=>void submit({action:"match_new"}),false,busy),
+  ]);
   status("本局结束");
  }else {center("",[]);status("AI 行动中 · 等待服务器同步")}
+ renderWins();
+ renderSettlement(el("classic-result-report"),state);
  resize();
 }
 function selectHand(node){
@@ -171,9 +228,15 @@ async function submit(cmd){
  if(busy)return;
  busy=true;if(timer!==null)clearTimeout(timer);
  try{
+  const previous=cmd.action==="match_new"?null:state;
   const result=await api(cmd);
   token=result.match_token;state=result.match;selected.clear();
-  store();draw();advance();
+  if(cmd.action==="match_new")voice?.reset();
+  store();
+  draw();
+  announceResponse(previous,state,result.match.public_steps,
+   cmd.action==="match_resume");
+  advance();
  }catch(e){
   console.error("Majiang UI match",e);status("操作失败："+e.message);
   if(token){
@@ -184,6 +247,7 @@ async function submit(cmd){
 }
 function boot(){
  setupImages();pai=MajiangTile($("#loaddata"));
+ initializeVoice();
  const hand=document.querySelector(".shoupai.main .bingpai");
  hand.addEventListener("click",e=>{
   const target=e.target.closest("[data-hand-index]");if(target)selectHand(target);

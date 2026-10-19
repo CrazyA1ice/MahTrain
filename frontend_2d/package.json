@@ -6,7 +6,7 @@
   "scripts": {
     "build:css": "stylus upstream-css/classic.styl -o src/majiang-upstream.css",
     "build": "npm run build:css && vite build",
-    "test:bridge": "node --test test/bridge.test.mjs"
+    "test:bridge": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "@kobalab/majiang-ui": "1.6.1",

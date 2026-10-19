@@ -63,3 +63,54 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
 }
 #loaddata{display:none}
 @media(max-width:800px){#classic-toolbar{margin:0 auto 3px}#classic-footer{max-width:100%}}
+
+/* M3.69: score sheet and durable win announcements are OUTSIDE the original
+   Majiang game board. Nothing overlays a concealed hand, river or meld. */
+#classic-toolbar #classic-voice-toggle[aria-pressed="true"]{
+  background:#d6ead6;color:#174127
+}
+.classic-voice-rate{display:flex;align-items:center;gap:5px;font-size:12px}
+.classic-voice-rate select{padding:6px 5px;border:0;border-radius:4px}
+#classic-win-announcement{
+ box-sizing:border-box;max-width:800px;width:calc(100% - 16px);
+ margin:6px auto;background:#284c32;color:#fff6df;
+ padding:10px 14px;border-left:4px solid #f0c76a;border-radius:5px;
+ font-size:14px;line-height:1.5
+}
+#classic-win-announcement[hidden],#classic-result-report[hidden]{display:none}
+#classic-win-announcement strong{color:#ffe59a}
+#classic-win-announcement .classic-win-record:not(:last-child){
+ border-bottom:1px solid #7d997b55
+}
+#classic-result-report{
+ box-sizing:border-box;max-width:1020px;margin:14px auto 28px;
+ padding:17px;background:#eff1e9;border-radius:6px;color:#142b22;
+ font-size:13px;box-shadow:0 5px 22px #0005;
+}
+#classic-result-report h2{font-size:20px;margin:0 0 9px}
+#classic-result-report h3{font-size:15px;margin:0 0 8px}
+#classic-result-report p{line-height:1.5;margin:5px 0}
+.classic-ledger-section{margin:12px 0;border-top:1px solid #c4cbbb;padding-top:12px}
+.classic-ledger-table{
+ width:100%;border-collapse:collapse;font-size:13px;line-height:1.5
+}
+.classic-ledger-table th,.classic-ledger-table td{
+ padding:7px 8px;border:1px solid #c5d2c4;text-align:left;vertical-align:top
+}
+.classic-ledger-table th{background:#c5d6c7;font-weight:700;white-space:nowrap}
+.classic-ledger-table tbody tr:nth-child(even){background:#dfe8df}
+.classic-ledger-table .is-plus{color:#12623a;font-weight:700}
+.classic-ledger-table .is-minus{color:#9e352c;font-weight:700}
+.classic-ledger-notice{color:#335b46}
+.classic-ledger-warning{color:#962d21;font-weight:700}
+.classic-ledger-win{padding:8px 9px;margin:6px 0;background:white;border-radius:4px;
+ border-left:3px solid #467959}
+.classic-ledger-details{margin:9px 0}
+.classic-ledger-details summary{cursor:pointer;font-weight:600;color:#1c5437}
+.classic-ledger-footnote{font-size:11px;color:#657068}
+@media(max-width:850px){
+ #classic-result-report{margin:10px 8px;padding:10px}
+ .classic-ledger-section{overflow-x:auto}
+ .classic-ledger-table{min-width:690px}
+ #classic-toolbar{gap:7px}
+}
