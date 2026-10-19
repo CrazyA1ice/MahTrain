@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {execFileSync} from "node:child_process";
 import {chromium} from "playwright-core";
+import {patternLabel} from "../src/settlement.mjs";
 const evidence=JSON.parse(fs.readFileSync(
  "frontend_2d/test-artifacts/real-http-full-round.json","utf8"));
 const terminal=evidence.terminal;
@@ -74,13 +75,14 @@ try{
    "seat "+i+" final net does not match REAL posted Python ledger");
   const won=terminal.win_ledger.wins.filter(w=>w.winner===i);
   if(won.length){
-   assert.ok(truth.rows[i][1].includes(won[0].main_pattern),
+   assert.ok(truth.rows[i][1].includes(patternLabel(won[0].main_pattern)),
     "seat "+i+" server-posted win pattern absent from displayed table");
   }
  }
  assert.equal(truth.hasWin,terminal.win_ledger.wins.length>0);
+ assert.ok(!truth.reportText.includes('seven_pairs'), 'no raw rule code in visible score sheet');
  for(const posted of terminal.win_ledger.wins){
-  assert.ok(truth.winText.includes(posted.main_pattern));
+  assert.ok(truth.winText.includes(patternLabel(posted.main_pattern)));
  }
  assert.equal(stats.calls,1);
  assert.deepEqual(stats.states,["match_resume"]);
