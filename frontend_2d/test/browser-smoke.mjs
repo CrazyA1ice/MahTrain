@@ -70,6 +70,13 @@ try {
  }
  assert.equal(await page.locator(".is-picked").count(),3);
  await page.getByRole("button",{name:/确认换三张/}).click();
+ await page.waitForTimeout(1900);
+ console.log("POST EXCHANGE",await page.evaluate(()=>({
+  status:document.querySelector("#classic-status")?.textContent,
+  center:document.querySelector("#classic-actions-title")?.textContent,
+  buttons:[...document.querySelectorAll("#classic-actions-buttons button")]
+   .map(x=>({name:x.textContent,disabled:x.disabled})),
+ })),errors);
  await page.waitForFunction(()=>
   document.querySelector("#classic-actions-title")?.textContent?.includes("定缺"),
   {timeout:35000});
