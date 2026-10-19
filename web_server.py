@@ -8,6 +8,7 @@ service. All session state and the shuffled wall stay in Python server memory.
 """
 from __future__ import annotations
 
+import errno
 import json
 import mimetypes
 import secrets
@@ -934,6 +935,25 @@ def _process(action: str, payload: dict) -> dict:
         }
 
 
+# Disconnects during a local HTTP response are normal (page navigation,
+# cancelled fetch, browser shutdown). On Windows, security software can also
+# abort an established localhost connection with WinError 10053.
+# Do not hide unrelated socket/file errors or failed JSON serialization.
+_CLIENT_DISCONNECT_ERRNOS = frozenset((
+    errno.EPIPE, errno.ECONNRESET, errno.ECONNABORTED,
+))
+_CLIENT_DISCONNECT_WINERRORS = frozenset((10053, 10054, 10058))
+
+
+def _is_client_disconnect(exc: OSError) -> bool:
+    return (
+        isinstance(exc, (BrokenPipeError, ConnectionResetError,
+                         ConnectionAbortedError))
+        or exc.errno in _CLIENT_DISCONNECT_ERRNOS
+        or getattr(exc, "winerror", None) in _CLIENT_DISCONNECT_WINERRORS
+    )
+
+
 class Handler(BaseHTTPRequestHandler):
     def _respond(self, status: int, data: bytes, content_type: str) -> None:
         self.send_response(status)
@@ -946,8 +966,16 @@ class Handler(BaseHTTPRequestHandler):
                          "default-src 'self'; script-src 'self'; style-src 'self'; "
                          "img-src 'self' data:; connect-src 'self'; "
                          "object-src 'none'; frame-ancestors 'none'")
-        self.end_headers()
-        self.wfile.write(data)
+        try:
+            self.end_headers()
+            self.wfile.write(data)
+        except OSError as exc:
+            if not _is_client_disconnect(exc):
+                raise
+            # The browser has gone away; nothing useful can be sent now.
+            # Treat this as a cancelled response, not a failed match/archive
+            # operation. Suppress only these expected network disconnects.
+            self.close_connection = True
 
     def _json(self, status: int, payload: dict) -> None:
         self._respond(status, json.dumps(payload, ensure_ascii=False).encode(),
@@ -961,39 +989,44 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with _LOCK:
                     if "archive_id" in query:
-                        self._json(200,_MATCH_ARCHIVE.detail(
-                            query["archive_id"][0]))
+                        result = _MATCH_ARCHIVE.detail(query["archive_id"][0])
                     else:
-                        limit=int(query.get("limit",["30"])[0])
-                        self._json(200,_MATCH_ARCHIVE.list_completed(limit))
-            except (ValueError,TypeError) as exc:
-                self._json(400,{"error":str(exc)})
+                        limit = int(query.get("limit", ["30"])[0])
+                        result = _MATCH_ARCHIVE.list_completed(limit)
+            except (ValueError, TypeError) as exc:
+                self._json(400, {"error": str(exc)})
+            else:
+                # Don't block active matches while a browser downloads
+                # archives or aborts a request halfway through the response.
+                self._json(200, result)
             return
         if path == "/api/history":
             query = parse_qs(url.query)
             try:
                 with _LOCK:
                     if "archive_id" in query:
-                        detail = _HISTORY.detail(query["archive_id"][0])
-                        self._json(200, detail)
+                        result = _HISTORY.detail(query["archive_id"][0])
                     else:
                         limit = int(query.get("limit", ["30"])[0])
-                        self._json(200, _HISTORY.list_history(limit))
+                        result = _HISTORY.list_history(limit)
             except (ValueError, TypeError) as exc:
                 self._json(400, {"error": str(exc)})
+            else:
+                self._json(200, result)
             return
         if path == "/api/state":
             token = parse_qs(url.query).get("token", [None])[0]
             with _LOCK:
                 game = _SESSIONS.get(token)
                 if not game:
-                    self._json(404, {"error": "训练会话不存在"})
+                    status, result = 404, {"error": "训练会话不存在"}
                 else:
-                    self._json(200, {
+                    status, result = 200, {
                         "state": game.public_state(),
                         "archive_id": getattr(game, "_archive_id", None),
                         "report": game.report() if game.report()["completed_rounds"] else None,
-                    })
+                    }
+            self._json(status, result)
             return
         asset = _asset_path(path)
         if asset is None or not asset.is_file():
