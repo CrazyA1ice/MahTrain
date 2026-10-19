@@ -1,6 +1,6 @@
 /* Conventional score sheet outside the original Majiang board. */
 import {summarizeSettlement,signed,seatName,WIN_KIND,KONG_KIND,
-  nonZeroBreakdown} from "./settlement.mjs";
+  nonZeroBreakdown,patternLabel} from "./settlement.mjs";
 const n=(tag,cls,txt)=>{
  const e=document.createElement(tag);
  if(cls)e.className=cls;
@@ -38,7 +38,7 @@ function chips(record){
   ...nonZeroBreakdown(record.combinations),
   ...nonZeroBreakdown(record.bonuses),
  ];
- return values.length?values.join("、"):"无额外番型与加成";
+ return values.length?values.map(v=>v.replace(/^([^×]+)/,key=>patternLabel(key))).join("、"):"无额外番型与加成";
 }
 export function renderSettlement(root,view){
  const data=summarizeSettlement(view);
@@ -60,7 +60,7 @@ export function renderSettlement(root,view){
  const rows=data.seats.map(s=>[
   s.name+(s.won?"（已胡）":""),
   s.patterns.length?s.patterns.map(p=>
-   (WIN_KIND[p.kind]||"胡")+"·"+p.name+" "+p.fan+"番").join("；"):"未胡",
+   (WIN_KIND[p.kind]||"胡")+"·"+patternLabel(p.name)+" "+p.fan+"番").join("；"):"未胡",
   s.win,s.kong,s.draw,s.total,
  ]);
  financialTable(summary,["玩家","实际胡牌番型","胡牌积分",
@@ -73,7 +73,7 @@ export function renderSettlement(root,view){
   const card=n("article","classic-ledger-win");
   card.append(n("strong","",String(index+1)+". "+seatName(win.winner)+
    " · "+(WIN_KIND[win.kind]||"胡")+" · "+
-   (win.main_pattern||"未命名番型")+" · "+
+   patternLabel(win.main_pattern||"未命名番型")+" · "+
    win.effective_fan+"番"+(win.raw_fan!==win.effective_fan?
     "（原始"+win.raw_fan+"番，按封顶入账）":"")));
   card.append(n("p","","牌型组合："+chips(win)));
