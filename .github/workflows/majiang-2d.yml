@@ -78,6 +78,7 @@ jobs:
           else:raise RuntimeError('MahTrain classic server failed to start')
           PY
           node frontend_2d/test/browser-smoke.mjs
+          node frontend_2d/test/browser-settlement.mjs
       - name: Archive real classic Majiang screenshots
         if: always()
         uses: actions/upload-artifact@v4
