@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - feat/m368-majiang-ui-2d
-      - feat/m369-classic-hu-score-voice
+      - feat/m370-classic-live-action-feedback
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -89,13 +89,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'feat/m369-classic-hu-score-voice'
+        if: github.event_name == 'push' && github.ref_name == 'feat/m370-classic-live-action-feedback'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.69): ship spoken hu and four-player settlement frontend'
-            git pull --rebase origin feat/m369-classic-hu-score-voice
-            git push origin HEAD:feat/m369-classic-hu-score-voice
+            git commit -m 'build(M3.70): ship public event feedback and final settlement scroll'
+            git pull --rebase origin feat/m370-classic-live-action-feedback
+            git push origin HEAD:feat/m370-classic-live-action-feedback
           fi
