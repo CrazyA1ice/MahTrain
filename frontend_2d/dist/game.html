@@ -4,16 +4,23 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>MahTrain · 電脳麻将经典2D对战</title>
-  <script type="module" crossorigin src="/classic/assets/game-DvT9qnbW.js"></script>
-  <link rel="stylesheet" crossorigin href="/classic/assets/game-D5GEkdzM.css">
+  <script type="module" crossorigin src="/classic/assets/game-juN2ayu3.js"></script>
+  <link rel="stylesheet" crossorigin href="/classic/assets/game-Djfv_sh5.css">
 </head>
 <body class="board">
 <header id="classic-toolbar">
   <a href="/" aria-label="返回MahTrain首页">← 返回训练首页</a>
   <strong>四人血战 · 電脳麻将经典桌面</strong>
   <button type="button" id="classic-new">随机新开一局</button>
+  <button type="button" id="classic-voice-toggle" aria-pressed="false" title="可开启或关闭中文报牌；若浏览器禁止自动语音，请点击此按钮">语音检测中…</button>
+  <button type="button" id="classic-voice-repeat" title="重听最近一次公开出牌或碰杠胡" disabled>重听</button>
+  <label class="classic-voice-rate">语速 <select id="classic-voice-rate" aria-label="中文语音速度">
+    <option value="slow">慢速</option><option value="normal" selected>正常</option>
+    <option value="fast">快速</option>
+  </select></label>
   <span id="classic-status" role="status" aria-live="polite">正在连接牌局…</span>
 </header>
+<section id="classic-win-announcement" aria-live="polite" aria-label="本局胡牌广播" hidden></section>
 <div id="classic-board-host">
   <div id="board">
     <div class="board" id="classic-game-board">
@@ -48,7 +55,9 @@
     </div>
   </div>
 </div>
+<section id="classic-result-report" aria-label="本局四家番型、杠钱和收支结算表" hidden></section>
 <div id="loaddata" aria-hidden="true"></div>
 <footer id="classic-footer"><span id="classic-footer-hint">原版 Majiang UI · MahTrain 四川血战 AI</span>
   <span>换三张、定缺、碰杠胡请看牌桌中央；任何提示不会覆盖手牌或牌河。</span></footer>
+<script src="/match_voice.js"></script>
 </body></html>
