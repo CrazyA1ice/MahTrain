@@ -115,49 +115,37 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
  #classic-toolbar{gap:7px}
 }
 
-/* M3.70: public move feedback is an external strip, never a modal over tiles.
-   Only the existing upstream player NAME plate gets a brief accent ring. */
-#classic-live-action{
-  box-sizing:border-box;max-width:800px;width:calc(100% - 16px);
-  margin:6px auto 5px;padding:8px 12px;display:flex;gap:9px;
-  align-items:baseline;justify-content:center;flex-wrap:wrap;
-  border:1px solid #9bb19b;border-radius:5px;
-  background:#203d2d;color:#e7f5df;font-size:13px;line-height:1.5;
+/* M3.73: Four-player table never changes size when a public action occurs.
+   Labels reuse the ORIGINAL fixed-size seat plates of upstream Majiang UI. */
+#classic-status{
+  box-sizing:border-box;height:18px;line-height:18px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-#classic-live-action[hidden]{display:none}
-#classic-live-action strong{font-size:15px;letter-spacing:.02em}
-#classic-live-action[data-kind="win"]{
-  background:#563b16;color:#fff4d4;border-color:#eec470
+#board>.board>.player{
+  box-sizing:border-box;display:flex;align-items:center;
+  justify-content:space-between;gap:4px;
+  width:160px;height:30px;overflow:hidden;
+  padding:2px 6px;font-size:12px;line-height:1.2;
+  white-space:nowrap;
 }
-#classic-live-action[data-kind="kong"]{
-  background:#273c51;color:#e5f4ff;border-color:#8ac4e9
+#board>.board>.player .classic-seat-name{
+  min-width:0;overflow:hidden;text-overflow:ellipsis;
 }
-#classic-live-action[data-kind="peng"]{
-  background:#26483d;color:#f2fced;border-color:#88ba99
+#board>.board>.player.classic-seat-won{
+  background:#493016;outline:2px solid #eec36f;
+  box-shadow:0 0 8px #d5ab5366;color:#fff2d1;
 }
-#classic-live-action-detail{font-size:11px;opacity:.86}
-#board>.board .player.classic-action-active{
-  filter:brightness(1.5) drop-shadow(0 0 4px #f8d889);
-  outline:2px solid #eed685;
-  outline-offset:2px;
-  border-radius:3px;
+#board>.board>.player .classic-won-badge{
+  flex:none;display:inline-flex;align-items:center;
+  justify-content:center;padding:2px 5px;
+  border:1px solid #ffdf95;border-radius:3px;
+  background:#d6a749;color:#231a0b;
+  font-size:12px;font-weight:700;
+  line-height:17px;letter-spacing:.03em;
 }
-#board>.board .player.classic-action-active.classic-action-win{
-  filter:brightness(1.4) drop-shadow(0 0 7px #ffcf79)
+#classic-score .classic-score-won{
+  color:#ffdf90;font-size:11px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
-@media(prefers-reduced-motion:no-preference){
-  #classic-live-action:not([hidden]){
-    animation:classic-live-enter .3s ease-out both
-  }
-  #board>.board .player.classic-action-active{
-    animation:classic-seat-pulse .8s ease-in-out 1
-  }
-}
-@keyframes classic-live-enter{
- from{opacity:.25;transform:translateY(-4px)}
- to{opacity:1;transform:translateY(0)}
-}
-@keyframes classic-seat-pulse{
- 0%,100%{opacity:1}
- 50%{opacity:.65}
-}
+/* Winner detail is below the board; it can grow without affecting the
+   table's original size or origin. No floating discard/kong notification. */

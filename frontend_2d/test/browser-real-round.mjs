@@ -50,14 +50,15 @@ try{
   const rows=[...report.querySelectorAll(".classic-ledger-table")[0]
      .querySelectorAll("tbody tr")].map(tr=>[...tr.children].map(td=>td.textContent.trim()));
   const win=document.querySelector("#classic-win-announcement");
-  const cue=document.querySelector("#classic-live-action");
   const board=document.querySelector("#classic-board-host").getBoundingClientRect();
   const sheet=report.getBoundingClientRect();
   const human=document.querySelector(".shoupai.main .bingpai");
   return {
    rows,hasWin:!win.hidden,winText:win.textContent,
    reportText:report.textContent,
-   cueHidden:cue.hidden,
+   cueAbsent:document.querySelector("#classic-live-action")===null,
+   markedSeats:[0,1,2,3].filter(i=>document.querySelector("#classic-player-"+i)
+     ?.classList.contains("classic-seat-won")),
    reportBelowBoard:sheet.top>=board.bottom-1,
    players:document.querySelectorAll("#classic-game-board > .player").length,
    handRendered:human.querySelectorAll("img.pai").length,
@@ -68,7 +69,8 @@ try{
  assert.equal(truth.rows.length,4);
  assert.equal(truth.reportBelowBoard,true,
   "real round financial report MUST NOT block any table tile or river");
- assert.equal(truth.cueHidden,true,"resume must not replay stale event animation");
+ assert.equal(truth.cueAbsent,true,"discard/claim banners never mount above board");
+ assert.deepEqual(truth.markedSeats,[0,1,2,3].filter(i=>terminal.won[i]));
  for(let i=0;i<4;i++){
   const expected=seatRows[i]>0?"+"+seatRows[i]:String(seatRows[i]);
   assert.equal(truth.rows[i][5],expected,
@@ -97,7 +99,11 @@ try{
   "#classic-result-report")?.hidden===false,null,{timeout:25000});
  assert.equal(stats.calls,2);
  assert.ok(stats.states.every(x=>x==="match_resume"));
- assert.equal(await page.locator("#classic-live-action").isHidden(),true);
+ assert.equal(await page.locator("#classic-live-action").count(),0);
+ for(let i=0;i<4;i++){
+   assert.equal(await page.locator("#classic-player-"+i+" .classic-won-badge").count(),
+     terminal.won[i]?1:0);
+ }
  console.log("REAL TERMINAL CLASSIC BROWSER: PASS",JSON.stringify({
   seed:evidence.summary.seed,phase:terminal.phase,
   summary:truth.rows,winCount:terminal.win_ledger.wins.length,
