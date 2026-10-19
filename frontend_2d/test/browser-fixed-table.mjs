@@ -49,11 +49,14 @@ const geometry=()=>page.evaluate(()=>{
  return {top:table.top+scrollY,left:table.left,width:table.width,height:table.height,
   gameWidth:game.width,gameHeight:game.height};
 });
+let expectedDiscards=0;
 async function discard(){
  const tile=page.locator('.shoupai.main .bingpai img.pai[data-hand-index="0"]');
  await tile.click();await tile.click();
+ expectedDiscards++;
  await page.waitForFunction(count=>Number(document.querySelector(
-  "#classic-wall-count")?.textContent)===50-count,null,{timeout:8000});
+  "#classic-wall-count")?.textContent)===50-count,
+  expectedDiscards,{timeout:8000});
 }
 try{
  await page.goto("http://127.0.0.1:8765/classic/game.html",
