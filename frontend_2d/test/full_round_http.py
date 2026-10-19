@@ -11,6 +11,9 @@ import time
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/"src"))
+from mahtrain_core.ai import MahjongAgent
 
 ORIGIN=os.environ.get("MAHTRAIN_TEST_ORIGIN","http://127.0.0.1:8765")
 ARTIFACTS=Path("frontend_2d/test-artifacts")
@@ -39,7 +42,7 @@ def missing_suit(hand:list[str]) -> str:
     # Prefer to eliminate the fewest remaining cards, deterministic and legal.
     return min("msp",key=lambda s:(sum(x[0]==s for x in hand),"msp".index(s)))
 
-def next_human(view:dict) -> dict:
+def next_human(view:dict, human:MahjongAgent) -> dict:
     phase=view["phase"]
     if phase in ("dealer_discard","await_discard") and view["turn"]==0:
         if view["can_self_draw_win"]:
@@ -49,10 +52,9 @@ def next_human(view:dict) -> dict:
             return {"action":"match_kong","kind":k["type"],"tile":k["tile"]}
         hand=view["hand"]
         missing=view["missing_suits"][0]
-        cut=next((x for x in hand if x[0]==missing),None)
+        cut=human.discard(view)
+        assert cut in hand, "authorized human AI must choose a tile in its own hand"
         drawn=view.get("drawn_tile")
-        if cut is None:
-            cut=drawn if drawn is not None else hand[0]
         return {"action":"match_discard","tile":cut,
                 "from_draw":cut==drawn}
     if phase in ("claim_window","rob_kong_window"):
@@ -104,9 +106,10 @@ def verify_privacy(view:dict) -> None:
     assert len(view["hand_counts"])==4 and len(view["hand"])<=14
     assert len(view["melds"])==4
 
-def finish_round(seed:int) -> tuple[dict,dict,list[dict]]:
+def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
+    human=MahjongAgent("advanced",seed=seed,seat=0)
     created=post({"action":"match_new","seed":seed,
-                  "ai_levels":["basic","basic","basic"],
+                  "ai_levels":[level,level,level],
                   "self_draw_mode":"add_base","kong_base":100})
     token=created["match_token"]
     view=created["match"]
@@ -127,7 +130,7 @@ def finish_round(seed:int) -> tuple[dict,dict,list[dict]]:
         if view["phase"] in ("finished","wall_exhausted"):
             break
         assert time.monotonic()-start<170, f"seed={seed} timed out at step={step}"
-        cmd=next_human(view)
+        cmd=next_human(view,human)
         response=post({"match_token":token,**cmd})
         view=response["match"]
         verify_privacy(view)
@@ -154,15 +157,25 @@ def finish_round(seed:int) -> tuple[dict,dict,list[dict]]:
     assert view["wall_count"]==0 or sum(view["won"])>=3
     assert view["match_archive_id"] is not None
     assert seen_kinds.get("discard",0)>0
-    return {"seed":seed,"token":token,"steps":step,
+    return {"seed":seed,"level":level,"token":token,"steps":step,
             "events":seen_kinds,"match_archive_id":view["match_archive_id"],
             "win_count":len(view["win_ledger"]["wins"]),
             "kong_count":len(view["kong_ledger"]["events"])},view,record
 
 def main():
     completed=[]
+    # Two quick ordinary games catch complete no-Hu / full-wall payment cases.
     for seed in (8407,8419):
         summary,view,record=finish_round(seed)
+        completed.append((summary,view,record))
+        print("REAL HTTP COMPLETED",json.dumps(summary,ensure_ascii=False),flush=True)
+    # Broaden coverage by using LEGAL advanced AI decisions for both the
+    # human and opponents; still only sees seat-zero authorized private view.
+    # Stop after the first genuine posted Hu, or after six honest attempts.
+    for seed in (137,420,2026,1777,65,999):
+        if any(x[0]["win_count"] for x in completed):
+            break
+        summary,view,record=finish_round(seed,level="advanced")
         completed.append((summary,view,record))
         print("REAL HTTP COMPLETED",json.dumps(summary,ensure_ascii=False),flush=True)
     chosen=max(completed,key=lambda x:(
@@ -173,6 +186,8 @@ def main():
              "all_runs":[x[0] for x in completed]}
     (ARTIFACTS/"real-http-full-round.json").write_text(
         json.dumps(payload,ensure_ascii=False,indent=2),encoding="utf8")
+    print("FULL ROUND REAL WIN COVERAGE:", "covered" if summary["win_count"] else
+          "not_observed_in_the_tested_seeds",flush=True)
     print("AUTHENTIC FULL ROUND FINAL AUDIT: PASS, seed=",summary["seed"],
           "terminal=",view["phase"],"win_count=",summary["win_count"],
           "kong_count=",summary["kong_count"],flush=True)
