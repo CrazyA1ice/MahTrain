@@ -6,6 +6,7 @@ on:
       - feat/m370-classic-live-action-feedback
       - fix/m373-fixed-classic-table-permanent-hu
       - fix/m374-persist-completed-classic-round
+      - fix/m375-classic-river-56-slot-layout
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -83,6 +84,7 @@ jobs:
           node frontend_2d/test/browser-smoke.mjs
           node frontend_2d/test/browser-settlement.mjs
           node frontend_2d/test/browser-fixed-table.mjs
+          node frontend_2d/test/browser-river-capacity.mjs
           node frontend_2d/test/browser-finished-refresh.mjs
           python frontend_2d/test/full_round_http.py
           node frontend_2d/test/browser-real-round.mjs
@@ -95,13 +97,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'fix/m374-persist-completed-classic-round'
+        if: github.event_name == 'push' && github.ref_name == 'fix/m375-classic-river-56-slot-layout'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.74): persist completed classic match after page refresh'
-            git pull --rebase origin fix/m374-persist-completed-classic-round
-            git push origin HEAD:fix/m374-persist-completed-classic-round
+            git commit -m 'build(M3.75): correct long rivers and meld clearance with native Majiang UI'
+            git pull --rebase origin fix/m375-classic-river-56-slot-layout
+            git push origin HEAD:fix/m375-classic-river-56-slot-layout
           fi
