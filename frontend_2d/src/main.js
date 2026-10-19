@@ -1,6 +1,8 @@
 /* Original kobalab/Majiang UI components; MahTrain Python is the only game authority. */
 import $ from "jquery";
-import UI from "@kobalab/majiang-ui";
+import MajiangTile from "@kobalab/majiang-ui/lib/pai.js";
+import MajiangShoupai from "@kobalab/majiang-ui/lib/shoupai.js";
+import MajiangHe from "@kobalab/majiang-ui/lib/he.js";
 import {SESSION_KEY,convertView,choiceAction} from "./bridge.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
@@ -51,7 +53,7 @@ function draw(){
  const view=convertView(state);
  for(let s=0;s<4;s++){
   const cls=CLS[s];
-  new UI.Shoupai($(".shoupai."+cls),pai,view.hands[s],s===0)
+  new MajiangShoupai($(".shoupai."+cls),pai,view.hands[s],s===0)
     .redraw(s===0).adjust();
   $(".shoupai."+cls+" .fulou .mianzi").each((i,node)=>{
    if(!view.redactions[s][i]?.hidden)return;
@@ -60,7 +62,7 @@ function draw(){
     img.alt="未公开的暗杠";img.removeAttribute("title");
    });
   });
-  new UI.He($(".he."+cls),pai,view.rivers[s],true).redraw(true);
+  new MajiangHe($(".he."+cls),pai,view.rivers[s],true).redraw(true);
   $(".he."+cls+" .dapai img.pai").each((i,node)=>{
    if(view.rivers[s].claimed[i])node.classList.add("claimed");
   });
@@ -176,7 +178,7 @@ async function submit(cmd){
  }finally{busy=false;if(state)draw()}
 }
 function boot(){
- setupImages();pai=UI.pai($("#loaddata"));
+ setupImages();pai=MajiangTile($("#loaddata"));
  const hand=document.querySelector(".shoupai.main .bingpai");
  hand.addEventListener("click",e=>{
   const target=e.target.closest("[data-hand-index]");if(target)selectHand(target);
