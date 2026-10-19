@@ -13,17 +13,27 @@ const browser=await chromium.launch({headless:true,executablePath:chrome(),
  args:["--no-sandbox","--disable-dev-shm-usage"]});
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[];
-page.on("pageerror",err=>errors.push(err.message));
+page.on("pageerror",err=>{errors.push(err.message);console.error("BROWSER PAGEERROR:",err.message)});
+page.on("console",msg=>{if(msg.type()==="error")console.error("BROWSER CONSOLE:",msg.text())});
+page.on("response",res=>{if(res.status()>=400)console.error("HTTP",res.status(),res.url())});
 try {
  const res=await page.goto("http://127.0.0.1:8765/classic/game.html",
   {waitUntil:"load",timeout:30000});
  assert.equal(res.status(),200);
+ await page.waitForTimeout(1300);
+ console.log("INITIAL BROWSER DIAGNOSTICS",await page.evaluate(()=>({
+  title:document.title,status:document.querySelector("#classic-status")?.textContent,
+  hand:document.querySelectorAll(".shoupai.main .bingpai img.pai").length,
+  indexed:document.querySelectorAll(".shoupai.main .bingpai img[data-hand-index]").length,
+  center:document.querySelector("#classic-actions-title")?.textContent,
+  errors:window.__majiangErrors||null
+ })), errors);
  await page.waitForFunction(()=>{
   const stage=document.querySelector(".shoupai.main .bingpai");
   const prompt=document.querySelector("#classic-actions-title");
   return !!stage && stage.querySelectorAll("img.pai[data-hand-index]").length>=13 &&
    prompt?.textContent?.includes("换三张");
- },{timeout:45000});
+ },null,{timeout:10000});
  const before=await page.evaluate(()=>{
   const view=document.querySelector("#classic-game-board").getBoundingClientRect();
   const imgs=[...document.querySelectorAll(".shoupai.main .bingpai img.pai")];
