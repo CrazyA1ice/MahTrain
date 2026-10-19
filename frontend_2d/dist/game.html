@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MahTrain · 電脳麻将经典2D对战</title>
+  <script type="module" crossorigin src="/classic/assets/game-DvT9qnbW.js"></script>
+  <link rel="stylesheet" crossorigin href="/classic/assets/game-D5GEkdzM.css">
+</head>
+<body class="board">
+<header id="classic-toolbar">
+  <a href="/" aria-label="返回MahTrain首页">← 返回训练首页</a>
+  <strong>四人血战 · 電脳麻将经典桌面</strong>
+  <button type="button" id="classic-new">随机新开一局</button>
+  <span id="classic-status" role="status" aria-live="polite">正在连接牌局…</span>
+</header>
+<div id="classic-board-host">
+  <div id="board">
+    <div class="board" id="classic-game-board">
+      <div class="score" id="classic-score">
+        <div class="juchang"><div class="jushu" id="classic-round">血战到底</div>
+          <div class="jicun"><span>庄家 <b id="classic-dealer">—</b></span></div></div>
+        <div class="shan"><div class="baopai"></div>
+          <div>余牌 <span class="paishu" id="classic-wall-count">—</span></div></div>
+        <div class="defen">
+          <div class="main" id="classic-score-0"></div>
+          <div class="xiajia" id="classic-score-1"></div>
+          <div class="duimian" id="classic-score-2"></div>
+          <div class="shangjia" id="classic-score-3"></div>
+        </div>
+      </div>
+      <div class="player main" id="classic-player-0">自己</div>
+      <div class="player xiajia" id="classic-player-1">1号</div>
+      <div class="player duimian" id="classic-player-2">2号</div>
+      <div class="player shangjia" id="classic-player-3">3号</div>
+      <div class="shoupai main"><div class="bingpai"></div><div class="fulou"></div></div>
+      <div class="shoupai xiajia"><div class="bingpai"></div><div class="fulou"></div></div>
+      <div class="shoupai duimian"><div class="bingpai"></div><div class="fulou"></div></div>
+      <div class="shoupai shangjia"><div class="bingpai"></div><div class="fulou"></div></div>
+      <div class="he main"><div class="lizhi"><span class="chouma hide"></span></div><div class="dapai"></div></div>
+      <div class="he xiajia"><div class="lizhi"><span class="chouma hide"></span></div><div class="dapai"></div></div>
+      <div class="he duimian"><div class="lizhi"><span class="chouma hide"></span></div><div class="dapai"></div></div>
+      <div class="he shangjia"><div class="lizhi"><span class="chouma hide"></span></div><div class="dapai"></div></div>
+      <div id="classic-center-actions" role="group" aria-label="中央换三张、定缺与碰杠胡操作" hidden>
+        <div id="classic-actions-title"></div>
+        <div id="classic-actions-buttons"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="loaddata" aria-hidden="true"></div>
+<footer id="classic-footer"><span id="classic-footer-hint">原版 Majiang UI · MahTrain 四川血战 AI</span>
+  <span>换三张、定缺、碰杠胡请看牌桌中央；任何提示不会覆盖手牌或牌河。</span></footer>
+</body></html>

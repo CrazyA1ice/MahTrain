@@ -294,13 +294,15 @@
           </select></label>
           <label class="match-kong-toggle"><input id="match-enable-kong" type="checkbox"/> 自定义杠钱底分</label>
           <label>杠钱底分（默认跟随房间系数） <input id="match-kong-base" type="number" min="1" max="1000000" value="100" disabled/></label>
-          <a id="match-open-queju-3d" class="primary"
-             href="/3d/game.html?mahtrain=1&amp;seat=0&amp;name=MahTrain"
-             title="直接进入完整开源雀局 Three.js 3D 对战前端，由原 Python AI 和血战规则驱动"
+          <a id="match-open-majiang-classic" class="primary"
+             href="/classic/game.html"
+             title="直接使用原版電脳麻将 Majiang UI 经典桌面，规则和 AI 仍由 MahTrain 提供"
              style="display:inline-block;padding:10px 16px;margin:3px;text-decoration:none;border-radius:8px">
-             开始 3D 血战（雀局成熟前端）
+             开始经典 2D 血战（Majiang UI）
           </a>
-          <button id="match-new" type="button" class="primary">旧版 2D 对战（备用）</button>
+          <a id="match-open-queju-3d" href="/3d/game.html?mahtrain=1&amp;seat=0&amp;name=MahTrain"
+             style="margin:3px;font-size:12px">旧 3D 试验版</a>
+          <button id="match-new" type="button" class="primary">原有 2D 对战（备用）</button>
         </div>
         <div class="match-extras">
           <label class="match-voice-switch"><input id="match-voice-enabled" type="checkbox" checked/> 语音播报出牌、碰、杠、胡</label>

@@ -1,0 +1,99 @@
+name: Majiang classic 2D UI integration
+on:
+  push:
+    branches:
+      - feat/m368-majiang-ui-2d
+    paths:
+      - "frontend_2d/**"
+      - "web_server.py"
+      - "web/index.html"
+      - "tests/test_web_app.py"
+      - ".github/workflows/majiang-2d.yml"
+  pull_request:
+    paths:
+      - "frontend_2d/**"
+      - "web_server.py"
+      - "web/index.html"
+      - "tests/test_web_app.py"
+      - ".github/workflows/majiang-2d.yml"
+permissions:
+  contents: write
+jobs:
+  classic-real-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install real Majiang UI library and original Stylus compiler
+        run: cd frontend_2d && npm install --no-audit --no-fund
+      - name: Validate private hand and public river adapter
+        run: cd frontend_2d && npm run test:bridge
+      - name: Compile original Majiang 2D styles and genuine components
+        run: cd frontend_2d && npm run build
+      - name: Verify security and original GIF bundle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import web_server
+          entry=web_server._asset_path('/classic/game.html')
+          assert entry.is_file(),entry
+          assert 'classic/assets' in entry.read_text('utf-8')
+          base=Path('frontend_2d/dist/img')
+          for suit in 'mps':
+              for n in range(1,10):
+                  assert (base / f'{suit}{n}.gif').stat().st_size>500
+          assert (base / 'pai.gif').stat().st_size>100
+          for path in ['/classic/img/../web_server.py',
+              '/classic/assets/../secret','/frontend_2d/src/main.js']:
+              assert web_server._asset_path(path) is None
+          print('Original Majiang 28 GIF sprite assets and safe server routes: PASS')
+          PY
+      - name: Real Chromium original Majiang UI and Sichuan match smoke
+        run: |
+          if ! command -v google-chrome >/dev/null 2>&1 \
+            && ! command -v chromium >/dev/null 2>&1 \
+            && ! command -v chromium-browser >/dev/null 2>&1; then
+              (cd frontend_2d && npx playwright install --with-deps chromium)
+          fi
+          export MAHTRAIN_HISTORY_DB=/tmp/majiang_2d_history.sqlite3
+          export MAHTRAIN_MATCH_DB=/tmp/majiang_2d_match.sqlite3
+          python web_server.py >/tmp/majiang_2d_python.log 2>&1 &
+          server=$!
+          trap 'kill "$server" || true' EXIT
+          python - <<'PY'
+          import time,urllib.request
+          for _ in range(100):
+              try:
+                  with urllib.request.urlopen('http://127.0.0.1:8765/classic/game.html',timeout=1) as r:
+                      assert r.status==200
+                      break
+              except Exception:
+                  time.sleep(.25)
+          else:raise RuntimeError('MahTrain classic server failed to start')
+          PY
+          node frontend_2d/test/browser-smoke.mjs
+      - name: Archive real classic Majiang screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mahtrain-majiang-classic-browser
+          path: frontend_2d/test-artifacts/
+          if-no-files-found: warn
+          retention-days: 10
+      - name: Persist real compiled classic assets in feature branch
+        if: github.event_name == 'push' && github.ref_name == 'feat/m368-majiang-ui-2d'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f frontend_2d/dist/
+          if ! git diff --cached --quiet; then
+            git commit -m 'build(M3.68): publish original Majiang 2D UI compiled browser bundle'
+            git pull --rebase origin feat/m368-majiang-ui-2d
+            git push origin HEAD:feat/m368-majiang-ui-2d
+          fi
