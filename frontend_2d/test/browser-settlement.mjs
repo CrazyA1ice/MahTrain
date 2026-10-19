@@ -136,6 +136,9 @@ try{
  assert.match(audit.report,/对对胡/);
  assert.ok(audit.spoken.some(x=>x==='胡'),'existing voice speaks only HU');
  assert.equal(audit.independent,true,'neither banner nor score sheet covers four rivers');
+ // A genuinely finished live round must automatically bring the final
+ // accounts into view, without an extra manual click.
+ await page.waitForFunction(()=>window.scrollY>50,null,{timeout:5500});
  assert.equal(errors.length,0,'fatal browser errors: '+errors.join(';'));
  assert.ok(requests>=2);
  const root=path.resolve('frontend_2d/test-artifacts');
