@@ -21,7 +21,13 @@ const browser=await chromium.launch({headless:true,executablePath:chrome(),
  args:["--no-sandbox","--disable-dev-shm-usage"]});
 const context=await browser.newContext({viewport:{width:1440,height:900}});
 await context.addInitScript((token)=>{
- sessionStorage.setItem("mahtrain.match.session.v1",token);
+ // Seed once; refreshing the real terminal must rely solely on the
+ // application's own persistence. Never conceal storage deletion by
+ // restoring the token from injected browser code on every navigation.
+ if(sessionStorage.getItem("__m374_seeded")!=="1"){
+  sessionStorage.setItem("__m374_seeded","1");
+  sessionStorage.setItem("mahtrain.match.session.v1",token);
+ }
 },evidence.token);
 const page=await context.newPage();
 const errors=[];
@@ -88,6 +94,9 @@ try{
  }
  assert.equal(stats.calls,1);
  assert.deepEqual(stats.states,["match_resume"]);
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem(
+  "mahtrain.match.session.v1")),evidence.token,
+  "real terminal token must remain after rendering final scores");
  assert.ok(!errors.length,"new classic UI errors: "+errors.join("; "));
  const out=path.resolve("frontend_2d/test-artifacts");
  fs.mkdirSync(out,{recursive:true});
@@ -99,6 +108,9 @@ try{
   "#classic-result-report")?.hidden===false,null,{timeout:25000});
  assert.equal(stats.calls,2);
  assert.ok(stats.states.every(x=>x==="match_resume"));
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem(
+  "mahtrain.match.session.v1")),evidence.token,
+  "terminal token must survive a real F5 reload without test reinjection");
  assert.equal(await page.locator("#classic-live-action").count(),0);
  for(let i=0;i<4;i++){
    assert.equal(await page.locator("#classic-player-"+i+" .classic-won-badge").count(),
