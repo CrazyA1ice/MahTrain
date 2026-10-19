@@ -82,6 +82,7 @@ function draw(){
   status("手牌显示不匹配，已禁用出牌");console.error("Hand size mismatch",nodes.length,view.indexed.length);
  }else nodes.forEach((img,i)=>{
   const info=view.indexed[i];img.dataset.handIndex=info.index;
+  img.dataset.tile=info.value;
   img.setAttribute("tabindex","0");img.setAttribute("role","button");
   img.setAttribute("aria-label",info.value+(info.fromDraw?"摸牌":"手牌"));
   img.classList.toggle("is-picked",selected.has(info.index));
