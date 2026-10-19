@@ -44,7 +44,11 @@ function center(title,buttons){
  const node=el("classic-center-actions");
  node.hidden=!buttons.length;
  el("classic-score").style.visibility=buttons.length?"hidden":"visible";
- if(!buttons.length)return;
+ if(!buttons.length){
+  el("classic-actions-title").textContent="";
+  el("classic-actions-buttons").replaceChildren();
+  return;
+ }
  el("classic-actions-title").textContent=title;
  el("classic-actions-buttons").replaceChildren(...buttons);
 }
