@@ -96,6 +96,21 @@ _SUITS = ("万", "条", "筒")
 def _asset_path(url_path: str) -> Path | None:
     if url_path in _STATIC:
         return _STATIC[url_path]
+    # Genuine kobalab/Majiang 2D client is compiled by Vite.
+    # A strict filename whitelist prevents arbitrary source exposure.
+    if url_path in ("/classic", "/classic/", "/classic/game.html"):
+        return ROOT / "frontend_2d" / "dist" / "game.html"
+    for prefix in ("/classic/assets/", "/classic/img/"):
+        if url_path.startswith(prefix):
+            name=url_path[len(prefix):]
+            if (name and len(name)<160
+                    and all(ch.isascii() and (ch.isalnum() or ch in "._-")
+                            for ch in name)
+                    and name not in (".","..")):
+                group="assets" if prefix.endswith("assets/") else "img"
+                return ROOT / "frontend_2d" / "dist" / group / name
+            return None
+
     # The entire Queju 3D front end is built independently by Vite.
     # Serve ONLY its compiled entry/assets; never serve TypeScript source,
     # private game state, node_modules or path traversal outside dist.
