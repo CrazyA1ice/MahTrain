@@ -128,5 +128,45 @@ class NoCallFastPathTests(unittest.TestCase):
             MahjongAgent("challenge", seed=11, seat=view["seat"]).response(view)
 
 
+    def test_two_real_full_games_match_the_pre_shortcut_policy(self):
+        from mahtrain_core.ai import _challenge_claim
+        from mahtrain_core.ai_tournament import simulate_match
+
+        class PreviousChallenge(MahjongAgent):
+            def response(self, view, *, rob=False):
+                if (not rob and view["phase"] == "claim_window"
+                        and "hu" not in view["claim_options"]
+                        and "peng" not in view["claim_options"]
+                        and "ming_gang" not in view["claim_options"]):
+                    # M3.81 would evaluate a full candidate outlook even
+                    # when only pass was legally possible.
+                    return _challenge_claim(view)
+                return super().response(view, rob=rob)
+
+        lineup = ["challenge", "advanced", "basic", "baseline"]
+        for seed in (11, 29):
+            with self.subTest(seed=seed):
+                previous = simulate_match(
+                    seed, lineup=lineup, offline_kong_base=1,
+                    offline_agent_overrides={
+                        0: PreviousChallenge("challenge", seed=seed, seat=0)
+                    },
+                )
+                current = simulate_match(
+                    seed, lineup=lineup, offline_kong_base=1
+                )
+                for key in (
+                    "trace", "public_events", "public_replay", "winners",
+                    "official_settled_balances", "partial_win_balances",
+                    "official_kong_balances", "official_exhaustive_balances",
+                    "terminal_phase", "physical_count",
+                ):
+                    self.assertEqual(
+                        previous[key], current[key],
+                        "new pass shortcut may not change match outcome: " + key,
+                    )
+                self.assertEqual(previous["physical_count"], 108)
+
+
 if __name__ == "__main__":
     unittest.main()
