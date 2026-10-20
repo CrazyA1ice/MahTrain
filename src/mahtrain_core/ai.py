@@ -250,6 +250,7 @@ def challenge_discard_scores(view: Mapping[str, Any],
 def _call_outlook(
     hand: Sequence[str], melds: Sequence[Mapping[str, str]], missing: str,
     public: Sequence[str], cap: int, tian: Mapping[str, Any],
+    *, minimum_ukeire: float | None = None,
 ) -> dict[str, Any]:
     """Real 13-effective-tile position at a legal call checkpoint.
 
@@ -257,6 +258,20 @@ def _call_outlook(
     or the EV of claiming a discard. Never sample the actual wall/AI hands.
     """
     info = effective_draws(hand, melds, missing, public)
+    # A trusted caller may impose a required remaining-copy floor. A kong
+    # falling below it can NEVER satisfy the established 75% claim policy,
+    # irrespective of potential fan or Tian Ting. Avoid enumerating score_win
+    # across its otherwise effective winning tiles. Default call sites are
+    # unchanged, retaining the exact previous score and public contract.
+    if (minimum_ukeire is not None
+            and info["effective_tile_count"] < minimum_ukeire):
+        return {
+            "shanten": info["shanten"],
+            "ukeire": info["effective_tile_count"],
+            "value": 0,
+            "tian_kept": False,
+            "insufficient_ukeire": True,
+        }
     # A full legal wait-set enumeration is relevant ONLY when the server
     # has verified Tian Ting. Normal tenpai scoring already knows each
     # winning draw from effective_draws; re-enumerating it here does not
@@ -428,55 +443,55 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
     if not prepared:
         return None
 
-    # Exact shanten is the PRIMARY and dominant part of the original
-    # candidate key (-shanten, value, ukeire, ...). Score candidates
-    # one exact-shanten tier at a time, best first. Once a tier has any
-    # admissible kong, later worse-shanten tiers cannot win regardless of
-    # their fan, effective draws, or exposed-kind preference. In particular
-    # the expensive normal-discard reference is unnecessary if an
-    # improved-shanten tier contains a legal, Tian Ting-preserving action.
-    # Do NOT stop after the first action in a tier: value and known-copy
-    # ranking still require evaluating all tied-shanten alternatives.
-    prepared.sort(key=lambda row: row[0])
+    # Full reference-value enumeration is needed only for same-stage
+    # candidates. A strictly better-shanten kong is accepted by the
+    # original rule without any ukeire/value comparison.
     before = None
-    for stage in sorted({row[0] for row in prepared}):
-        same_stage = [row for row in prepared if row[0] == stage]
-        if stage == least:
-            # Only equal-shanten candidates are subject to the original
-            # 75% reference-ukeire and fan-value policy. Resolve the full
-            # reference once, lazily, if no better tier was admissible.
-            baselines = []
-            for tile, shanten in quick:
-                if shanten != least:
-                    continue
-                after = list(hand)
-                after.remove(tile)
-                baselines.append(_call_outlook(
-                    after, melds, missing, [*public, tile], cap, tian,
-                ))
-            before = max(
-                (x for x in baselines if x["shanten"] == least),
-                key=lambda x: (x["value"], x["ukeire"]),
-            )
-
-        candidates = []
-        for _, after, extra, choice in same_stage:
-            outlook = _call_outlook(after, extra, missing, public, cap, tian)
-            if tian.get("eligible") and not outlook["tian_kept"]:
+    if any(stage == least for stage, *_ in prepared):
+        baselines = []
+        for tile, shanten in quick:
+            if shanten != least:
                 continue
-            if (stage == least
-                    and not _outlook_better_than_baseline(
-                        outlook, before, fraction=0.75)):
-                continue
-            tile, kind = choice["tile"], choice["type"]
-            candidates.append((
-                (-outlook["shanten"], outlook["value"], outlook["ukeire"],
-                 int(kind == "an_gang"), -TILE_INDEX[tile]),
-                dict(choice),
+            after = list(hand)
+            after.remove(tile)
+            baselines.append(_call_outlook(
+                after, melds, missing, [*public, tile], cap, tian,
             ))
-        if candidates:
-            return max(candidates, key=lambda entry: entry[0])[1]
-    return None
+        before = max(
+            (x for x in baselines if x["shanten"] == least),
+            key=lambda x: (x["value"], x["ukeire"]),
+        )
+
+    candidates = []
+    for stage, after, extra, choice in prepared:
+        outlook = _call_outlook(
+            after, extra, missing, public, cap, tian,
+            minimum_ukeire=(
+                before["ukeire"] * 0.75 if stage == least else None
+            ),
+        )
+        # Full fan-weighted winning-tile scoring is irrelevant once the
+        # candidate already misses the REQUIRED 75% available-copy floor.
+        # Avoid every score_win call for such objectively inadmissible
+        # equal-shanten kongs; the original policy would always reject.
+        if outlook.get("insufficient_ukeire"):
+            continue
+        if tian.get("eligible") and not outlook["tian_kept"]:
+            continue
+        if (before is not None
+                and not _outlook_better_than_baseline(
+                    outlook, before, fraction=0.75)):
+            continue
+        # Same ranking and deterministic tie breaks as M3.79. A strictly
+        # better stage than baseline is always accepted, but every viable
+        # candidate still gets its real fan-weighted value for ordering.
+        tile, kind = choice["tile"], choice["type"]
+        candidates.append((
+            (-outlook["shanten"], outlook["value"], outlook["ukeire"],
+             int(kind == "an_gang"), -TILE_INDEX[tile]),
+            dict(choice),
+        ))
+    return max(candidates, key=lambda entry: entry[0])[1] if candidates else None
 
 
 class MahjongAgent:
