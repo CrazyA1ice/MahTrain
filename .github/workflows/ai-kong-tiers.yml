@@ -1,4 +1,4 @@
-name: M3.86 priority-tier kong policy parity and actual-view CPU
+name: M3.86 exact 75 percent kong copy floor parity and CPU
 on:
   push:
     branches: [feat/m386-kong-stage-tier-shortcircuit]
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Frozen M3.85 policy, Tian Ting fallback, equal-stage scores and two complete game ledgers
+      - name: Frozen M3.85 policy, required 75 percent copy floor, fan-boundary and real ledgers
         run: python -m unittest discover -s tests -p 'test_ai_kong_tiers.py' -v
       - name: Existing shanten prune parity
         run: python -m unittest discover -s tests -p 'test_ai_kong_prune.py' -v
@@ -42,9 +42,10 @@ jobs:
           assert len(data["rows"])==2
           for row in data["rows"]:
               assert row["same_action"] and row["physical_tiles"]==108
-              assert row["m386_outlook_calls"]<=row["m385_outlook_calls"]
+              assert row["m386_score_win_calls"]<=row["m385_score_win_calls"]
               print(row["scenario"],"old/new outlook",
                     row["m385_outlook_calls"],row["m386_outlook_calls"],
+                    "fan score_win calls",row["m385_score_win_calls"],row["m386_score_win_calls"],
                     "median CPU ms",row["m385_median_ms"],row["m386_median_ms"],
                     "exact stages",row["candidate_shanten"])
           PY
