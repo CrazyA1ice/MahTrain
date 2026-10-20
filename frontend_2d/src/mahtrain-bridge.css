@@ -50,12 +50,33 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
 #board>.board .shoupai .fulou .mianzi{white-space:nowrap}
 #board>.board .shoupai .fulou .mianzi .pai.unknown{visibility:visible}
 
+/* M3.85: retain all four physical meld groups in ONE native rack row.
+   Original float-right .mianzi nodes can wrap when four 132px kongs
+   coexist with a two-tile concealed hand in a 560px side rack.
+   A nonwrapping, reverse-order flex row retains Majiang's original
+   float-right visual order and prevents vertical table expansion. */
+#board>.board .shoupai .fulou{
+ display:flex;flex-flow:row-reverse nowrap;align-items:flex-end;
+ column-gap:2px;white-space:nowrap;max-width:100%;
+}
+#board>.board .shoupai .fulou .mianzi{
+ float:none;flex:0 0 auto;margin-left:0;white-space:nowrap;
+}
+/* Only four fully declared melds use the tighter physical artwork. A
+   one-to-three meld hand preserves M3.84's original 30×42px tiles. */
+#board>.board .shoupai{
+ --mh-kong-w:30px;--mh-kong-h:42px;--mh-kong-lift:14px;
+}
+#board>.board .shoupai[data-meld-count="4"]{
+ --mh-kong-w:26px;--mh-kong-h:38px;--mh-kong-lift:12px;
+}
+
 /* Four-seat Sichuan KONG physical arrangement. One local row for EVERY
    player; native .shoupai.xiajia/.duimian/.shangjia rotate the entire row,
-   keeping left/right positions relative to the MELD OWNER rather than
-   the viewer. Fixed-height groups never reflow the 800×680 table. */
+   preserving the source-relative left/middle/right placement of M3.84.
+   Rotated images keep their own physical card aspect ratio. */
 #board>.board .shoupai .fulou .mianzi.mahtrain-kong-mianzi{
- display:inline-block;overflow:visible;height:42px;vertical-align:bottom
+ display:inline-block;overflow:visible;height:42px;vertical-align:bottom;
 }
 #board>.board .shoupai .fulou .mahtrain-kong{
  position:relative;display:flex;align-items:flex-end;
@@ -64,26 +85,35 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
 #board>.board .shoupai .fulou .mahtrain-kong-slot{
  box-sizing:border-box;position:relative;display:inline-flex;
  flex:none;align-items:flex-end;justify-content:center;
- width:30px;height:42px;overflow:visible
+ width:var(--mh-kong-w);height:var(--mh-kong-h);overflow:visible;
 }
-#board>.board .shoupai .fulou .mahtrain-kong-slot.mahtrain-kong-sideways{width:42px}
+#board>.board .shoupai .fulou .mahtrain-kong-slot.mahtrain-kong-sideways{
+ width:var(--mh-kong-h);
+}
 #board>.board .shoupai .fulou .mahtrain-kong-slot>img.pai,
 #board>.board .shoupai .fulou .mahtrain-kong-overlay>img.pai{
  display:block;position:relative;box-sizing:border-box;
- flex:none;width:30px;height:42px;max-width:none;max-height:none;
- object-fit:fill;transform:none
+ flex:none;width:var(--mh-kong-w);height:var(--mh-kong-h);
+ max-width:none;max-height:none;object-fit:fill;transform:none;
 }
 #board>.board .shoupai .fulou .mahtrain-kong-sideways>img.pai{
- position:absolute;left:6px;top:0;transform:rotate(90deg)
+ position:absolute;
+ left:calc((var(--mh-kong-h) - var(--mh-kong-w))/2);
+ top:0;transform:rotate(90deg);
 }
 #board>.board .shoupai .fulou .mahtrain-kong-overlay{
  display:block;position:absolute;z-index:2;overflow:visible;
- left:-6px;top:-14px;width:42px;height:30px;
- pointer-events:none
+ left:calc((var(--mh-kong-w) - var(--mh-kong-h))/2);
+ top:calc(-1 * var(--mh-kong-lift));
+ width:var(--mh-kong-h);height:var(--mh-kong-w);
+ pointer-events:none;
 }
 #board>.board .shoupai .fulou .mahtrain-kong-overlay>img.pai{
- position:absolute;left:6px;top:-6px;transform:rotate(90deg);
- box-shadow:0 1px 3px rgba(0,0,0,.55)
+ position:absolute;
+ left:calc((var(--mh-kong-h) - var(--mh-kong-w))/2);
+ top:calc((var(--mh-kong-w) - var(--mh-kong-h))/2);
+ transform:rotate(90deg);
+ box-shadow:0 1px 3px rgba(0,0,0,.55);
 }
 
 #classic-center-actions{
