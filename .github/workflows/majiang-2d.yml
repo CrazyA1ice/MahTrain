@@ -9,6 +9,7 @@ on:
       - fix/m375-classic-river-56-slot-layout
       - feat/m376-classic-claim-and-keyboard-ux
       - feat/m377-classic-public-tenpai-hints
+      - feat/m378-fan-aware-classic-hints
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -38,6 +39,8 @@ jobs:
           python-version: "3.11"
       - name: Install real Majiang UI library and original Stylus compiler
         run: cd frontend_2d && npm install --no-audit --no-fund
+      - name: Validate authentic Sichuan tenpai fan reference and authorization
+        run: python -m unittest discover -s tests -p 'test_classic_hint.py' -v
       - name: Validate private hand and public river adapter
         run: cd frontend_2d && npm run test:bridge
       - name: Compile original Majiang 2D styles and genuine components
@@ -101,13 +104,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'feat/m377-classic-public-tenpai-hints'
+        if: github.event_name == 'push' && github.ref_name == 'feat/m378-fan-aware-classic-hints'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.77): read-only public Mahjong shanten references below fixed table'
-            git pull --rebase origin feat/m377-classic-public-tenpai-hints
-            git push origin HEAD:feat/m377-classic-public-tenpai-hints
+            git commit -m 'build(M3.78): compile fan-aware classic tenpai panel'
+            git pull --rebase origin feat/m378-fan-aware-classic-hints
+            git push origin HEAD:feat/m378-fan-aware-classic-hints
           fi
