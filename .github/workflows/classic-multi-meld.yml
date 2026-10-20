@@ -1,0 +1,66 @@
+name: M3.85 four-meld classic fixed-row capacity and built assets
+on:
+  push:
+    branches: [feat/m385-multi-meld-row-capacity]
+    paths:
+      - "frontend_2d/src/**"
+      - "frontend_2d/test/**"
+      - ".github/workflows/classic-multi-meld.yml"
+permissions:
+  contents: write
+jobs:
+  four-meld-capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/m385-multi-meld-row-capacity
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install and build classic distributable
+        working-directory: frontend_2d
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+      - name: Node regression all four seats and prior kong source direction
+        working-directory: frontend_2d
+        run: node --test test/*.test.mjs
+      - name: Install real Chromium
+        working-directory: frontend_2d
+        run: npx playwright-core install --with-deps chromium
+      - name: Browser four-meld capacity, single row, no overlap and preceding kong display regression
+        run: |
+          python web_server.py > /tmp/m385-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/classic/game.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node frontend_2d/test/browser-multi-meld-capacity.mjs
+          node frontend_2d/test/browser-kong-layout.mjs
+      - name: Save updated executable classic frontend dist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f frontend_2d/dist/
+          if git diff --cached --quiet; then
+            echo "Compiled classic dist unchanged."
+          else
+            git commit -m "build(M3.85): publish four-meld nonwrapping classic layout"
+            git push origin HEAD:feat/m385-multi-meld-row-capacity
+          fi
+      - name: Archive visual evidence and server logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m385-multi-meld-browser-screenshots
+          path: |
+            /tmp/m385-*.png
+            /tmp/m384-*.png
+            /tmp/m385-server.log
+          if-no-files-found: ignore
+          retention-days: 14
