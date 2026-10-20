@@ -99,10 +99,18 @@ async function geometry(){
 async function update(kinds){
  state=fixture(kinds);
  await page.locator("#classic-new").click();
- await page.waitForFunction(count=>[...document.querySelectorAll(
-  ".shoupai")].length===4 && [...document.querySelectorAll(
-  ".shoupai")].every(x=>x.dataset.meldCount===String(count) &&
-  x.querySelectorAll(".fulou .mianzi").length===count),kinds.length);
+ // A new fixture can have the SAME number of melds as the previous one.
+ // Wait for all four actual rendered types rather than stale meld-count.
+ await page.waitForFunction(expected=>{
+  const seats=[...document.querySelectorAll(".shoupai")];
+  return seats.length===4 && seats.every(root=>{
+   const items=[...root.querySelectorAll(".fulou .mianzi")];
+   const types=items.map(node=>
+    node.querySelector(".mahtrain-kong")?.dataset.kongType||"peng").sort();
+   return root.dataset.meldCount===String(expected.length) &&
+    types.join("|")===expected.slice().sort().join("|");
+  });
+ },kinds,{timeout:10000});
  return geometry();
 }
 
