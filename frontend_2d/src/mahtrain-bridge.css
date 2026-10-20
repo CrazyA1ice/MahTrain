@@ -56,7 +56,7 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
    A nonwrapping, reverse-order flex row retains Majiang's original
    float-right visual order and prevents vertical table expansion. */
 #board>.board .shoupai .fulou{
- display:flex;flex-flow:row-reverse nowrap;align-items:flex-end;
+ position:relative;display:flex;flex-flow:row-reverse nowrap;align-items:flex-end;
  column-gap:2px;white-space:nowrap;max-width:100%;
 }
 #board>.board .shoupai .fulou .mianzi{
