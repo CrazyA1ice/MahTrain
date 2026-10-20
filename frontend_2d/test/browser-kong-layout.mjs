@@ -112,7 +112,10 @@ try{
    assert.ok(row.groupWidth>0);
    assert.equal(row.tableWidth,dimensions.tableWidth);
    assert.equal(row.tableHeight,dimensions.tableHeight);
+   if(owner>0)assert.notEqual(row.rotation,"none",
+    "side seat should retain own full-row rotated reading direction");
   }
+  await page.screenshot({path:"/tmp/m384-ming-"+side+".png"});
  }
  for(const kind of ["bu_gang","an_gang"]){
   current=fixture(kind,3);
@@ -135,6 +138,7 @@ try{
    assert.equal(row.tableWidth,dimensions.tableWidth);
    assert.equal(row.tableHeight,dimensions.tableHeight);
   }
+  await page.screenshot({path:"/tmp/m384-"+kind+".png"});
  }
  assert.deepEqual(errors,[],"browser must not emit JS errors");
  console.log("M3.84 ALL FOUR SEATS × LEFT/RIGHT/OPPOSITE + KONG STACK/BACK: PASS");
