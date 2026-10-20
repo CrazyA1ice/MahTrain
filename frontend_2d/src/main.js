@@ -9,6 +9,7 @@ import {renderSettlement} from "./report.mjs";
 import {seatOutcome} from "./seat-status.mjs";
 import {claimDecision,ownKongChoices} from "./action-choice.mjs";
 import {renderClassicHint} from "./hint-view.mjs";
+import {renderKongMeld} from "./kong-view.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
 const TURN=new Set(["dealer_discard","await_discard"]);
@@ -155,7 +156,16 @@ function draw(){
   new MajiangShoupai($(".shoupai."+cls),pai,view.hands[s],s===0)
     .redraw(s===0).adjust();
   $(".shoupai."+cls+" .fulou .mianzi").each((i,node)=>{
-   if(!view.redactions[s][i]?.hidden)return;
+   const meld=view.redactions[s][i];
+   if(!meld)return;
+   if(["an_gang","ming_gang","bu_gang"].includes(meld.kind)){
+    // Native Majiang notation rotates every claimed tile by a seat-fixed
+    // sign. Replace only kong DOM, using the real PUBLIC claimed-discard
+    // source to orient the sideways fourth tile within this seat's frame.
+    renderKongMeld(node,meld,s);
+    return;
+   }
+   if(!meld.hidden)return;
    $("img.pai",node).each((_,img)=>{
     img.src="/classic/img/pai.gif";img.dataset.pai="_";
     img.alt="未公开的暗杠";img.removeAttribute("title");

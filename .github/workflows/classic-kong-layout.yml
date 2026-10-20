@@ -1,0 +1,61 @@
+name: M3.84 classic four-seat kong arrangement and built assets
+on:
+  push:
+    branches: [feat/m384-source-aware-kong-layout]
+permissions:
+  contents: write
+jobs:
+  four-seat-kongs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/m384-source-aware-kong-layout
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install classic UI dependencies and build distributable
+        working-directory: frontend_2d
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+      - name: Test all owner/source directions and privacy boundaries
+        run: |
+          cd frontend_2d
+          node --test test/*.test.mjs
+      - name: Install headless Chromium
+        working-directory: frontend_2d
+        run: npx playwright-core install --with-deps chromium
+      - name: Browser four-seat kong layout, source-relative rotations, stack and fixed geometry
+        run: |
+          python web_server.py > /tmp/mahtrain-m384-server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8765/classic/game.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node frontend_2d/test/browser-kong-layout.mjs
+      - name: Persist compiled classic distributable on feature branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f frontend_2d/dist/
+          if git diff --cached --quiet; then
+            echo "Built distribution unchanged."
+          else
+            git commit -m "build(M3.84): publish source-aware classic kong layout"
+            git push origin HEAD:feat/m384-source-aware-kong-layout
+          fi
+      - name: Archive 2D browser proof and build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m384-classic-kong-test-output
+          path: |
+            /tmp/mahtrain-m384-server.log
+            /tmp/m384-*.png
+          if-no-files-found: ignore
+          retention-days: 14

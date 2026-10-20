@@ -217,6 +217,12 @@ class FourPlayerClaimsTests(unittest.TestCase):
         self.assertEqual(g.public_state()["wall_count"],54)
         self.assertEqual(g._effective(p),14)
         self.assertEqual(g._melds[p],[{"type":"ming_gang","tile":"m9"}])
+        # Frontend infers the called tile's left/right/opposite position
+        # from these AUTHENTIC PUBLIC river fields, not from AI hidden hand.
+        river_claim=g.public_state()["discards"][-1]
+        self.assertEqual(river_claim["seat"],d)
+        self.assertEqual(river_claim["tile"],"m9")
+        self.assertEqual(river_claim["claimed_by"],p)
         self.assertEqual(g.debug_tile_counts()["total"],108)
 
     def test_concealed_gang_one_public_flip_and_tail_supplement(self):

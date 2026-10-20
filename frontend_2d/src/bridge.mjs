@@ -52,7 +52,18 @@ export function convertView(view) {
     const m=seat===0
       ?closedHandModel(view.hand,view.drawn_tile):concealedModel(view.hand_counts[seat]);
     const melds=seat===0 ?(view.own_melds||[]) :(view.melds?.[seat]||[]);
-    redactions[seat]=melds.map(x=>meldToken(x,seat));
+    // The official discard river contains the actual source of every
+    // successful peng/ming-gang (and of the peng later upgraded to bu-gang).
+    // Direction is SOURCE-relative-to-OWNER, never fixed by screen seat.
+    // Public history has no opponent concealed hand or future wall data.
+    redactions[seat]=melds.map(x=>{
+      const info=meldToken(x,seat);
+      const claim=(view.discards||[]).find(d=>d.claimed_by===seat&&
+        d.tile===x.tile&&d.seat!==seat);
+      return {...info,kind:x.type,tile:info.hidden?null:x.tile,
+        revealed:x.type==="an_gang"?(seat===0||x.revealed===true):true,
+        source:claim?claim.seat:null};
+    });
     m._fulou=redactions[seat].map(x=>x.code);
     hands[seat]=m;
     const raw=(view.discards||[]).filter(x=>x.seat===seat);
