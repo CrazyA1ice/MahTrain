@@ -1,0 +1,60 @@
+name: Challenge claim pass fast path parity and timing
+on:
+  push:
+    branches: [feat/m382-pass-claim-fastpath]
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_pass_fastpath.py"
+      - "examples/benchmark_claim_pass_fastpath.py"
+      - ".github/workflows/ai-pass-fastpath.yml"
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_pass_fastpath.py"
+      - "examples/benchmark_claim_pass_fastpath.py"
+      - ".github/workflows/ai-pass-fastpath.yml"
+permissions:
+  contents: read
+jobs:
+  match-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fast-pass, legal HU, Tian Ting and whole-game parity
+        run: python -m unittest discover -s tests -p 'test_ai_pass_fastpath.py' -v
+      - name: Original AI call regression
+        run: python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: M3.81 exact ukeire acceleration equivalence
+        run: python -m unittest discover -s tests -p 'test_ukeire_fast.py' -v
+      - name: Matched same-view claim-response CPU benchmark
+        run: |
+          python examples/benchmark_claim_pass_fastpath.py --samples 24 --warmups 4 --json-out /tmp/m382-claim-pass-timing.json > /tmp/m382-claim-pass-timing.log
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/m382-claim-pass-timing.json',encoding='utf8'))
+          assert p['protocol']=='m382_matched_call_response_microbenchmark_v1'
+          assert len(p['rows'])==2
+          assert all(row['same_decision_on_every_observation']
+                     and row['samples_per_policy']==24
+                     and row['all_108_physical_tiles_legal']
+                     for row in p['rows'])
+          for row in p['rows']:
+              print(row['scenario'], 'legacy median ms:',
+                    row['legacy_median_ms'], 'optimized median ms:',
+                    row['optimized_median_ms'])
+          print('No absolute speed target on shared CI hardware.')
+          PY
+      - name: Archive equal-view latency metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m382-real-call-fastpath-matched-benchmark
+          path: |
+            /tmp/m382-claim-pass-timing.json
+            /tmp/m382-claim-pass-timing.log
+          retention-days: 14
+          if-no-files-found: warn
