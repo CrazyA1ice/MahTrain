@@ -109,7 +109,7 @@ class ChallengeCallTests(unittest.TestCase):
         g, seat, view = offer_kongs()
         options = list(view["kong_options"])
         before = copy.deepcopy(view)
-        def fake(hand, melds, missing, public, cap, tian):
+        def fake(hand, melds, missing, public, cap, tian, **kwargs):
             if not melds:
                 return {"shanten":1,"ukeire":8,"value":8,"tian_kept":False}
             val = 12 if melds[-1]["tile"] == "m9" else 8
