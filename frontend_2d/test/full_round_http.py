@@ -125,10 +125,42 @@ def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
     start=time.monotonic()
     visible={}
     seen_kinds={}
+    hint_checked=False
     for step in range(450):
         if view["phase"] in ("finished","wall_exhausted"):
             break
         assert time.monotonic()-start<170, f"seed={seed} timed out at step={step}"
+        if (not hint_checked and view["phase"] in
+                ("dealer_discard", "await_discard") and view["turn"]==0
+                and not view["won"][0]):
+            stable=post({"action":"match_resume","match_token":token})["match"]
+            hint_result=post({"action":"match_hint","match_token":token})
+            hint=hint_result["hint"]
+            assert hint_result["match_token"]==token
+            assert "match" not in hint_result
+            assert hint["status"] in ("choose_discard","already_winning")
+            if hint["status"]=="choose_discard":
+                assert hint["candidates"]
+                for row in hint["candidates"]:
+                    assert row["discard"] in view["hand"]
+                    assert row["effective_tile_count_upper_bound"]>=0
+                    assert all(item["unknown_copies_upper_bound"] in (1,2,3,4)
+                               for item in row["effective_details"])
+                miss=view["missing_suits"][0]
+                if any(x[0]==miss for x in view["hand"]):
+                    assert all(x["discard"][0]==miss
+                               for x in hint["candidates"])
+            assert "opponent_hands" not in hint
+            assert "wall" not in hint
+            after=post({"action":"match_resume","match_token":token})["match"]
+            for field in ("phase","turn","hand","wall_count","discards",
+                          "win_ledger","kong_ledger"):
+                assert after[field]==stable[field],field
+            hint_checked=True
+            print("REAL AUTHORIZED HINT HTTP: PASS",{
+                "seed":seed,"status":hint["status"],
+                "candidates":len(hint["candidates"]),
+            },flush=True)
         cmd=next_human(view,human)
         response=post({"match_token":token,**cmd})
         view=response["match"]
@@ -152,6 +184,7 @@ def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
                                      for e in f.get("events",[])]})
     else:
         raise AssertionError(f"seed={seed} did not terminate after 450 server actions")
+    assert hint_checked,"real game never reached a seat-zero legal hint decision"
     verify_ledger(view)
     assert view["wall_count"]==0 or sum(view["won"])>=3
     assert view["match_archive_id"] is not None
