@@ -43,6 +43,8 @@ const browser=await chromium.launch({headless:true,executablePath:chrome(),
 const page=await browser.newPage({viewport:{width:1440,height:900}});
 const errors=[];
 page.on("pageerror",e=>errors.push(e.message));
+// The real "random new match" button requires explicit user confirmation.
+page.on("dialog",dialog=>dialog.accept());
 await page.route("**/api/action",async route=>{
  await route.fulfill({status:200,contentType:"application/json",
   body:JSON.stringify({match_token:"kong-ui-test",match:current})});
