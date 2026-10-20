@@ -77,7 +77,8 @@ class ChallengeCallTests(unittest.TestCase):
                     "ukeire": 10 if melds else 8,
                     "value": 10 if melds else 8,
                     "tian_kept": False}
-        with patch("mahtrain_core.ai._call_outlook", side_effect=outlook):
+        with patch("mahtrain_core.ai._cut_shanten", return_value=2), \
+             patch("mahtrain_core.ai._call_outlook", side_effect=outlook):
             self.assertEqual(
                 MahjongAgent("challenge", seed=42, seat=seat).response(view),
                 "pass")
@@ -86,7 +87,8 @@ class ChallengeCallTests(unittest.TestCase):
                     "ukeire": 12 if melds else 8,
                     "value": 12 if melds else 8,
                     "tian_kept": False}
-        with patch("mahtrain_core.ai._call_outlook", side_effect=stronger):
+        with patch("mahtrain_core.ai._cut_shanten", return_value=2), \
+             patch("mahtrain_core.ai._call_outlook", side_effect=stronger):
             self.assertEqual(
                 MahjongAgent("challenge", seed=42, seat=seat).response(view),
                 "peng")
