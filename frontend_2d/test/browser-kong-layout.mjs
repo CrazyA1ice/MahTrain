@@ -73,8 +73,22 @@ const getState=()=>page.evaluate(classes=>{
 try{
  await page.goto("http://127.0.0.1:8765/classic/game.html",
   {waitUntil:"load",timeout:30000});
- await page.waitForFunction(()=>
-  document.querySelectorAll(".mahtrain-kong").length===4);
+ try{
+  await page.waitForFunction(()=>
+   document.querySelectorAll(".mahtrain-kong").length===4,null,{timeout:12000});
+ }catch(err){
+  const diagnostic=await page.evaluate(()=>({
+   status:document.querySelector("#classic-status")?.textContent,
+   melds:[...document.querySelectorAll(".shoupai .fulou")].map(el=>({
+    className:el.parentElement?.className,
+    html:el.innerHTML.slice(0,1200),
+   })),
+   scripts:[...document.scripts].map(x=>x.src||x.type),
+  }));
+  console.error("M3.84 BROWSER STATE:",JSON.stringify(diagnostic));
+  console.error("M3.84 PAGE ERRORS:",JSON.stringify(errors));
+  throw err;
+ }
  const dimensions=(await getState())[0];
  for(const [offset,side,index] of [
   [3,"left",0],[2,"opposite",2],[1,"right",3]
