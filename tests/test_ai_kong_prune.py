@@ -148,7 +148,7 @@ class KongPruningTests(unittest.TestCase):
     def test_strictly_better_kongs_skip_reference_but_rank_all_candidates(self):
         _, _, view = offer_kongs()
         got = []
-        def scored(hand, melds, missing, public, cap, tian):
+        def scored(hand, melds, missing, public, cap, tian, **kwargs):
             got.append(tuple(group["tile"] for group in melds))
             if not melds:
                 self.fail("strictly improved shanten does not need a reference")
@@ -164,7 +164,7 @@ class KongPruningTests(unittest.TestCase):
 
     def test_same_stage_compares_every_real_kong_and_keeps_tie_ranking(self):
         _, _, view = offer_kongs()
-        def scored(hand, melds, missing, public, cap, tian):
+        def scored(hand, melds, missing, public, cap, tian, **kwargs):
             value = 8 if not melds else (
                 15 if melds[-1]["tile"] == "m9" else 12)
             return {"shanten": 1, "ukeire": value,

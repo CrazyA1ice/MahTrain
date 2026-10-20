@@ -250,6 +250,7 @@ def challenge_discard_scores(view: Mapping[str, Any],
 def _call_outlook(
     hand: Sequence[str], melds: Sequence[Mapping[str, str]], missing: str,
     public: Sequence[str], cap: int, tian: Mapping[str, Any],
+    *, minimum_ukeire: float | None = None,
 ) -> dict[str, Any]:
     """Real 13-effective-tile position at a legal call checkpoint.
 
@@ -257,6 +258,20 @@ def _call_outlook(
     or the EV of claiming a discard. Never sample the actual wall/AI hands.
     """
     info = effective_draws(hand, melds, missing, public)
+    # A trusted caller may impose a required remaining-copy floor. A kong
+    # falling below it can NEVER satisfy the established 75% claim policy,
+    # irrespective of potential fan or Tian Ting. Avoid enumerating score_win
+    # across its otherwise effective winning tiles. Default call sites are
+    # unchanged, retaining the exact previous score and public contract.
+    if (minimum_ukeire is not None
+            and info["effective_tile_count"] < minimum_ukeire):
+        return {
+            "shanten": info["shanten"],
+            "ukeire": info["effective_tile_count"],
+            "value": 0,
+            "tian_kept": False,
+            "insufficient_ukeire": True,
+        }
     # A full legal wait-set enumeration is relevant ONLY when the server
     # has verified Tian Ting. Normal tenpai scoring already knows each
     # winning draw from effective_draws; re-enumerating it here does not
@@ -449,7 +464,18 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
 
     candidates = []
     for stage, after, extra, choice in prepared:
-        outlook = _call_outlook(after, extra, missing, public, cap, tian)
+        outlook = _call_outlook(
+            after, extra, missing, public, cap, tian,
+            minimum_ukeire=(
+                before["ukeire"] * 0.75 if stage == least else None
+            ),
+        )
+        # Full fan-weighted winning-tile scoring is irrelevant once the
+        # candidate already misses the REQUIRED 75% available-copy floor.
+        # Avoid every score_win call for such objectively inadmissible
+        # equal-shanten kongs; the original policy would always reject.
+        if outlook.get("insufficient_ukeire"):
+            continue
         if tian.get("eligible") and not outlook["tian_kept"]:
             continue
         if (before is not None
