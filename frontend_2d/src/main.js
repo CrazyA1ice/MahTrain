@@ -153,6 +153,10 @@ function draw(){
  const view=convertView(state);
  for(let s=0;s<4;s++){
   const cls=CLS[s];
+  // A full four-meld hand has only two physical concealed tiles left.
+  // Mark its fixed-width rack BEFORE the native redraw/adjust, so the
+  // local-side compact kong measurements cannot push melds to a 2nd row.
+  $(".shoupai."+cls).attr("data-meld-count",String(view.redactions[s].length));
   new MajiangShoupai($(".shoupai."+cls),pai,view.hands[s],s===0)
     .redraw(s===0).adjust();
   $(".shoupai."+cls+" .fulou .mianzi").each((i,node)=>{
