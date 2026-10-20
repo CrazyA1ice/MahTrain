@@ -54,6 +54,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m384-classic-kong-test-output
-          path: /tmp/mahtrain-m384-server.log
+          path: |
+            /tmp/mahtrain-m384-server.log
+            /tmp/m384-*.png
           if-no-files-found: ignore
           retention-days: 14
