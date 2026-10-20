@@ -7,7 +7,7 @@ import {SESSION_KEY,convertView,choiceAction} from "./bridge.mjs";
 import {publicActions,recentWins,winTitle} from "./settlement.mjs";
 import {renderSettlement} from "./report.mjs";
 import {seatOutcome} from "./seat-status.mjs";
-import {claimDecision,ownKongChoices,tileLabel} from "./action-choice.mjs";
+import {claimDecision,ownKongChoices} from "./action-choice.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
 const TURN=new Set(["dealer_discard","await_discard"]);
