@@ -148,8 +148,12 @@ class KongTierParityTests(unittest.TestCase):
         for name,policy in (("old",_m385_challenge_kong),
                             ("new",_challenge_kong)):
             with patch("mahtrain_core.ai._cut_shanten",return_value=2), \
+                 patch("test_ai_kong_tiers._cut_shanten",return_value=2), \
                  patch("mahtrain_core.ai.shanten_13",side_effect=stage), \
+                 patch("test_ai_kong_tiers.shanten_13",side_effect=stage), \
                  patch("mahtrain_core.ai._call_outlook",
+                       side_effect=score(evidence[name])), \
+                 patch("test_ai_kong_tiers._call_outlook",
                        side_effect=score(evidence[name])):
                 self.assertEqual(policy(view),{"type":"an_gang","tile":"m1"})
         self.assertIn("baseline",evidence["old"])
@@ -175,8 +179,12 @@ class KongTierParityTests(unittest.TestCase):
         for name,policy in (("old",_m385_challenge_kong),
                             ("new",_challenge_kong)):
             with patch("mahtrain_core.ai._cut_shanten",return_value=1), \
+                 patch("test_ai_kong_tiers._cut_shanten",return_value=1), \
                  patch("mahtrain_core.ai.shanten_13",side_effect=stage), \
+                 patch("test_ai_kong_tiers.shanten_13",side_effect=stage), \
                  patch("mahtrain_core.ai._call_outlook",
+                       side_effect=score(evidence[name])), \
+                 patch("test_ai_kong_tiers._call_outlook",
                        side_effect=score(evidence[name])):
                 self.assertEqual(policy(view),{"type":"an_gang","tile":"m9"})
         self.assertIn("baseline",evidence["new"])
@@ -197,8 +205,12 @@ class KongTierParityTests(unittest.TestCase):
         for name,policy in (("old",_m385_challenge_kong),
                             ("new",_challenge_kong)):
             with patch("mahtrain_core.ai._cut_shanten",return_value=1), \
+                 patch("test_ai_kong_tiers._cut_shanten",return_value=1), \
                  patch("mahtrain_core.ai.shanten_13",return_value=1), \
+                 patch("test_ai_kong_tiers.shanten_13",return_value=1), \
                  patch("mahtrain_core.ai._call_outlook",
+                       side_effect=scorer(evidence[name])), \
+                 patch("test_ai_kong_tiers._call_outlook",
                        side_effect=scorer(evidence[name])):
                 self.assertEqual(policy(view),{"type":"an_gang","tile":"m9"})
         self.assertEqual(evidence["old"].count("baseline"),
