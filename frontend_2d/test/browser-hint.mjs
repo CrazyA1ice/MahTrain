@@ -66,7 +66,7 @@ try{
  assert.match(await table.textContent(),/听牌/);
  assert.match(await table.textContent(),/≤ 2 张/);
  assert.match(await table.textContent(),/九万 ≤2/);
- assert.match(await table.textContent(),/不是牌墙实存张数/);
+ assert.match(await table.textContent(),/不代表牌墙实存张数/);
  assert.equal(await table.locator("tbody tr").count(),2);
  assert.equal(await page.locator('.shoupai.main img[data-tile="p9"].is-hint-cut').count(),1);
  const below=await page.evaluate(()=>{
