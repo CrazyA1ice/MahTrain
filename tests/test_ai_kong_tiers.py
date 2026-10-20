@@ -131,71 +131,62 @@ class KongTierParityTests(unittest.TestCase):
             self.assertIsNone(_challenge_kong(view))
         self.assertEqual(game.debug_tile_counts()["total"],108)
 
-    def test_mixed_stage_early_winner_skips_baseline_and_worse_kong(self):
-        game,seat,view=offer_kongs()
-        evidence={"old":[],"new":[]}
-        def stage(hand,melds,missing):
-            return 1 if melds[-1]["tile"]=="m1" else 2
-        def score(tracker):
-            def func(hand,melds,missing,public,cap,tian):
-                tag=melds[-1]["tile"] if melds else "baseline"
-                tracker.append(tag)
-                stage_num=stage(hand,melds,missing) if melds else 2
-                val=9 if tag=="m1" else 200
-                return {"shanten":stage_num,"value":val,"ukeire":val,
-                        "tian_kept":False}
-            return func
-        for name,policy in (("old",_m385_challenge_kong),
-                            ("new",_challenge_kong)):
-            with patch("mahtrain_core.ai._cut_shanten",return_value=2), \
-                 patch("test_ai_kong_tiers._cut_shanten",return_value=2), \
-                 patch("mahtrain_core.ai.shanten_13",side_effect=stage), \
-                 patch("test_ai_kong_tiers.shanten_13",side_effect=stage), \
-                 patch("mahtrain_core.ai._call_outlook",
-                       side_effect=score(evidence[name])), \
-                 patch("test_ai_kong_tiers._call_outlook",
-                       side_effect=score(evidence[name])):
-                self.assertEqual(policy(view),{"type":"an_gang","tile":"m1"})
-        self.assertIn("baseline",evidence["old"])
-        self.assertIn("m9",evidence["old"])
-        self.assertEqual(evidence["new"],["m1"],
-          "inferior fan cannot overcome strictly better exact shanten")
+    def test_75_percent_ukeire_shortcut_preserves_two_kong_decisions(self):
+        # Both kongs are legal, equally tenpai by exact stage. Only m1
+        # cannot preserve 75% of the baseline's publicly remaining copies.
+        game, seat, view=offer_kongs()
+        scores={"old":[], "new":[]}
+        def effective(hand,melds,missing,public):
+            if melds and melds[-1]["tile"]=="m1":
+                copies=[("m2",4),("p3",4),("p7",2)]
+            else:
+                copies=[("m2",4),("m4",4),("m7",4),("p3",4),("p7",4)]
+            return {"shanten":0,
+                    "effective_tile_count":sum(n for _,n in copies),
+                    "effective_details":[{"tile":t,"remaining":n}
+                                         for t,n in copies]}
+        for version,policy in (("old",_m385_challenge_kong),
+                               ("new",_challenge_kong)):
+            def score(hand,melds,missing,cap,context):
+                scores[version].append(
+                    melds[-1]["tile"] if melds else "baseline")
+                return {"multiplier":2}
+            with patch("mahtrain_core.ai._cut_shanten",return_value=0), \
+                 patch("test_ai_kong_tiers._cut_shanten",return_value=0), \
+                 patch("mahtrain_core.ai.shanten_13",return_value=0), \
+                 patch("test_ai_kong_tiers.shanten_13",return_value=0), \
+                 patch("mahtrain_core.ai.effective_draws",side_effect=effective), \
+                 patch("mahtrain_core.ai.score_win",side_effect=score):
+                self.assertEqual(policy(view),{"type":"an_gang","tile":"m9"})
+        self.assertIn("m1",scores["old"])
+        self.assertNotIn("m1",scores["new"],
+           "below the real cutoff, per-wait score_win must not execute")
+        self.assertIn("m9",scores["new"])
         self.assertEqual(game.debug_tile_counts()["total"],108)
 
-    def test_better_tier_fails_tian_eligibility_then_falls_back(self):
-        _,_,view=offer_kongs()
-        view["tian_ting"]={"eligible":True,"initial_waits":["m5"]}
-        evidence={"old":[],"new":[]}
-        def stage(hand,melds,missing):
-            return 0 if melds[-1]["tile"]=="m1" else 1
-        def score(tracker):
-            def func(hand,melds,missing,public,cap,tian):
-                tag=melds[-1]["tile"] if melds else "baseline"
-                tracker.append(tag)
-                return {"shanten":0 if tag=="m1" else 1,
-                  "value":20 if tag=="m9" else 11,"ukeire":20,
-                  "tian_kept":tag=="m9"}
-            return func
-        for name,policy in (("old",_m385_challenge_kong),
-                            ("new",_challenge_kong)):
-            with patch("mahtrain_core.ai._cut_shanten",return_value=1), \
-                 patch("test_ai_kong_tiers._cut_shanten",return_value=1), \
-                 patch("mahtrain_core.ai.shanten_13",side_effect=stage), \
-                 patch("test_ai_kong_tiers.shanten_13",side_effect=stage), \
-                 patch("mahtrain_core.ai._call_outlook",
-                       side_effect=score(evidence[name])), \
-                 patch("test_ai_kong_tiers._call_outlook",
-                       side_effect=score(evidence[name])):
-                self.assertEqual(policy(view),{"type":"an_gang","tile":"m9"})
-        self.assertIn("baseline",evidence["new"])
-        self.assertEqual(evidence["new"][0],"m1",
-          "first tier must be checked before reference evaluation")
+    def test_ukeire_floor_boundary_still_scores_all_required_waits(self):
+        from mahtrain_core.ai import _call_outlook
+        info={"shanten":0,"effective_tile_count":12,
+              "effective_details":[
+                  {"tile":"m7","remaining":4},
+                  {"tile":"p8","remaining":4},
+                  {"tile":"p9","remaining":4}]}
+        with patch("mahtrain_core.ai.effective_draws",return_value=info), \
+             patch("mahtrain_core.ai.score_win",
+                   return_value={"multiplier":3}) as wins:
+            rejected=_call_outlook([],[],"s",[],3,{},minimum_ukeire=12.001)
+            self.assertTrue(rejected["insufficient_ukeire"])
+            self.assertEqual(wins.call_count,0)
+            accepted=_call_outlook([],[],"s",[],3,{},minimum_ukeire=12)
+            self.assertNotIn("insufficient_ukeire",accepted)
+            self.assertEqual(accepted["value"],36)
+            self.assertEqual(wins.call_count,3)
 
-    def test_equal_stage_must_score_all_and_keep_full_reference(self):
+    def test_equal_stage_compares_all_and_preserves_original_fan_ranking(self):
         _,_,view=offer_kongs()
         evidence={"old":[],"new":[]}
         def scorer(calls):
-            def func(hand,melds,missing,public,cap,tian):
+            def func(hand,melds,missing,public,cap,tian,**kwargs):
                 tag=melds[-1]["tile"] if melds else "baseline"
                 calls.append(tag)
                 val={"m1":12,"m9":15,"baseline":8}[tag]
@@ -216,21 +207,6 @@ class KongTierParityTests(unittest.TestCase):
         self.assertEqual(evidence["old"].count("baseline"),
                          evidence["new"].count("baseline"))
         self.assertEqual(set(evidence["new"]),{"baseline","m1","m9"})
-
-    def test_two_improving_kongs_compare_both_values_without_baseline(self):
-        _,_,view=offer_kongs()
-        evidence=[]
-        def scored(hand,melds,missing,public,cap,tian):
-            self.assertTrue(melds,"improved tier skips irrelevant reference")
-            evidence.append(melds[-1]["tile"])
-            val=7 if melds[-1]["tile"]=="m1" else 9
-            return {"shanten":1,"ukeire":val,"value":val,"tian_kept":False}
-        with patch("mahtrain_core.ai._cut_shanten",return_value=2), \
-             patch("mahtrain_core.ai.shanten_13",return_value=1), \
-             patch("mahtrain_core.ai._call_outlook",side_effect=scored):
-            self.assertEqual(_challenge_kong(view),
-                             {"type":"an_gang","tile":"m9"})
-        self.assertEqual(evidence,["m1","m9"])
 
     def test_hidden_future_wall_and_opponents_cannot_affect_priority(self):
         game,seat,view=offer_kongs()
