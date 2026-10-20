@@ -121,6 +121,13 @@ class ChallengeCallTests(unittest.TestCase):
         self.assertEqual(view, before)
         self.assertIn(result, options)
         self.assertEqual(g.debug_tile_counts()["total"], 108)
+        # The selected alternative must also execute in the authoritative
+        # game, including an actual tail-wall replacement and ledger change.
+        wall_before = g.public_state()["wall_count"]
+        g.declare_kong(seat, result["type"], result["tile"])
+        self.assertEqual(g.public_state()["wall_count"], wall_before - 1)
+        self.assertEqual(g.private_view(seat)["own_melds"][-1]["tile"], "m9")
+        self.assertEqual(g.debug_tile_counts()["total"], 108)
 
     def test_real_kong_and_tian_ting_protect_original_wait_set(self):
         g, seat, v = offer_kongs()
