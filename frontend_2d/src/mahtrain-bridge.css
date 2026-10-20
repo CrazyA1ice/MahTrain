@@ -3,7 +3,7 @@
  * new. Tiles, hand, meld, four-seat orientation and table background are
  * drawn by original Majiang styles and @kobalab/majiang-ui.
  */
-body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yahei",sans-serif;margin:0;overflow-x:hidden}
+body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yahei",sans-serif;margin:0;overflow-x:hidden;overflow-y:scroll}
 #classic-toolbar{
  box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:12px;
  width:100%;max-width:1120px;margin:8px auto 3px;padding:8px 12px;
