@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 
 from mahtrain_core.ai_tournament import (seat_assignment, simulate_match, tournament, explain_public_action)
+from mahtrain_core.rules import TILE_INDEX
 
 
 class FourAgentTrialTests(unittest.TestCase):
@@ -54,7 +55,11 @@ class FourAgentTrialTests(unittest.TestCase):
                     self.assertGreaterEqual(record["shanten_regret"],0)
             for event in match["public_events"]:
                 if event["type"]=="an_gang":
-                    self.assertNotIn("tile",event)
+                    # The CURRENT physical engine officially flips one
+                    # identifying tile face from a declared concealed kong;
+                    # other tiles in all concealed hands remain private.
+                    self.assertIs(event.get("revealed"),True)
+                    self.assertIn(event["tile"],TILE_INDEX)
             if match["terminal_phase"]=="finished":
                 self.assertEqual(len(match["winners"]),3)
             else:
@@ -150,7 +155,8 @@ class FourAgentTrialTests(unittest.TestCase):
                 for melds in frame["board"]["melds"]:
                     for meld in melds:
                         if meld["type"]=="an_gang":
-                            self.assertIsNone(meld["tile"])
+                            self.assertIs(meld.get("revealed"),True)
+                            self.assertIn(meld["tile"],TILE_INDEX)
                 if frame["action"]["action"]=="an_gang":
                     self.assertNotIn("tile",frame["action"])
                 if frame["action"]["action"]=="draw":

@@ -247,6 +247,195 @@ def challenge_discard_scores(view: Mapping[str, Any],
                 TILE_INDEX[item["discard"]])))
 
 
+def _call_outlook(
+    hand: Sequence[str], melds: Sequence[Mapping[str, str]], missing: str,
+    public: Sequence[str], cap: int, tian: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Real 13-effective-tile position at a legal call checkpoint.
+
+    The 'value' is a public-copy-weighted next-draw surrogate, NOT win odds
+    or the EV of claiming a discard. Never sample the actual wall/AI hands.
+    """
+    info = effective_draws(hand, melds, missing, public)
+    waits = set(winning_tiles(hand, melds, missing)) if info["shanten"] == 0 else set()
+    tian_kept = (
+        tian.get("eligible") is True
+        and info["shanten"] == 0
+        and waits == set(tian.get("initial_waits", []))
+    )
+    value = info["effective_tile_count"]
+    if info["shanten"] == 0:
+        value = sum(
+            entry["remaining"] * score_win(
+                [*hand, entry["tile"]], melds, missing, cap=cap,
+                context={"tian_ting_verified": tian_kept},
+            )["multiplier"]
+            for entry in info["effective_details"]
+        )
+    return {
+        "shanten": info["shanten"],
+        "ukeire": info["effective_tile_count"],
+        "value": value,
+        "tian_kept": tian_kept,
+    }
+
+
+def _call_settings(view: Mapping[str, Any]) -> tuple[list[str], int, Mapping[str, Any]]:
+    public = visible_tiles(view)
+    rules = view.get("win_ledger") or {}
+    cap = rules.get("fan_cap", 3)
+    if type(cap) is not int or not 0 <= cap <= 12:
+        cap = 3
+    tian = view.get("tian_ting") or {}
+    return public, cap, tian
+
+
+def _outlook_better_than_baseline(
+    candidate: Mapping[str, Any], baseline: Mapping[str, Any],
+    *, fraction: float,
+) -> bool:
+    if candidate["shanten"] != baseline["shanten"]:
+        return candidate["shanten"] < baseline["shanten"]
+    # Keep most current effective copies: an immediate kong gets a tail draw
+    # and kong money, but must not burn the whole wait for those benefits.
+    if baseline["ukeire"] and candidate["ukeire"] == 0:
+        return False
+    return (candidate["ukeire"] >= baseline["ukeire"] * fraction
+            and candidate["value"] >= baseline["value"] * fraction)
+
+
+def _challenge_claim(view: Mapping[str, Any]) -> str:
+    """Public-only, bounded-call outlook for the online challenge tier.
+
+    'peng' necessarily consumes two concealed copies, while its CLAIMED
+    river tile moves to the exposed meld. Avoid subtracting it twice.
+    """
+    hand, melds, missing = _own_view(view)
+    public, cap, tian = _call_settings(view)
+    target = view["pending_discard"]["tile"]
+    options = view["claim_options"]
+    before = _call_outlook(hand, melds, missing, public, cap, tian)
+    exposed_public = list(public)
+    # The unclaimed pending discard is present once in the public river.
+    # Once melded, the same physical copy belongs to our exposed meld.
+    exposed_public.remove(target)
+
+    if "ming_gang" in options:
+        remainder = list(hand)
+        for _ in range(3):
+            remainder.remove(target)
+        after = _call_outlook(
+            remainder, [*melds, {"type": "ming_gang", "tile": target}],
+            missing, exposed_public, cap, tian,
+        )
+        if (not tian.get("eligible") or after["tian_kept"]
+                ) and _outlook_better_than_baseline(after, before, fraction=0.75):
+            return "ming_gang"
+
+    if "peng" in options:
+        if tian.get("eligible"):
+            return "pass"  # Peng revokes Tian Ting even if waits are unchanged.
+        remainder = list(hand)
+        for _ in range(2):
+            remainder.remove(target)
+        groups = [*melds, {"type": "peng", "tile": target}]
+        # Cheap exact shanten first. Only calculate effective draws for
+        # equal-shanten cuts that could change the call decision. In common
+        # non-improving cases this avoids numerous costly lookahead calls.
+        cuts = sorted(set(remainder), key=TILE_INDEX.__getitem__)
+        # Mirror the challenge discard policy: clear the declared missing
+        # suit first rather than valuing a forced-to-be-ignored alternative.
+        forced = [tile for tile in cuts if tile[0] == missing]
+        if forced:
+            cuts = forced
+        ranked = [(cut, _cut_shanten(remainder, groups, missing, cut))
+                  for cut in cuts]
+        best = min(n for _, n in ranked)
+        if best < before["shanten"]:
+            return "peng"
+        # For equal-shanten claims, demand a meaningful effective-copy GAIN,
+        # and never break an existing tenpai hand for an unpriced ping.
+        if best == before["shanten"] and best > 0:
+            for cut, shanten in ranked:
+                if shanten != best:
+                    continue
+                after = list(remainder)
+                after.remove(cut)
+                # A called pong forces an immediate hand discard. Include
+                # that future PUBLIC cut in the known-copy denominator.
+                info = _call_outlook(
+                    after, groups, missing, [*exposed_public, cut], cap, tian,
+                )
+                if info["ukeire"] >= before["ukeire"] + 3:
+                    return "peng"
+    return "pass"
+
+
+def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
+    """Rank all legal own kongs, rather than accepting the first option.
+
+    A 14-effective hand is compared to its best lawful after-discard
+    13-effective reference. Kong's mandatory supplement draw is unknown.
+    """
+    hand, melds, missing = _own_view(view)
+    public, cap, tian = _call_settings(view)
+    allowed = sorted(set(hand), key=TILE_INDEX.__getitem__)
+    forced = [tile for tile in allowed if tile[0] == missing]
+    if forced:
+        allowed = forced
+    # Avoid computing expensive multi-draw effective tiles for cuts that
+    # already lose on exact shanten. Kong is rare, but the visual turn should
+    # never wait for avoidable full-hand enumeration.
+    quick = [(tile, _cut_shanten(hand, melds, missing, tile))
+             for tile in allowed]
+    least = min(n for _, n in quick)
+    baselines = []
+    for tile, shanten in quick:
+        if shanten != least:
+            continue
+        after = list(hand)
+        after.remove(tile)
+        baselines.append(_call_outlook(
+            after, melds, missing, [*public, tile], cap, tian,
+        ))
+    before = max(
+        (x for x in baselines if x["shanten"] == least),
+        key=lambda x: (x["value"], x["ukeire"]),
+    )
+    candidates = []
+    for choice in view["kong_options"]:
+        tile, kind = choice["tile"], choice["type"]
+        after = list(hand)
+        extra = [dict(group) for group in melds]
+        if kind == "an_gang":
+            for _ in range(4):
+                after.remove(tile)
+            extra.append({"type": "an_gang", "tile": tile})
+        elif kind == "bu_gang":
+            after.remove(tile)
+            extra = [
+                {"type": "bu_gang" if group["type"] == "peng"
+                 and group["tile"] == tile else group["type"],
+                 "tile": group["tile"]}
+                for group in extra
+            ]
+        else:
+            continue
+        outlook = _call_outlook(after, extra, missing, public, cap, tian)
+        if tian.get("eligible") and not outlook["tian_kept"]:
+            continue
+        if not _outlook_better_than_baseline(outlook, before, fraction=0.75):
+            continue
+        # Prefer a better structural stage, then stronger next-draw shape;
+        # when exactly equal prefer concealed kong to avoid rob-kong exposure.
+        candidates.append((
+            (-outlook["shanten"], outlook["value"], outlook["ukeire"],
+             int(kind == "an_gang"), -TILE_INDEX[tile]),
+            dict(choice),
+        ))
+    return max(candidates, key=lambda entry: entry[0])[1] if candidates else None
+
+
 class MahjongAgent:
     """Per-seat stateful seeded RNG; no access to any hidden game object."""
 
@@ -304,6 +493,8 @@ class MahjongAgent:
             return "pass"
         if self.level == "basic":
             return "peng" if "peng" in options and self._rng.random() < .35 else "pass"
+        if self.level in ("challenge", *ABLATION_VARIANTS):
+            return _challenge_claim(view)
         hand, melds, missing = _own_view(view)
         target = view["pending_discard"]["tile"]
         before = shanten_13(hand, melds, missing)
@@ -337,6 +528,8 @@ class MahjongAgent:
             return None
         if self.level == "basic":
             return self._rng.choice(choices) if self._rng.random() < .60 else None
+        if self.level in ("challenge", *ABLATION_VARIANTS):
+            return _challenge_kong(view)
         hand, melds, missing = _own_view(view)
         # Evaluate post-kong 13-effective tiles, before unknown tail draw.
         baseline = min(_cut_shanten(hand, melds, missing, t)
@@ -402,7 +595,7 @@ class MahjongAgent:
         return {
             "basic":"种子随机的合法切牌，适度尝试碰/暗杠；能胡必胡",
             "advanced":"优先不退向听，仅在牌效提升时主动碰杠",
-            "challenge":"最小向听及番值期望优先；依据公开场况防守，残局对少量候选以有限合成隐藏牌世界作直接放铳损失敏感性分析",
+            "challenge":"切牌最小向听和公开番值优先，按公开场况弱防守；碰杠时比较真实进张和原天听约束，综合收益仍待对照试验验证",
         }[self.level]
 
 
