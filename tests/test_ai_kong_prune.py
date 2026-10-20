@@ -23,6 +23,8 @@ from mahtrain_core.efficiency import shanten_13
 from mahtrain_core.rules import TILE_INDEX
 from mahtrain_core.ai_tournament import simulate_match
 from test_ai_calls import offer_kongs
+from test_four_player_claims import staged_game
+from mahtrain_core.four_player import FourPlayerOpening
 
 
 def _legacy_challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
@@ -91,7 +93,38 @@ def _legacy_challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
 
 
 
+def offer_seven_pairs_disrupting_kong():
+    """Server-real hand: best cut is tenpai seven-pairs, kong destroys it."""
+    dealer = FourPlayerOpening(42).dealer
+    hand = (["m1"] * 4 + ["m3"] * 2 + ["m5"] * 2
+            + ["m7"] * 2 + ["p1"] * 2 + ["p3", "p9"])
+    game = staged_game({dealer: hand}, {dealer: "s"})
+    view = game.private_view(dealer)
+    assert view["kong_options"] == [{"type": "an_gang", "tile": "m1"}]
+    assert game.debug_tile_counts()["total"] == 108
+    return game, dealer, view
+
+
 class KongPruningTests(unittest.TestCase):
+    def test_actual_seven_pairs_waits_block_losing_kong_without_scoring(self):
+        game, seat, view = offer_seven_pairs_disrupting_kong()
+        original = copy.deepcopy(view)
+        hand, melds, missing = _own_view(view)
+        before = min(_cut_shanten(hand, melds, missing, t) for t in set(hand))
+        after = list(hand)
+        for _ in range(4):
+            after.remove("m1")
+        kong_melds = [*melds, {"type": "an_gang", "tile": "m1"}]
+        stage = shanten_13(after, kong_melds, missing)
+        self.assertLess(before, stage, "fixture must really lose shanten")
+        self.assertIsNone(_legacy_challenge_kong(view))
+        with patch("mahtrain_core.ai._call_outlook",
+                   side_effect=AssertionError("no costly eval for lost shanten")):
+            self.assertIsNone(_challenge_kong(view))
+        self.assertEqual(view, original)
+        self.assertEqual(game.debug_tile_counts()["total"], 108)
+
+
     def test_real_multiple_kongs_identical_to_preoptimization(self):
         game, seat, view = offer_kongs()
         original = copy.deepcopy(view)
