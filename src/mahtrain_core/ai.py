@@ -381,10 +381,13 @@ def _challenge_claim(view: Mapping[str, Any]) -> str:
 
 
 def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
-    """Rank all legal own kongs, rather than accepting the first option.
+    """Rank all legal own kongs without evaluating impossible worse shapes.
 
-    A 14-effective hand is compared to its best lawful after-discard
-    13-effective reference. Kong's mandatory supplement draw is unknown.
+    Compare legal 14-effective kongs with the *best* post-discard 13-tile
+    stage. A kong with worse exact shanten can never pass the original
+    _outlook_better_than_baseline test, regardless of its fan/copy counts.
+    Compute that cheap structural bound first, before evaluating any
+    expensive multi-draw/fan outlook or collecting reference values.
     """
     hand, melds, missing = _own_view(view)
     public, cap, tian = _call_settings(view)
@@ -392,26 +395,14 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
     forced = [tile for tile in allowed if tile[0] == missing]
     if forced:
         allowed = forced
-    # Avoid computing expensive multi-draw effective tiles for cuts that
-    # already lose on exact shanten. Kong is rare, but the visual turn should
-    # never wait for avoidable full-hand enumeration.
     quick = [(tile, _cut_shanten(hand, melds, missing, tile))
              for tile in allowed]
     least = min(n for _, n in quick)
-    baselines = []
-    for tile, shanten in quick:
-        if shanten != least:
-            continue
-        after = list(hand)
-        after.remove(tile)
-        baselines.append(_call_outlook(
-            after, melds, missing, [*public, tile], cap, tian,
-        ))
-    before = max(
-        (x for x in baselines if x["shanten"] == least),
-        key=lambda x: (x["value"], x["ukeire"]),
-    )
-    candidates = []
+
+    # Handle every legal kong kind, but discard candidates whose exact
+    # shanten ALREADY loses to best lawful hand cut. This rejects only
+    # outcomes that the old full _call_outlook would certainly reject.
+    prepared = []
     for choice in view["kong_options"]:
         tile, kind = choice["tile"], choice["type"]
         after = list(hand)
@@ -430,13 +421,45 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
             ]
         else:
             continue
+        stage = shanten_13(after, extra, missing)
+        if stage > least:
+            continue
+        prepared.append((stage, after, extra, choice))
+    if not prepared:
+        return None
+
+    # Full reference-value enumeration is needed only for same-stage
+    # candidates. A strictly better-shanten kong is accepted by the
+    # original rule without any ukeire/value comparison.
+    before = None
+    if any(stage == least for stage, *_ in prepared):
+        baselines = []
+        for tile, shanten in quick:
+            if shanten != least:
+                continue
+            after = list(hand)
+            after.remove(tile)
+            baselines.append(_call_outlook(
+                after, melds, missing, [*public, tile], cap, tian,
+            ))
+        before = max(
+            (x for x in baselines if x["shanten"] == least),
+            key=lambda x: (x["value"], x["ukeire"]),
+        )
+
+    candidates = []
+    for stage, after, extra, choice in prepared:
         outlook = _call_outlook(after, extra, missing, public, cap, tian)
         if tian.get("eligible") and not outlook["tian_kept"]:
             continue
-        if not _outlook_better_than_baseline(outlook, before, fraction=0.75):
+        if (before is not None
+                and not _outlook_better_than_baseline(
+                    outlook, before, fraction=0.75)):
             continue
-        # Prefer a better structural stage, then stronger next-draw shape;
-        # when exactly equal prefer concealed kong to avoid rob-kong exposure.
+        # Same ranking and deterministic tie breaks as M3.79. A strictly
+        # better stage than baseline is always accepted, but every viable
+        # candidate still gets its real fan-weighted value for ordering.
+        tile, kind = choice["tile"], choice["type"]
         candidates.append((
             (-outlook["shanten"], outlook["value"], outlook["ukeire"],
              int(kind == "an_gang"), -TILE_INDEX[tile]),
