@@ -162,6 +162,27 @@ class FastUkeireExactParity(unittest.TestCase):
             list(reversed(hand)), list(reversed(melds)), missing, public)
         self.assertEqual(got, reversed_got)
 
+    def test_real_ai_tournament_trace_matches_legacy_ukeire(self):
+        # Verify complete rule-engine outputs and agent calls, not merely
+        # isolated helper functions. The benchmark's clock samples naturally
+        # differ and must NEVER affect game decisions.
+        from mahtrain_core.ai_tournament import simulate_match
+        for seed in (11, 29):
+            with self.subTest(seed=seed):
+                with patch("mahtrain_core.efficiency._effective_types_13",
+                           side_effect=reference_effective_types):
+                    original = simulate_match(
+                        seed, rotation=0, offline_kong_base=1)
+                optimized = simulate_match(
+                    seed, rotation=0, offline_kong_base=1)
+                for key in ("terminal_phase", "winners", "trace",
+                            "public_events", "public_replay",
+                            "official_settled_balances",
+                            "official_kong_balances",
+                            "official_exhaustive_balances"):
+                    self.assertEqual(original[key], optimized[key], key)
+                self.assertEqual(optimized["physical_count"], 108)
+
 
 if __name__ == "__main__":
     unittest.main()
