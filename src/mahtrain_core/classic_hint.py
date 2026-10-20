@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from .ai import visible_tiles
 from .efficiency import analyze_discards, effective_draws
-from .rules import TILE_INDEX
+from .rules import TILE_INDEX, score_win, winning_tiles
 
 _TURNS = frozenset(("dealer_discard", "await_discard"))
 
@@ -55,35 +55,88 @@ def classic_hand_hint(view: Mapping) -> dict:
                 "forced_missing": False,
             }
         analyses = report["candidates"]
-    lowest = min(row["shanten"] for row in analyses)
-    largest = max(row["effective_tile_count"]
-                  for row in analyses if row["shanten"] == lowest)
-    ranked = sorted(analyses, key=lambda row: (
-        row["shanten"], -row["effective_tile_count"],
-        TILE_INDEX[row["discard"]],
-    ))
+    # Only an actually tenpai post-cut hand has a direct winning-tile
+    # multiplier. Use the exact room fan cap and preserve authenticated
+    # Tian Ting ONLY when this hypothetical discard keeps the initial waits.
+    # Sum (unexcluded unknown physical copies * official base multiplier).
+    # This is a comparative upper-bound WEIGHT, NOT draw probability, wall
+    # composition, danger model or a guaranteed future payoff.
+    cap = view.get("win_ledger", {}).get("fan_cap", 3)
+    if type(cap) is not int or cap < 0:
+        cap = 3
+    tian = view.get("tian_ting") or {}
+    enriched = []
+    for row in analyses:
+        item = dict(row)
+        item["fan_weighted_unknown_copies"] = None
+        item["winning_details"] = []
+        if row["shanten"] == 0:
+            after = list(hand)
+            after.remove(row["discard"])
+            waits = set(winning_tiles(after, melds, missing))
+            preserve_tian = (
+                tian.get("eligible") is True
+                and waits == set(tian.get("initial_waits", []))
+            )
+            total = 0
+            for draw in row["effective_details"]:
+                tile = draw["tile"]
+                score = score_win(
+                    [*after, tile], melds, missing, cap=cap,
+                    context={"tian_ting_verified": preserve_tian},
+                )
+                # effective_draws already checked each structural winning
+                # tile; fail closed if a future rule revision disagrees.
+                if not score["legal"]:
+                    raise ValueError("结构听口与真实计分规则不一致")
+                total += draw["remaining"] * score["multiplier"]
+                item["winning_details"].append({
+                    "tile": tile,
+                    "unknown_copies_upper_bound": draw["remaining"],
+                    "main_pattern": score["main_pattern"],
+                    "effective_fan": score["effective_fan"],
+                    "multiplier": score["multiplier"],
+                    "tian_ting_applied": preserve_tian,
+                })
+            item["fan_weighted_unknown_copies"] = total
+        enriched.append(item)
+
+    def key(row):
+        weighted = (row["fan_weighted_unknown_copies"]
+                    if row["shanten"] == 0
+                    else row["effective_tile_count"])
+        return (
+            row["shanten"],
+            -weighted,
+            -row["effective_tile_count"],
+        )
+
+    best_key = min(key(row) for row in enriched)
+    ranked = sorted(enriched, key=lambda row: (*key(row), TILE_INDEX[row["discard"]]))
     return {
         "status": "choose_discard",
         "phase": view["phase"],
         "forced_missing": bool(forced),
         "missing_suit": missing,
-        "interpretation": "structural_only",
-        "ranking_rule": "minimum_shanten_then_unknown_copy_upper_bound",
+        "interpretation": "public_information_fan_weighted_upper_bound",
+        "fan_cap": cap,
+        "ranking_rule": "min_shanten_then_tenpai_fan_weighted_upper_bound_else_ukeire",
         "candidates": [{
             "discard": row["discard"],
             "shanten": row["shanten"],
             "effective_details": [{
-                "tile": item["tile"],
-                "unknown_copies_upper_bound": item["remaining"],
-            } for item in row["effective_details"]],
+                "tile": d["tile"],
+                "unknown_copies_upper_bound": d["remaining"],
+            } for d in row["effective_details"]],
             "effective_tile_count_upper_bound": row["effective_tile_count"],
             "effective_type_count": len(row["effective_types"]),
-            "reference_best": row["shanten"] == lowest
-                and row["effective_tile_count"] == largest,
+            "fan_weighted_unknown_copies": row["fan_weighted_unknown_copies"],
+            "winning_details": row["winning_details"],
+            "reference_best": key(row) == best_key,
         } for row in ranked],
         "limitations": (
-            "以自己的手牌和公开弃牌／公开副露扣除已知牌。"
-            "未排除张数是未知位置中的物理牌张上限，不是牌墙真实剩余数，"
-            "也不是下一摸概率或综合番型收益。"
+            "听牌时仅把公开未知张数上限乘以当前规则计算的基础胡牌倍率。"
+            "它不代表真实墙内张数、下一摸胡牌概率或完整收益期望，"
+            "且不考虑尚未发生的杠上花、海底等事件或放铳风险。"
         ),
     }

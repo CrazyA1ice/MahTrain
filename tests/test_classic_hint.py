@@ -28,13 +28,47 @@ class ClassicHintTests(unittest.TestCase):
         before=deepcopy(state)
         hint=classic_hand_hint(state)
         self.assertEqual(hint["status"],"choose_discard")
-        self.assertEqual(hint["interpretation"],"structural_only")
+        self.assertEqual(hint["interpretation"],"public_information_fan_weighted_upper_bound")
         rows={c["discard"]:c for c in hint["candidates"]}
         self.assertEqual(rows["p9"]["shanten"],0)
         self.assertEqual(rows["p9"]["effective_details"],
                          [{"tile":"m9","unknown_copies_upper_bound":3}])
         self.assertEqual(rows["p9"]["effective_tile_count_upper_bound"],3)
+        self.assertEqual(rows["p9"]["fan_weighted_unknown_copies"],6)
+        self.assertEqual(rows["p9"]["winning_details"],[{
+            "tile":"m9","unknown_copies_upper_bound":3,
+            "main_pattern":"all_pungs","effective_fan":1,
+            "multiplier":2,"tian_ting_applied":False}])
         self.assertEqual(state,before,"reference must not mutate the match")
+
+    def test_verified_tian_ting_weight_uses_original_waits_and_actual_cap(self):
+        state=view()
+        state["win_ledger"]={"fan_cap":3}
+        state["tian_ting"]={"eligible":True,"initial_waits":["m9"]}
+        out=classic_hand_hint(state)
+        rows={r["discard"]:r for r in out["candidates"]}
+        self.assertEqual(rows["p9"]["fan_weighted_unknown_copies"],24)
+        self.assertEqual(rows["p9"]["winning_details"][0]["effective_fan"],3)
+        self.assertTrue(rows["p9"]["winning_details"][0]["tian_ting_applied"])
+        self.assertTrue(rows["p9"]["reference_best"])
+        self.assertEqual(rows["m9"]["fan_weighted_unknown_copies"],6)
+        self.assertFalse(rows["m9"]["winning_details"][0]["tian_ting_applied"])
+        self.assertFalse(rows["m9"]["reference_best"])
+        self.assertEqual(out["candidates"][0]["discard"],"p9")
+        # An actual zero-fan room cap must win over a hypothetical bonus.
+        state["win_ledger"]["fan_cap"]=0
+        capped=classic_hand_hint(state)
+        self.assertEqual(capped["fan_cap"],0)
+        self.assertEqual({r["discard"]:r["fan_weighted_unknown_copies"]
+                          for r in capped["candidates"]}["p9"],3)
+
+    def test_non_tenpai_has_no_fabricated_win_multiplier(self):
+        state=view(["m1","m1","m1","m4","m4","m4","p1","p1",
+                    "p1","p4","p4","m8","p9","s1"],missing="s")
+        out=classic_hand_hint(state)
+        for r in out["candidates"]:
+            self.assertIsNone(r["fan_weighted_unknown_copies"])
+            self.assertEqual(r["winning_details"],[])
 
     def test_public_discard_reduces_upper_bound_but_no_wall_or_ai_hand_access(self):
         state=view()

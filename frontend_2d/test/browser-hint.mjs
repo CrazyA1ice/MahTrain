@@ -27,14 +27,20 @@ const common={
  settled_balances:[0,0,0,0],public_steps:[],
 };
 const reference={
- status:"choose_discard",interpretation:"structural_only",
+ status:"choose_discard",interpretation:"public_information_fan_weighted_upper_bound",fan_cap:3,
  forced_missing:false,missing_suit:"s",
  candidates:[
   {discard:"p9",shanten:0,reference_best:true,effective_type_count:1,
-   effective_tile_count_upper_bound:2,
+   effective_tile_count_upper_bound:2,fan_weighted_unknown_copies:4,
+   winning_details:[{tile:"m9",unknown_copies_upper_bound:2,
+    main_pattern:"all_pungs",effective_fan:1,multiplier:2,
+    tian_ting_applied:false}],
    effective_details:[{tile:"m9",unknown_copies_upper_bound:2}]},
   {discard:"m9",shanten:0,reference_best:false,effective_type_count:1,
-   effective_tile_count_upper_bound:1,
+   effective_tile_count_upper_bound:1,fan_weighted_unknown_copies:2,
+   winning_details:[{tile:"p9",unknown_copies_upper_bound:1,
+    main_pattern:"all_pungs",effective_fan:1,multiplier:2,
+    tian_ting_applied:false}],
    effective_details:[{tile:"p9",unknown_copies_upper_bound:1}]},
  ]};
 const requests=[];
@@ -66,7 +72,11 @@ try{
  assert.match(await table.textContent(),/听牌/);
  assert.match(await table.textContent(),/≤ 2 张/);
  assert.match(await table.textContent(),/九万 ≤2/);
- assert.match(await table.textContent(),/不代表牌墙实存张数/);
+ assert.match(await table.textContent(),/对对胡 1番 ×2/);
+ assert.match(await table.textContent(),/≤ 4（倍率加权）/);
+ assert.match(await table.textContent(),/听牌番值加权参考/);
+ assert.equal(await table.locator("thead th").count(),6);
+ assert.match(await table.textContent(),/不是实际期望积分、真实胜率或牌墙剩余张数/);
  assert.equal(await table.locator("tbody tr").count(),2);
  assert.equal(await page.locator('.shoupai.main img[data-tile="p9"].is-hint-cut').count(),1);
  const below=await page.evaluate(()=>{
