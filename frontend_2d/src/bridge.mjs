@@ -81,7 +81,10 @@ export function choiceAction(view,kind,details={}) {
   }
   if(kind==="claim"&&["claim_window","rob_kong_window"].includes(phase)){
     const options=phase==="claim_window"?view.claim_options:view.rob_options;
-    const submitted=phase==="claim_window"?view.claim_submitted:view.rob_submitted;
+    // Both normal claims and rob-kong responses share Python's _responses,
+    // published as claim_submitted in public_state(). There is no separate
+    // rob_submitted field in MahTrain's actual API.
+    const submitted=view.claim_submitted??view.rob_submitted;
     const pending=phase==="claim_window"?view.pending_discard:view.pending_rob_kong;
     const option=details.option;
     if(pending?.seat===0||submitted?.includes(0)||!options?.includes(option))

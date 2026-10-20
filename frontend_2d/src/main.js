@@ -7,6 +7,7 @@ import {SESSION_KEY,convertView,choiceAction} from "./bridge.mjs";
 import {publicActions,recentWins,winTitle} from "./settlement.mjs";
 import {renderSettlement} from "./report.mjs";
 import {seatOutcome} from "./seat-status.mjs";
+import {claimDecision,ownKongChoices} from "./action-choice.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
 const TURN=new Set(["dealer_discard","await_discard"]);
@@ -184,22 +185,26 @@ function draw(){
    action:"match_missing",suit:s}),false,busy));
   center("定缺：选择一门花色",buttons);status("请选择定缺花色");
  }else if(["claim_window","rob_kong_window"].includes(state.phase)){
-  const rob=state.phase==="rob_kong_window";
-  const opts=rob?state.rob_options:state.claim_options;
-  const submitted=rob?state.rob_submitted:state.claim_submitted;
-  const target=rob?state.pending_rob_kong:state.pending_discard;
-  if(target?.seat!==0 && !submitted?.includes(0)&&opts?.some(x=>x!=="pass")){
-   buttons=["hu","ming_gang","peng","pass"].filter(o=>opts.includes(o))
-    .map(o=>btn(({hu:"胡",ming_gang:"杠",peng:"碰",pass:"过"})[o],
-      ()=>run("claim",{option:o}),o==="hu",busy));
+  const decision=claimDecision(state);
+  if(decision){
+   buttons=decision.choices.map(choice=>{
+    const control=btn(choice.label,()=>void submit(choice.command),
+      choice.primary,busy);
+    control.title=choice.explanation;
+    return control;
+   });
   }
-  center("请选择碰、杠、胡或过",buttons);status("等待碰杠胡处理");
+  center(decision?.title||"",buttons);
+  status(decision?"请选择合法操作；也可以点「过」":"等待其他玩家响应");
  }else if(TURN.has(state.phase)&&state.turn===0){
   if(state.can_self_draw_win)buttons.push(btn("自摸胡",()=>run("win"),true,busy));
-  for(const k of state.kong_options||[])buttons.push(btn("杠 "+k.tile,()=>
-   run("kong",{kind:k.type,tile:k.tile}),false,busy));
-  center("轮到你出牌",buttons);
-  status("点击一张手牌选中，再点同张打出；胡牌/杠在中央");
+  for(const offer of ownKongChoices(state)){
+   const button=btn(offer.label,()=>void submit(offer.command),false,busy);
+   button.title="可以不杠，直接点选手牌出牌";
+   buttons.push(button);
+  }
+  center(buttons.length?"可自摸或杠，也可直接出牌":"",buttons);
+  status("点击手牌选中、再点同一张打出；按 Esc 可取消选牌");
  }else if(DONE.has(state.phase)){
   center("本局结束",[
    btn("查看结算",()=>el("classic-result-report").scrollIntoView({
@@ -213,7 +218,14 @@ function draw(){
  renderSettlement(el("classic-result-report"),state);
  resize();
 }
-function selectHand(node){
+function focusTile(index){
+ // Shoupai.redraw() replaces the original GIF nodes. Restore keyboard
+ // focus to the SAME physical copy, including duplicate and drawn tiles.
+ const replacement=document.querySelector(
+  '.shoupai.main .bingpai [data-hand-index="'+index+'"]');
+ replacement?.focus({preventScroll:true});
+}
+function selectHand(node,restoreKeyboardFocus=false){
  if(busy||!state)return;
  const i=Number(node?.dataset.handIndex);
  if(!Number.isInteger(i)||i<0||i>=state.hand.length)return;
@@ -221,10 +233,14 @@ function selectHand(node){
   if(selected.has(i))selected.delete(i);
   else if(selected.size<3)selected.add(i);
   draw();
+  if(restoreKeyboardFocus)focusTile(i);
  }else if(TURN.has(state.phase)&&state.turn===0){
   const cmd=choiceAction(state,"discard",{index:i});if(!cmd)return;
   if(selected.has(i))void submit(cmd);
-  else{selected.clear();selected.add(i);draw()}
+  else{
+   selected.clear();selected.add(i);draw();
+   if(restoreKeyboardFocus)focusTile(i);
+  }
  }
 }
 function run(kind,details={}){
@@ -293,9 +309,12 @@ function boot(){
   const target=e.target.closest("[data-hand-index]");if(target)selectHand(target);
  });
  hand.addEventListener("keydown",e=>{
-  if(e.key==="Enter"||e.key===" "){
-   const t=e.target.closest("[data-hand-index]");
-   if(t){e.preventDefault();selectHand(t)}
+  const t=e.target.closest("[data-hand-index]");
+  if(e.key==="Escape"&&selected.size){
+   e.preventDefault();selected.clear();draw();
+   if(t)focusTile(Number(t.dataset.handIndex));
+  }else if(t&&(e.key==="Enter"||e.key===" ")){
+   e.preventDefault();selectHand(t,true);
   }
  });
  el("classic-new").onclick=()=>{if(confirm("开始新的牌局？"))
