@@ -61,7 +61,13 @@ def compare(samples=24,warmups=4):
         policies={"m385":_m385_challenge_kong,"m386":_challenge_kong}
         invocations={}
         for name,policy in policies.items():
-            with patch("mahtrain_core.ai._call_outlook",wraps=_call_outlook) as calls:
+            # The historical function is intentionally frozen in the
+            # regression test MODULE. Patch that namespace for M3.85 and
+            # the production namespace for M3.86; otherwise old calls
+            # would misleadingly read as zero.
+            namespace=("test_ai_kong_tiers" if name=="m385"
+                       else "mahtrain_core.ai")
+            with patch(namespace+"._call_outlook",wraps=_call_outlook) as calls:
                 action=policy(view)
                 invocations[name]={"action":action,"outlook_calls":calls.call_count}
         if invocations["m385"]["action"]!=invocations["m386"]["action"]:
