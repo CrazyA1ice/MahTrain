@@ -257,11 +257,15 @@ def _call_outlook(
     or the EV of claiming a discard. Never sample the actual wall/AI hands.
     """
     info = effective_draws(hand, melds, missing, public)
-    waits = set(winning_tiles(hand, melds, missing)) if info["shanten"] == 0 else set()
+    # A full legal wait-set enumeration is relevant ONLY when the server
+    # has verified Tian Ting. Normal tenpai scoring already knows each
+    # winning draw from effective_draws; re-enumerating it here does not
+    # influence any legal decision or fan multiplier.
     tian_kept = (
         tian.get("eligible") is True
         and info["shanten"] == 0
-        and waits == set(tian.get("initial_waits", []))
+        and set(winning_tiles(hand, melds, missing)) ==
+            set(tian.get("initial_waits", []))
     )
     value = info["effective_tile_count"]
     if info["shanten"] == 0:
@@ -314,6 +318,11 @@ def _challenge_claim(view: Mapping[str, Any]) -> str:
     public, cap, tian = _call_settings(view)
     target = view["pending_discard"]["tile"]
     options = view["claim_options"]
+    # Peng always revokes Tian Ting; if that is our only legal call, the
+    # policy already mandates pass and no hypothetical effective-draw
+    # enumeration is needed. A possible ming-gang still requires scoring.
+    if "ming_gang" not in options and tian.get("eligible"):
+        return "pass"
     before = _call_outlook(hand, melds, missing, public, cap, tian)
     exposed_public = list(public)
     # The unclaimed pending discard is present once in the public river.
@@ -490,6 +499,13 @@ class MahjongAgent:
         if "hu" in options:
             return "hu"
         if rob:
+            return "pass"
+        # Most claim windows only permit passing. Prior versions still
+        # enumerated complete effective draws for challenge on EVERY such
+        # window (and shanten for advanced), despite having no possible
+        # legal action except pass. This fast path is strategy-equivalent,
+        # state-immutable and leaves no extra RNG consumption.
+        if "peng" not in options and "ming_gang" not in options:
             return "pass"
         if self.level == "basic":
             return "peng" if "peng" in options and self._rng.random() < .35 else "pass"
