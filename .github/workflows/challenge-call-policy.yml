@@ -28,18 +28,19 @@ jobs:
         run: python -m unittest discover -s tests -p 'test_ai_calls.py' -v
       - name: Four-seat paired official-score smoke comparison
         run: |
-          python examples/compare_challenge_call_policy.py --seed-start 810 --seeds 1 --json-out /tmp/mahtrain-call-pilot.json > /tmp/mahtrain-call-pilot.log
+          python examples/compare_challenge_call_policy.py --seed-start 810 --seeds 4 --json-out /tmp/mahtrain-call-pilot.json > /tmp/mahtrain-call-pilot.log
           python - <<'PY'
           import json
           p=json.load(open('/tmp/mahtrain-call-pilot.json',encoding='utf8'))
-          assert p['independent_seed_clusters']==1
-          assert p['total_games']==8
-          assert len(p['cases'])==4
+          assert p['independent_seed_clusters']==4
+          assert p['total_games']==32
+          assert len(p['cases'])==16
           assert all(c['proposed_net']-c['legacy_net']==c['paired_delta']
                      for c in p['cases'])
-          print('Pilot finished: seed cluster=1, total=8 full games')
+          print('Pilot finished: seed clusters=4, total=32 full games')
           print('Mean seat-paired net score delta:',p['mean_seed_cluster_delta'])
-          print('No strength/significance claims from one seed cluster')
+          print('Seed-cluster deltas:',[s['mean_four_seat_delta'] for s in p['per_seed']])
+          print('No strength/significance claims from four seed clusters')
           PY
       - name: Archive paired raw-score smoke results
         if: always()
