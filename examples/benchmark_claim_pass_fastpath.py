@@ -19,7 +19,8 @@ from time import perf_counter_ns
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "src"), str(ROOT / "tests")]
 
-from mahtrain_core.ai import MahjongAgent, _challenge_claim
+from mahtrain_core.ai import (MahjongAgent, _call_outlook, _call_settings,
+                              _challenge_claim, _own_view)
 from test_ai_calls import offer_peng
 from test_four_player_claims import deal_for_ron
 
@@ -50,6 +51,14 @@ def old_response(agent, view):
     HU/rob checks omitted because these matched views only offer
     'pass' or 'pass+peng' and never include legal HU or rob choice.
     """
+    # Restore exactly the unnecessary pre-check baseline from M3.81
+    # for a verified Tian-Ting hand: original outcome already was pass.
+    if view.get("tian_ting", {}).get("eligible") and (
+            "ming_gang" not in view["claim_options"]):
+        hand, melds, missing = _own_view(view)
+        public, cap, tian = _call_settings(view)
+        _call_outlook(hand, melds, missing, public, cap, tian)
+        return "pass"
     return _challenge_claim(view)
 
 
