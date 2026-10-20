@@ -1,0 +1,60 @@
+name: M3.86 priority-tier kong policy parity and actual-view CPU
+on:
+  push:
+    branches: [feat/m386-kong-stage-tier-shortcircuit]
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_kong_tiers.py"
+      - "examples/benchmark_kong_tiers.py"
+      - ".github/workflows/ai-kong-tiers.yml"
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_kong_tiers.py"
+      - "examples/benchmark_kong_tiers.py"
+      - ".github/workflows/ai-kong-tiers.yml"
+permissions:
+  contents: read
+jobs:
+  kong-priority-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Frozen M3.85 policy, Tian Ting fallback, equal-stage scores and two complete game ledgers
+        run: python -m unittest discover -s tests -p 'test_ai_kong_tiers.py' -v
+      - name: Existing shanten prune parity
+        run: python -m unittest discover -s tests -p 'test_ai_kong_prune.py' -v
+      - name: All existing challenge claim and fast pass rules
+        run: |
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+          python -m unittest discover -s tests -p 'test_ai_pass_fastpath.py' -v
+      - name: Compare identical real authorized own-kong observations
+        run: |
+          python examples/benchmark_kong_tiers.py --samples 24 --warmups 4 --json-out /tmp/m386-kong-tier.json > /tmp/m386-kong-tier.log
+          python - <<'PY'
+          import json
+          data=json.load(open("/tmp/m386-kong-tier.json",encoding="utf8"))
+          assert data["protocol"]=="m386_same_observation_kong_priority_tier_v1"
+          assert len(data["rows"])==2
+          for row in data["rows"]:
+              assert row["same_action"] and row["physical_tiles"]==108
+              assert row["m386_outlook_calls"]<=row["m385_outlook_calls"]
+              print(row["scenario"],"old/new outlook",
+                    row["m385_outlook_calls"],row["m386_outlook_calls"],
+                    "median CPU ms",row["m385_median_ms"],row["m386_median_ms"],
+                    "exact stages",row["candidate_shanten"])
+          PY
+      - name: Archive same-observation tier decisions and CPU metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m386-frozen-policy-parity-cpu
+          path: |
+            /tmp/m386-kong-tier.json
+            /tmp/m386-kong-tier.log
+          retention-days: 14
+          if-no-files-found: warn
