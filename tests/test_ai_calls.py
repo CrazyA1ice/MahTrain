@@ -114,7 +114,8 @@ class ChallengeCallTests(unittest.TestCase):
                 return {"shanten":1,"ukeire":8,"value":8,"tian_kept":False}
             val = 12 if melds[-1]["tile"] == "m9" else 8
             return {"shanten":1,"ukeire":val,"value":val,"tian_kept":True}
-        with patch("mahtrain_core.ai._call_outlook", side_effect=fake):
+        with patch("mahtrain_core.ai._cut_shanten", return_value=1), \
+             patch("mahtrain_core.ai._call_outlook", side_effect=fake):
             result = MahjongAgent("challenge", seed=42, seat=seat).kong(view)
             self.assertEqual(result, {"type":"an_gang","tile":"m9"})
         self.assertEqual(view, before)
