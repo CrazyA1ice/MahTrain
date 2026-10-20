@@ -1,0 +1,60 @@
+name: M3.83 exact kong shanten pruning parity and timing
+on:
+  push:
+    branches: [feat/m383-kong-shanten-prefilter]
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_kong_prune.py"
+      - "tests/test_ai_calls.py"
+      - "examples/benchmark_kong_prune.py"
+      - ".github/workflows/ai-kong-shanten-prune.yml"
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_kong_prune.py"
+      - "tests/test_ai_calls.py"
+      - "examples/benchmark_kong_prune.py"
+      - ".github/workflows/ai-kong-shanten-prune.yml"
+permissions:
+  contents: read
+jobs:
+  kong-exact-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Exact losing-stage bounds, two-kong ranking, frozen M3.82 and complete official game parity
+        run: python -m unittest discover -s tests -p 'test_ai_kong_prune.py' -v
+      - name: Existing AI full call-rule regression
+        run: python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: M3.82 fast path regression
+        run: python -m unittest discover -s tests -p 'test_ai_pass_fastpath.py' -v
+      - name: Matched actual kong CPU benchmarks
+        run: |
+          python examples/benchmark_kong_prune.py --samples 24 --warmups 4 --json-out /tmp/m383-kong-parity.json > /tmp/m383-kong-parity.log
+          python - <<'PY'
+          import json
+          result = json.load(open("/tmp/m383-kong-parity.json", encoding="utf8"))
+          assert result["protocol"] == "m383_authorized_kong_same_view_matched_cpu_v1"
+          assert len(result["rows"]) == 2
+          assert all(row["matched_decision"] and row["physical_tiles"] == 108
+                     and row["samples_per_version"] == 24
+                     for row in result["rows"])
+          for row in result["rows"]:
+              print(row["scenario"], "old median ms:", row["legacy_median_ms"],
+                    "pruned median ms:", row["optimized_median_ms"])
+          print("No whole-match speedup or AI strength claim.")
+          PY
+      - name: Archive kong CPU parity output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m383-real-kong-stage-pruning-cpu
+          path: |
+            /tmp/m383-kong-parity.json
+            /tmp/m383-kong-parity.log
+          if-no-files-found: warn
+          retention-days: 14
