@@ -140,7 +140,7 @@ try{
    }
    assert.ok(sorted[0].x>=-1,row.cls+" left meld cropped");
    assert.ok(sorted.at(-1).x+sorted.at(-1).w<=row.fulouWidth+1,
-    row.cls+" right meld cropped");
+    row.cls+" right meld cropped: "+JSON.stringify(row));
    if(kinds.length===4){
     assert.equal(row.nodes.filter(x=>x.overlay===1).length,
      kinds.filter(x=>x==="bu_gang").length,
