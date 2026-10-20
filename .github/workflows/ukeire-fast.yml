@@ -1,0 +1,49 @@
+name: M3.81 exact ukeire performance and game parity
+on:
+  push:
+    branches: [feat/m381-efficient-ukeire-engine, main]
+    paths:
+      - "src/mahtrain_core/efficiency.py"
+      - "tests/test_ukeire_fast.py"
+      - "examples/benchmark_ukeire_fast.py"
+      - ".github/workflows/ukeire-fast.yml"
+  pull_request:
+    paths:
+      - "src/mahtrain_core/efficiency.py"
+      - "tests/test_ukeire_fast.py"
+      - "examples/benchmark_ukeire_fast.py"
+      - ".github/workflows/ukeire-fast.yml"
+permissions:
+  contents: read
+jobs:
+  exact-stage-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify M3.80 reference parity, 0..4 melds, public copies and real game logs
+        run: python -m unittest discover -s tests -p 'test_ukeire_fast.py' -v
+      - name: Verify existing real peng/kong AI scenarios
+        run: python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: Measure equal-result old/new stage latency without strict speed gating
+        run: |
+          python examples/benchmark_ukeire_fast.py --samples 24 --repeats 3 --json-out /tmp/mahtrain-m381-ukeire-performance.json
+          python - <<'PY'
+          import json
+          r=json.load(open('/tmp/mahtrain-m381-ukeire-performance.json',encoding='utf8'))
+          assert r['parity']=='all_equal' and r['positions']==24
+          assert r['cache_size_bound']<=16384
+          assert r['optimized_mean_ms_per_position']>=0
+          print('Exact parity confirmed; speed is a descriptive measurement, not a release gate.')
+          PY
+      - name: Preserve raw timing results for later comparisons
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mahtrain-m381-ukeire-parity-and-latency
+          path: /tmp/mahtrain-m381-ukeire-performance.json
+          if-no-files-found: warn
+          retention-days: 14

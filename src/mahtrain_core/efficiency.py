@@ -140,6 +140,42 @@ def _remaining_counts(
     return ({tile: 4 - physical[tile] for tile in TILES}, 108 - known)
 
 
+@lru_cache(maxsize=16_384)
+def _cached_effective_types_non_tenpai(
+    concealed_counts: tuple[int, ...], exposed_count: int,
+    missing_suit: str, available_mask: int, current: int,
+) -> tuple[str, ...]:
+    """Exact one-draw improvements without rebuilding Python tile hands.
+
+    The mask excludes tiles whose four physical copies are ALL represented
+    by this player's own hand/melds. PUBLIC river tiles deliberately do NOT
+    enter this cache: public availability is applied later, per observation,
+    by _remaining_counts. A bounded cache limits long-lived server memory.
+    """
+    counts = list(concealed_counts)
+    improving: list[str] = []
+    for draw_index, drawn_tile in enumerate(TILES):
+        if not (available_mask & (1 << draw_index)):
+            continue
+        counts[draw_index] += 1
+        for cut_index in range(len(TILES)):
+            # Cutting the newly drawn tile returns the original 13 tiles,
+            # whose shanten is 'current': it cannot be an improvement.
+            if cut_index == draw_index or not counts[cut_index]:
+                continue
+            counts[cut_index] -= 1
+            reduces = (
+                _cached_shanten(tuple(counts), exposed_count, missing_suit)
+                < current
+            )
+            counts[cut_index] += 1
+            if reduces:
+                improving.append(drawn_tile)
+                break
+        counts[draw_index] -= 1
+    return tuple(improving)
+
+
 def _effective_types_13(
     concealed: Sequence[str],
     melds: Sequence[Mapping[str, str]],
@@ -147,26 +183,23 @@ def _effective_types_13(
 ) -> list[str]:
     current = shanten_13(concealed, melds, missing_suit)
     if current == 0:
+        # Tenpai uses the authoritative legal-win enumeration, including
+        # four-copy exclusions, rather than the non-tenpai cache.
         return winning_tiles(concealed, melds, missing_suit)
 
-    own_counts = _validate(concealed, melds, missing_suit)
-    improving: list[str] = []
-    for drawn_tile in TILES:
-        if own_counts[drawn_tile] >= 4:
-            continue
-        fourteen = [*concealed, drawn_tile]
-        candidates = set(fourteen)
-        if min(
-            shanten_13(
-                [t for i, t in enumerate(fourteen) if i != cut_index],
-                melds,
-                missing_suit,
-            )
-            for cut_tile in candidates
-            for cut_index in (fourteen.index(cut_tile),)
-        ) < current:
-            improving.append(drawn_tile)
-    return improving
+    # _validate counts physical concealed + exposed meld tiles (four for
+    # an_gang, three for peng). Never allow a hypothetical fifth tile.
+    physical = _validate(concealed, melds, missing_suit)
+    owned = Counter(concealed)
+    concealed_counts = tuple(owned[tile] for tile in TILES)
+    available_mask = sum(
+        1 << index for index, tile in enumerate(TILES)
+        if physical[tile] < 4
+    )
+    return list(_cached_effective_types_non_tenpai(
+        concealed_counts, len(melds), missing_suit,
+        available_mask, current,
+    ))
 
 
 def effective_draws(

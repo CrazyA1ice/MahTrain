@@ -283,3 +283,8 @@ GitHub Actions 对 Python 3.11/3.13 运行规则、牌效、四类单题、理�
 ### M3.80 · AI 强度独立种子复验与正式账本拆解（不改变线上策略）
 
 M3.79 挑战级 AI 碰杠策略实验已升级为**独立种子验证**：固定先前未使用的 `900–907` 八个洗牌种子，逐种子四座位轮换，真实完成 64 局，按**官方胡牌、杠钱、流局净分分账**核验结果；区分碰杠决策尝试与规则引擎实际生效，补充胡牌、自摸、放铳、抢杠和真实合法碰杠窗口的决策耗时；统计以整个种子簇为独立单位。执行 `python examples/compare_challenge_call_policy.py --seed-start 900 --seeds 8 --json-out call_holdout_900_907.json`，并查看 [M3.80 试验说明](docs/MATCH_AI_CALL_HOLDOUT_VALIDATION_V0.91.md)。样本量仍不足以证明收益稳定提升，**本轮不改变默认挑战级 AI 的线上操作逻辑**。
+
+
+### M3.81 · 牌效计算向量化与有界缓存（策略不变）
+
+将非听牌的「27 种摸牌 × 切牌」精确有效进张枚举改为长度 27 的牌张计数向量与有界缓存，减少重复创建 Python 手牌、计数与规则校验的开销。**不改变**原有 `shanten`、有效进张、胡牌/番值、碰杠规则、挑战级 AI 决策门槛；公开剩余张数每次重新计算。新增 M3.80 旧算法逐状态逐字段精确对照、真实完整对局动作/账本一致性测试和 CI 性能 JSON。运行 `python -m unittest discover -s tests -p "test_ukeire_fast.py" -v`，参考 [M3.81 文档](docs/MATCH_AI_UKEIRE_COUNT_VECTOR_V0.92.md)。
