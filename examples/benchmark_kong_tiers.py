@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path[:0]=[str(ROOT/"src"),str(ROOT/"tests")]
-from mahtrain_core.ai import _challenge_kong, _call_outlook, _cut_shanten, _own_view
+from mahtrain_core.ai import _challenge_kong, _call_outlook, _cut_shanten, _own_view, score_win
 from mahtrain_core.efficiency import shanten_13
 from test_ai_calls import offer_kongs
 from test_ai_kong_prune import offer_seven_pairs_disrupting_kong
@@ -67,9 +67,14 @@ def compare(samples=24,warmups=4):
             # would misleadingly read as zero.
             namespace=("test_ai_kong_tiers" if name=="m385"
                        else "mahtrain_core.ai")
-            with patch(namespace+"._call_outlook",wraps=_call_outlook) as calls:
+            with patch(namespace+"._call_outlook",wraps=_call_outlook) as calls, \
+                 patch("mahtrain_core.ai.score_win",wraps=score_win) as fan_calls:
                 action=policy(view)
-                invocations[name]={"action":action,"outlook_calls":calls.call_count}
+                invocations[name]={
+                    "action":action,
+                    "outlook_calls":calls.call_count,
+                    "score_win_calls":fan_calls.call_count,
+                }
         if invocations["m385"]["action"]!=invocations["m386"]["action"]:
             raise AssertionError("M3.86 changed the legal kong choice")
         for i in range(warmups+samples):
@@ -89,6 +94,8 @@ def compare(samples=24,warmups=4):
             "best_cut_shanten":best_cut,"candidate_shanten":candidate_shanten,
             "m385_outlook_calls":invocations["m385"]["outlook_calls"],
             "m386_outlook_calls":invocations["m386"]["outlook_calls"],
+            "m385_score_win_calls":invocations["m385"]["score_win_calls"],
+            "m386_score_win_calls":invocations["m386"]["score_win_calls"],
             "same_action":True,"physical_tiles":108,
             "m385_median_ms":round(median(latencies["m385"]),6),
             "m386_median_ms":round(median(latencies["m386"]),6),
@@ -100,7 +107,7 @@ def compare(samples=24,warmups=4):
         "warmups":warmups,"rows":rows,
         "caveat":("CPU microbench on selected real staged legal views; "
                   "not all matches, AI win rate, or official net score. "
-                  "M3.86 gain needs mixed exact-stage viable candidates."),
+                  "M3.86 gain needs candidates below the strict 75% ukeire floor."),
     }
 
 
