@@ -8,6 +8,7 @@ on:
       - fix/m374-persist-completed-classic-round
       - fix/m375-classic-river-56-slot-layout
       - feat/m376-classic-claim-and-keyboard-ux
+      - feat/m377-classic-public-tenpai-hints
     paths:
       - "frontend_2d/**"
       - "web_server.py"
@@ -86,6 +87,7 @@ jobs:
           node frontend_2d/test/browser-settlement.mjs
           node frontend_2d/test/browser-fixed-table.mjs
           node frontend_2d/test/browser-action-choice.mjs
+          node frontend_2d/test/browser-hint.mjs
           node frontend_2d/test/browser-river-capacity.mjs
           node frontend_2d/test/browser-finished-refresh.mjs
           python frontend_2d/test/full_round_http.py
@@ -99,13 +101,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 10
       - name: Persist real compiled classic assets in feature branch
-        if: github.event_name == 'push' && github.ref_name == 'feat/m376-classic-claim-and-keyboard-ux'
+        if: github.event_name == 'push' && github.ref_name == 'feat/m377-classic-public-tenpai-hints'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f frontend_2d/dist/
           if ! git diff --cached --quiet; then
-            git commit -m 'build(M3.76): contextual Chinese claim and keyboard focus in Majiang UI'
-            git pull --rebase origin feat/m376-classic-claim-and-keyboard-ux
-            git push origin HEAD:feat/m376-classic-claim-and-keyboard-ux
+            git commit -m 'build(M3.77): read-only public Mahjong shanten references below fixed table'
+            git pull --rebase origin feat/m377-classic-public-tenpai-hints
+            git push origin HEAD:feat/m377-classic-public-tenpai-hints
           fi

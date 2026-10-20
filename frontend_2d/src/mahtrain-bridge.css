@@ -3,7 +3,7 @@
  * new. Tiles, hand, meld, four-seat orientation and table background are
  * drawn by original Majiang styles and @kobalab/majiang-ui.
  */
-body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yahei",sans-serif;margin:0;overflow-x:hidden}
+body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yahei",sans-serif;margin:0;overflow-x:hidden;overflow-y:scroll}
 #classic-toolbar{
  box-sizing:border-box;display:flex;flex-wrap:wrap;align-items:center;gap:12px;
  width:100%;max-width:1120px;margin:8px auto 3px;padding:8px 12px;
@@ -159,3 +159,42 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
 }
 /* Winner detail is below the board; it can grow without affecting the
    table's original size or origin. No floating discard/kong notification. */
+
+/* M3.77: opt-in analysis stays BELOW the stable 800x680 Majiang table.
+   No top-of-table action bar, resize trigger, or hidden-wall estimates. */
+.classic-hint-controls{
+ box-sizing:border-box;max-width:800px;margin:8px auto 4px;
+ display:flex;align-items:center;gap:10px;padding:0 8px;
+ flex-wrap:wrap;font-size:11px;color:#b9cec0;
+}
+.classic-hint-controls button{
+ border:1px solid #819a83;background:#d8e8d6;
+ padding:7px 12px;border-radius:5px;color:#153323;
+ font-size:12px;cursor:pointer;font-weight:650;
+}
+.classic-hint-controls button:disabled{opacity:.55;cursor:default}
+#classic-hint-panel{
+ box-sizing:border-box;max-width:800px;width:calc(100% - 16px);
+ margin:8px auto;padding:14px;
+ background:#e8eee5;color:#1b3527;border-radius:5px;
+ font-size:12px;line-height:1.5;overflow-x:auto;
+}
+#classic-hint-panel[hidden]{display:none}
+#classic-hint-panel h3{margin:0 0 8px;font-size:16px}
+#classic-hint-panel p{margin:7px 0}
+.classic-hint-note{color:#356147}
+.classic-hint-table{border-collapse:collapse;width:100%;min-width:640px}
+.classic-hint-table th,.classic-hint-table td{
+ border:1px solid #bacdba;padding:6px;text-align:left;vertical-align:middle
+}
+.classic-hint-table th{background:#bbd1be}
+.classic-hint-table tbody tr:nth-child(even){background:#dae5d8}
+.classic-hint-table tbody tr.classic-hint-reference{background:#f6ecc5}
+.classic-hint-tile{width:19px;height:27px;object-fit:fill;vertical-align:middle;margin-right:5px}
+.classic-hint-footnote{font-size:11px;color:#5d675b}
+#board>.board .shoupai.main .bingpai .pai.is-hint-cut{
+ outline:2px dashed #f4de85;outline-offset:-2px
+}
+#board>.board .shoupai.main .bingpai .pai.is-picked.is-hint-cut{
+ outline-style:solid
+}

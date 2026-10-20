@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from mahtrain_core import SoloTrainingSession, FourPlayerOpening  # noqa: E402
 from mahtrain_core.ai import MahjongAgent, AI_LEVELS  # noqa: E402
 from mahtrain_core.rules import winning_tiles  # noqa: E402
+from mahtrain_core.classic_hint import classic_hand_hint  # noqa: E402
 from mahtrain_core.ai_tournament import tournament  # noqa: E402
 from mahtrain_core.ai_independent_benchmark import independent_benchmark  # noqa: E402
 from mahtrain_core.training import MODES, generate_question, grade_answer
@@ -595,6 +596,18 @@ def _process(action: str, payload: dict) -> dict:
             _MATCH_OPENING[token]=_match_public_board(game)
             return {"match_token":token,
                     "match":_match_private_view(game,agents)}
+        if action == "match_hint":
+            # Deliberately read-only. Do not advance AI, mutate game/RNG,
+            # archive a result, or expose other seat private hands/wall.
+            token = payload.get("match_token")
+            game = (_MATCH_SESSIONS.get(token)
+                    if type(token) is str else None)
+            agents = (_MATCH_AGENTS.get(token)
+                      if game is not None else None)
+            if game is None or agents is None:
+                raise ValueError("对局会话已失效，请重新开局")
+            view = game.private_view(0)
+            return {"match_token": token, "hint": classic_hand_hint(view)}
         if action == "match_resume":
             # Read-only recovery of a SAME-TAB bearer session. Never accept
             # a seat id, replay private walls, generate a new game, or move AI.
