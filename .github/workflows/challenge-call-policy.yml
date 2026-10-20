@@ -1,0 +1,53 @@
+name: Challenge AI call outlook pilot
+on:
+  push:
+    branches: [feat/m379-challenge-call-outlook]
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_calls.py"
+      - "examples/compare_challenge_call_policy.py"
+      - ".github/workflows/challenge-call-policy.yml"
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "tests/test_ai_calls.py"
+      - "examples/compare_challenge_call_policy.py"
+      - ".github/workflows/challenge-call-policy.yml"
+permissions:
+  contents: read
+jobs:
+  paired-call-choices:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real legal call options, Tian Ting, no double counted river tiles
+        run: python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: Four-seat paired official-score smoke comparison
+        run: |
+          python examples/compare_challenge_call_policy.py --seed-start 810 --seeds 1 --json-out /tmp/mahtrain-call-pilot.json > /tmp/mahtrain-call-pilot.log
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/mahtrain-call-pilot.json',encoding='utf8'))
+          assert p['independent_seed_clusters']==1
+          assert p['total_games']==8
+          assert len(p['cases'])==4
+          assert all(c['proposed_net']-c['legacy_net']==c['paired_delta']
+                     for c in p['cases'])
+          print('Pilot finished: seed cluster=1, total=8 full games')
+          print('Mean seat-paired net score delta:',p['mean_seed_cluster_delta'])
+          print('No strength/significance claims from one seed cluster')
+          PY
+      - name: Archive paired raw-score smoke results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mahtrain-m379-call-paired-pilot
+          path: |
+            /tmp/mahtrain-call-pilot.json
+            /tmp/mahtrain-call-pilot.log
+          if-no-files-found: warn
+          retention-days: 14
