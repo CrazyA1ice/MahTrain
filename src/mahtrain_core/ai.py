@@ -339,25 +339,30 @@ def _challenge_claim(view: Mapping[str, Any]) -> str:
         for _ in range(2):
             remainder.remove(target)
         groups = [*melds, {"type": "peng", "tile": target}]
-        outlooks = []
-        for cut in sorted(set(remainder), key=TILE_INDEX.__getitem__):
-            after = list(remainder)
-            after.remove(cut)
-            # A called pong forces an immediate hand discard. Include that
-            # future PUBLIC cut in the physical known-copy denominator.
-            outlooks.append(_call_outlook(
-                after, groups, missing, [*exposed_public, cut], cap, tian,
-            ))
-        best = min(x["shanten"] for x in outlooks)
+        # Cheap exact shanten first. Only calculate effective draws for
+        # equal-shanten cuts that could change the call decision. In common
+        # non-improving cases this avoids numerous costly lookahead calls.
+        cuts = sorted(set(remainder), key=TILE_INDEX.__getitem__)
+        ranked = [(cut, _cut_shanten(remainder, groups, missing, cut))
+                  for cut in cuts]
+        best = min(n for _, n in ranked)
         if best < before["shanten"]:
             return "peng"
         # For equal-shanten claims, demand a meaningful effective-copy GAIN,
         # and never break an existing tenpai hand for an unpriced ping.
         if best == before["shanten"] and best > 0:
-            largest = max(x["ukeire"] for x in outlooks
-                          if x["shanten"] == best)
-            if largest >= before["ukeire"] + 3:
-                return "peng"
+            for cut, shanten in ranked:
+                if shanten != best:
+                    continue
+                after = list(remainder)
+                after.remove(cut)
+                # A called pong forces an immediate hand discard. Include
+                # that future PUBLIC cut in the known-copy denominator.
+                info = _call_outlook(
+                    after, groups, missing, [*exposed_public, cut], cap, tian,
+                )
+                if info["ukeire"] >= before["ukeire"] + 3:
+                    return "peng"
     return "pass"
 
 
@@ -373,14 +378,21 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
     forced = [tile for tile in allowed if tile[0] == missing]
     if forced:
         allowed = forced
+    # Avoid computing expensive multi-draw effective tiles for cuts that
+    # already lose on exact shanten. Kong is rare, but the visual turn should
+    # never wait for avoidable full-hand enumeration.
+    quick = [(tile, _cut_shanten(hand, melds, missing, tile))
+             for tile in allowed]
+    least = min(n for _, n in quick)
     baselines = []
-    for tile in allowed:
+    for tile, shanten in quick:
+        if shanten != least:
+            continue
         after = list(hand)
         after.remove(tile)
         baselines.append(_call_outlook(
             after, melds, missing, [*public, tile], cap, tian,
         ))
-    least = min(item["shanten"] for item in baselines)
     before = max(
         (x for x in baselines if x["shanten"] == least),
         key=lambda x: (x["value"], x["ukeire"]),
