@@ -343,6 +343,11 @@ def _challenge_claim(view: Mapping[str, Any]) -> str:
         # equal-shanten cuts that could change the call decision. In common
         # non-improving cases this avoids numerous costly lookahead calls.
         cuts = sorted(set(remainder), key=TILE_INDEX.__getitem__)
+        # Mirror the challenge discard policy: clear the declared missing
+        # suit first rather than valuing a forced-to-be-ignored alternative.
+        forced = [tile for tile in cuts if tile[0] == missing]
+        if forced:
+            cuts = forced
         ranked = [(cut, _cut_shanten(remainder, groups, missing, cut))
                   for cut in cuts]
         best = min(n for _, n in ranked)
