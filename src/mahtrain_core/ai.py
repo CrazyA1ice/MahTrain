@@ -428,44 +428,55 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
     if not prepared:
         return None
 
-    # Full reference-value enumeration is needed only for same-stage
-    # candidates. A strictly better-shanten kong is accepted by the
-    # original rule without any ukeire/value comparison.
+    # Exact shanten is the PRIMARY and dominant part of the original
+    # candidate key (-shanten, value, ukeire, ...). Score candidates
+    # one exact-shanten tier at a time, best first. Once a tier has any
+    # admissible kong, later worse-shanten tiers cannot win regardless of
+    # their fan, effective draws, or exposed-kind preference. In particular
+    # the expensive normal-discard reference is unnecessary if an
+    # improved-shanten tier contains a legal, Tian Ting-preserving action.
+    # Do NOT stop after the first action in a tier: value and known-copy
+    # ranking still require evaluating all tied-shanten alternatives.
+    prepared.sort(key=lambda row: row[0])
     before = None
-    if any(stage == least for stage, *_ in prepared):
-        baselines = []
-        for tile, shanten in quick:
-            if shanten != least:
-                continue
-            after = list(hand)
-            after.remove(tile)
-            baselines.append(_call_outlook(
-                after, melds, missing, [*public, tile], cap, tian,
-            ))
-        before = max(
-            (x for x in baselines if x["shanten"] == least),
-            key=lambda x: (x["value"], x["ukeire"]),
-        )
+    for stage in sorted({row[0] for row in prepared}):
+        same_stage = [row for row in prepared if row[0] == stage]
+        if stage == least:
+            # Only equal-shanten candidates are subject to the original
+            # 75% reference-ukeire and fan-value policy. Resolve the full
+            # reference once, lazily, if no better tier was admissible.
+            baselines = []
+            for tile, shanten in quick:
+                if shanten != least:
+                    continue
+                after = list(hand)
+                after.remove(tile)
+                baselines.append(_call_outlook(
+                    after, melds, missing, [*public, tile], cap, tian,
+                ))
+            before = max(
+                (x for x in baselines if x["shanten"] == least),
+                key=lambda x: (x["value"], x["ukeire"]),
+            )
 
-    candidates = []
-    for stage, after, extra, choice in prepared:
-        outlook = _call_outlook(after, extra, missing, public, cap, tian)
-        if tian.get("eligible") and not outlook["tian_kept"]:
-            continue
-        if (before is not None
-                and not _outlook_better_than_baseline(
-                    outlook, before, fraction=0.75)):
-            continue
-        # Same ranking and deterministic tie breaks as M3.79. A strictly
-        # better stage than baseline is always accepted, but every viable
-        # candidate still gets its real fan-weighted value for ordering.
-        tile, kind = choice["tile"], choice["type"]
-        candidates.append((
-            (-outlook["shanten"], outlook["value"], outlook["ukeire"],
-             int(kind == "an_gang"), -TILE_INDEX[tile]),
-            dict(choice),
-        ))
-    return max(candidates, key=lambda entry: entry[0])[1] if candidates else None
+        candidates = []
+        for _, after, extra, choice in same_stage:
+            outlook = _call_outlook(after, extra, missing, public, cap, tian)
+            if tian.get("eligible") and not outlook["tian_kept"]:
+                continue
+            if (stage == least
+                    and not _outlook_better_than_baseline(
+                        outlook, before, fraction=0.75)):
+                continue
+            tile, kind = choice["tile"], choice["type"]
+            candidates.append((
+                (-outlook["shanten"], outlook["value"], outlook["ukeire"],
+                 int(kind == "an_gang"), -TILE_INDEX[tile]),
+                dict(choice),
+            ))
+        if candidates:
+            return max(candidates, key=lambda entry: entry[0])[1]
+    return None
 
 
 class MahjongAgent:
