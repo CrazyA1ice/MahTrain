@@ -1,15 +1,19 @@
-name: Challenge AI call outlook pilot
+name: Challenge AI call holdout validation
 on:
   push:
-    branches: [feat/m379-challenge-call-outlook]
+    branches: [feat/m380-seed-cluster-official-call-evaluation]
     paths:
       - "src/mahtrain_core/ai.py"
+      - "src/mahtrain_core/ai_tournament.py"
+      - "tests/test_ai_call_research.py"
       - "tests/test_ai_calls.py"
       - "examples/compare_challenge_call_policy.py"
       - ".github/workflows/challenge-call-policy.yml"
   pull_request:
     paths:
       - "src/mahtrain_core/ai.py"
+      - "src/mahtrain_core/ai_tournament.py"
+      - "tests/test_ai_call_research.py"
       - "tests/test_ai_calls.py"
       - "examples/compare_challenge_call_policy.py"
       - ".github/workflows/challenge-call-policy.yml"
@@ -26,27 +30,41 @@ jobs:
           python-version: "3.11"
       - name: Real legal call options, Tian Ting, no double counted river tiles
         run: python -m unittest discover -s tests -p 'test_ai_calls.py' -v
-      - name: Four-seat paired official-score smoke comparison
+      - name: Check ledger and cluster-bootstrap unit tests
+        run: python -m unittest discover -s tests -p 'test_ai_call_research.py' -v
+      - name: M3.80 independent holdout eight-seed paired official-score comparison
         run: |
-          python examples/compare_challenge_call_policy.py --seed-start 810 --seeds 4 --json-out /tmp/mahtrain-call-pilot.json > /tmp/mahtrain-call-pilot.log
+          python examples/compare_challenge_call_policy.py --seed-start 900 --seeds 8 --json-out /tmp/mahtrain-call-pilot.json > /tmp/mahtrain-call-pilot.log
           python - <<'PY'
           import json
           p=json.load(open('/tmp/mahtrain-call-pilot.json',encoding='utf8'))
-          assert p['independent_seed_clusters']==4
-          assert p['total_games']==32
-          assert len(p['cases'])==16
+          assert p['protocol']=='four_seat_paired_initial_shuffle_v2_authoritative_ledger'
+          assert p['independent_seed_clusters']==8
+          assert p['total_games']==64
+          assert len(p['cases'])==32
           assert all(c['proposed_net']-c['legacy_net']==c['paired_delta']
                      for c in p['cases'])
-          print('Pilot finished: seed clusters=4, total=32 full games')
-          print('Mean seat-paired net score delta:',p['mean_seed_cluster_delta'])
-          print('Seed-cluster deltas:',[s['mean_four_seat_delta'] for s in p['per_seed']])
-          print('No strength/significance claims from four seed clusters')
+          assert all(c['proposed']['net']==sum(c['proposed'][name]
+                     for name in ('hu_points','kong_points','exhaustive_points'))
+                     for c in p['cases'])
+          assert all(c['legacy']['net']==sum(c['legacy'][name]
+                     for name in ('hu_points','kong_points','exhaustive_points'))
+                     for c in p['cases'])
+          assert all(c['proposed']['resolved_calls']<=c['proposed']['attempted_calls']
+                     and c['legacy']['resolved_calls']<=c['legacy']['attempted_calls']
+                     for c in p['cases'])
+          assert p['cluster_bootstrap_95pct_intervals']['net'] is not None
+          print('Holdout complete: 8 distinct seeds, four rotating seats, 64 full games')
+          print('Mean cluster net delta:', p['mean_seed_cluster_delta'])
+          print('Independent seed deltas:', [s['mean_four_seat_delta'] for s in p['per_seed']])
+          print('95pct cluster bootstrap interval:', p['cluster_bootstrap_95pct_intervals']['net'])
+          print('Hu/kong/exhaustive, win/deal-in, resolved calls and wall-time breakdown in archived JSON')
           PY
       - name: Archive paired raw-score smoke results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mahtrain-m379-call-paired-pilot
+          name: mahtrain-m380-independent-holdout
           path: |
             /tmp/mahtrain-call-pilot.json
             /tmp/mahtrain-call-pilot.log

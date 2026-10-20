@@ -361,6 +361,16 @@ def simulate_match(seed: int, rotation: int = 0,
         # This is an AUTHORITATIVE one-shot rule-A score, not the preview.
         # Keep HU-only results separate for legacy statistics.
         "official_settled_balances":board["settled_balances"],
+        # Separate AUTHORITATIVE ledger components. They are already public
+        # in FourPlayerOpening.public_state(), and let offline policy
+        # experiments attribute the exact delta to Hu, priced kongs or
+        # exhaustive-wall settlements without reverse-engineering events.
+        "official_kong_balances":board["kong_ledger"]["balances"],
+        "official_exhaustive_balances":(
+            board["exhaustive_settlement"]["balances"]
+            if board["exhaustive_settlement"] is not None
+            else [0, 0, 0, 0]
+        ),
         "official_exhaustive_posted":bool(
             board["exhaustive_settlement"] is not None and
             board["exhaustive_settlement"]["posted"]),
