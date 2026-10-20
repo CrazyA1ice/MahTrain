@@ -8,6 +8,7 @@ import {publicActions,recentWins,winTitle} from "./settlement.mjs";
 import {renderSettlement} from "./report.mjs";
 import {seatOutcome} from "./seat-status.mjs";
 import {claimDecision,ownKongChoices} from "./action-choice.mjs";
+import {renderClassicHint} from "./hint-view.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
 const TURN=new Set(["dealer_discard","await_discard"]);
@@ -15,6 +16,7 @@ const DONE=new Set(["finished","wall_exhausted"]);
 const el=id=>document.getElementById(id);
 let token=null,state=null,pai=null,busy=false,timer=null,voice=null;
 let terminalScrollTimeout=null;
+let hintSource=null,hintReport=null,hintBusy=false;
 const selected=new Set();
 function status(t){el("classic-status").textContent=t}
 function initializeVoice(){
@@ -73,6 +75,41 @@ function store(){try{
  if(token&&state)sessionStorage.setItem(SESSION_KEY,token);
  else sessionStorage.removeItem(SESSION_KEY);
 }catch{}}
+function clearHint(){
+ hintSource=null;hintReport=null;
+ renderClassicHint(el("classic-hint-panel"),null);
+ el("classic-hint-trigger").textContent="查看当前牌效参考";
+}
+async function toggleHint(){
+ if(hintBusy||!state)return;
+ if(hintReport&&hintSource===state){clearHint();draw();return}
+ const current=state,currentToken=token;
+ if(!TURN.has(current.phase)||current.turn!==0||current.won?.[0])return;
+ hintBusy=true;
+ el("classic-hint-trigger").disabled=true;
+ el("classic-hint-trigger").textContent="正在计算…";
+ try{
+  const response=await fetch("/api/action",{
+   method:"POST",headers:{"Content-Type":"application/json","X-MahTrain":"1"},
+   body:JSON.stringify({action:"match_hint",match_token:currentToken}),
+  });
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error||"牌效计算失败");
+  if(current!==state||currentToken!==token)return;
+  if(!result.hint||result.match_token!==currentToken)
+   throw Error("牌效返回会话不匹配");
+  hintSource=current;hintReport=result.hint;
+  renderClassicHint(el("classic-hint-panel"),hintReport);
+  el("classic-hint-trigger").textContent="收起牌效参考";
+  draw();
+ }catch(err){
+  if(current===state)status("牌效暂不可用："+err.message);
+ }finally{
+  hintBusy=false;
+  if(!hintReport)el("classic-hint-trigger").textContent="查看当前牌效参考";
+  if(state)draw();
+ }
+}
 function setupImages(){
  const rack=el("loaddata");
  for(const s of ["m","p","s"])for(let n=1;n<=9;n++){
@@ -168,6 +205,8 @@ function draw(){
   img.setAttribute("aria-label",info.value+(info.fromDraw?"摸牌":"手牌"));
   img.classList.toggle("is-picked",selected.has(info.index));
   img.classList.toggle("is-draw",!!info.fromDraw);
+  img.classList.toggle("is-hint-cut",hintSource===state&&
+   !!hintReport?.candidates?.some(x=>x.reference_best&&x.discard===info.value));
  });
  let buttons=[];
  if(state.phase==="exchange_select"){
@@ -214,6 +253,9 @@ function draw(){
   ]);
   status("本局结束");
  }else {center("",[]);status("AI 行动中 · 等待服务器同步")}
+ const available=TURN.has(state.phase)&&state.turn===0&&
+  state.won?.[0]!==true;
+ el("classic-hint-trigger").disabled=!available||hintBusy;
  renderWins();
  renderSettlement(el("classic-result-report"),state);
  resize();
@@ -273,6 +315,9 @@ async function submit(cmd){
   const previous=cmd.action==="match_new"?null:state;
   const result=await api(cmd);
   token=result.match_token;state=result.match;selected.clear();
+  // A change of turn/hand invalidates all reference counts, even if the
+  // same tile values later recur. Do not show stale advice after a move.
+  clearHint();
   if(cmd.action==="match_new"){
    voice?.reset();
    if(terminalScrollTimeout!==null)clearTimeout(terminalScrollTimeout);
@@ -317,6 +362,7 @@ function boot(){
    e.preventDefault();selectHand(t,true);
   }
  });
+ el("classic-hint-trigger").onclick=()=>void toggleHint();
  el("classic-new").onclick=()=>{if(confirm("开始新的牌局？"))
   void submit({action:"match_new"})};
  window.addEventListener("resize",resize);resize();
