@@ -219,7 +219,9 @@ function draw(){
   score.classList.toggle("lunban",playing);
  }
  el("classic-wall-count").textContent=String(state.wall_count??"—");
+ el("classic-round").textContent="第"+String(state.series_round??1)+"局 · 血战到底";
  el("classic-dealer").textContent=String(state.dealer??"—")+"号";
+ el("classic-dealer").title=state.dealer_origin||"首局随机庄";
  const nodes=[...document.querySelectorAll(".shoupai.main .bingpai > img.pai"),
   ...document.querySelectorAll(".shoupai.main .bingpai .zimo img.pai")];
  if(nodes.length!==view.indexed.length){
