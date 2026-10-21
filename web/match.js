@@ -1005,7 +1005,10 @@
       "流局待核验 · 当前显示胡牌和杠钱已入账金额":
       state.exhaustive_settlement?.posted?
         "本局胡牌 + 杠钱 + 流局结算 · 已入账":"本局胡牌 + 杠钱结算 · 已入账";
-    $("match-table-round-phase").textContent=terminal?"摸切已结束":"对局进行中";
+    $("match-table-round-phase").textContent=terminal?
+      ("摸切已结束"+(state.next_dealer?
+       " · 下局 "+state.next_dealer.dealer+"号坐庄（"+
+       state.next_dealer.label+"）":"")):"对局进行中";
     const myPosted=state.settled_balances?.[0]??ledger.balances[0];
     $("match-table-self-summary").textContent=
       "我的已入账积分 "+signedScore(myPosted)+" · "+
