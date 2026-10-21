@@ -152,7 +152,7 @@
   async function action(name,fields={}){
     // An interrupted mutation may ALREADY have run on the server. Until a
     // read-only snapshot resolves that ambiguity, NEVER repeat the action.
-    if(busy||(recoveryRequired&&name!=="match_new"))return;
+    if(busy||(recoveryRequired&&(name!=="match_new"&&name!=="match_next")))return;
     busy=true;
     $("match-request-status").textContent=
       name==="match_continue"?"正在执行下一步 AI 操作…":"已收到操作，正在计算本步…";
@@ -182,14 +182,14 @@
       // Preserve real, sanitized post-action boards EVEN when playback is
       // disabled or focus mode skips animation frames. Never archive a
       // remote private view or reconstruct intermediate wall contents.
-      const reviewSteps=name!=="match_new"&&state&&
+      const reviewSteps=(name!=="match_new"&&name!=="match_next")&&state&&
         Array.isArray(data.match.public_steps)
         ?window.MahTrainPlayback.normalizeHistorySteps(
           data.match.public_steps,state):[];
       // Replay only NEW public events from this response, never seek a wall
       // or a concealed AI draw. The trusted final state is applied once at
       // completion; intermediate historic hand/wall layouts are NOT forged.
-      if(name!=="match_new" && state && playback &&
+      if((name!=="match_new"&&name!=="match_next") && state && playback &&
           Number($("match-playback-speed").value)!==0){
         const before=state.events?.length||0;
         const newEvents=data.match.events||[];
@@ -235,7 +235,7 @@
           }
         }
       }
-      if(name==="match_new"){
+      if((name==="match_new"||name==="match_next")){
         voice?.reset();
         syncVoiceControls();
         if(playback){
@@ -248,7 +248,7 @@
       // Speech starts only AFTER the public tile is actually in the DOM;
       // waiting here would produce invisible spoken discards.
       liveBoard=null;
-      if(name==="match_new"){
+      if((name==="match_new"||name==="match_next")){
         reviewHistory=[];reviewDropped=0;reviewSelected=null;
         $("match-hand").scrollLeft=0;
         $("match-review-seat-filter").value="all";
@@ -262,7 +262,7 @@
       $("match-resume-tools").hidden=true;
       needsContinue=data.match.needs_continue===true;
       pendingDiscard=null;
-      if(name==="match_new"){
+      if((name==="match_new"||name==="match_next")){
         const opening=window.MahTrainPlayback.openingFrame(state);
         if(opening)appendReviewFrames([opening]);
       }else if(reviewSteps.length){
@@ -283,7 +283,7 @@
       $("match-request-status").textContent=Number.isFinite(service)?
         "服务器本步计算 "+service.toFixed(0)+" ms · 牌桌已同步":
         "牌桌已同步";
-      if(name==="match_new")renderScoreBursts([]);
+      if((name==="match_new"||name==="match_next"))renderScoreBursts([]);
       else if(!announcedByPlayback){
         // Disabled/empty replay still exposes ONLY already-booked ledger
         // transfers, never guesses a payment from fan or a private tile.
@@ -293,7 +293,7 @@
           payers:win.payers,amount_per_payer:win.amount_per_payer,
         })));
       }
-      if(name!=="match_new" && !announcedByPlayback && voice){
+      if((name!=="match_new"&&name!=="match_next") && !announcedByPlayback && voice){
         const events=(data.match.events||[]).slice(previousEvents);
         // Audio is optional UI feedback. Never delay an already-computed AI turn
         // until browser speechSynthesis fires onend (or its 1.3s hard stop).
@@ -303,7 +303,7 @@
       }
     }catch(err){
       liveBoard=null;
-      if(name!=="match_new"&&requestToken&&!err.rejected){
+      if((name!=="match_new"&&name!=="match_next")&&requestToken&&!err.rejected){
         recoveryRequired=true;
         const tools=$("match-resume-tools");
         tools.hidden=false;
@@ -337,7 +337,7 @@
       busy=false;
       // A server-approved next AI transition follows the short visual hold;
       // speech never gates rule execution, but HTTP requests remain serialized.
-      if(needsContinue && token && (name==="match_new"||requestToken===token)){
+      if(needsContinue && token && ((name==="match_new"||name==="match_next")||requestToken===token)){
         const expectedToken=token;
         setTimeout(()=>{
           if(!busy&&!recoveryRequired&&token===expectedToken&&state?.needs_continue===true)
@@ -1541,7 +1541,13 @@
       }
       options.seed=number;
     }
-    action("match_new",options);
+    // "再来一局" from a finished battle is part of the SAME four-player
+    // series. The server derives the dealer from real posted Hu results.
+    // The separate entry-page "开局" button still starts a fresh random
+    // series with the selected settings and optional laboratory seed.
+    if(alwaysRandom&&state&&["finished","wall_exhausted"].includes(state.phase)){
+      action("match_next");
+    }else action("match_new",options);
   }
   function init(){
     if(window.MahTrainMatchVoice){
