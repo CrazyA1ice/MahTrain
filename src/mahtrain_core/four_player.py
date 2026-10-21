@@ -28,7 +28,8 @@ _KONG_TYPES = ("ming_gang", "an_gang", "bu_gang")
 class FourPlayerOpening:
     def __init__(self, seed: int, *, room_coefficient: int = 100,
                  fan_cap: int = 3, kong_base: int | None = None,
-                 self_draw_mode: str = "legacy") -> None:
+                 self_draw_mode: str = "legacy",
+                 dealer_override: int | None = None) -> None:
         if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
             raise ValueError("seed must be an integer from 0 to 2^64 - 1")
         self.ledger = WinLedger(room_coefficient, fan_cap, self_draw_mode)
@@ -36,7 +37,15 @@ class FourPlayerOpening:
         rng = random.Random(seed)
         deck = [tile for tile in TILES for _ in range(4)]
         rng.shuffle(deck)
-        self.dealer = rng.randrange(SEAT_COUNT)
+        if dealer_override is not None and (
+                type(dealer_override) is not int
+                or not 0 <= dealer_override < SEAT_COUNT):
+            raise ValueError("dealer_override must be a seat from 0 to 3")
+        random_dealer = rng.randrange(SEAT_COUNT)
+        # Consume the SAME random choices for shuffle/direction. Only the
+        # starting seat is intentionally inherited between completed rounds.
+        self.dealer = (random_dealer if dealer_override is None
+                       else dealer_override)
         self.exchange_direction = rng.choice(tuple(EXCHANGE_OFFSETS))
         self._hands: list[list[str]] = [[], [], [], []]
         offset = 0
