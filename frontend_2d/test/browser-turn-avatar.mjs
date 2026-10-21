@@ -108,6 +108,9 @@ try{
   document.querySelector("#classic-player-3").classList.contains("classic-seat-active") &&
   document.querySelector("#classic-dealer").textContent==="3号");
  assert.equal(sent.at(-1),"match_next");
+ assert.match(await page.locator("#classic-round").textContent(),/第2局/);
+ assert.equal(await page.locator("#classic-dealer").getAttribute("title"),
+              "首位胡牌玩家坐庄");
  const last=await rows();
  assert.equal(last.result[3].active,true);
  assert.equal(last.result[3].dealer,true);
