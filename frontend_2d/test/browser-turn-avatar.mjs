@@ -80,7 +80,8 @@ try{
   assert.equal(snapshot.result[seat].ring,"solid");
   assert.equal(snapshot.result[1].dealer,true);
   assert.match(snapshot.result[seat].role,/当前行动玩家/);
-  for(const row of snapshot.result)assert.equal(row.height,30);
+  for(let i=0;i<4;i++)assert.equal(snapshot.result[i].height,
+    initial.result[i].height,"seat plate must not resize when turn changes");
  }
  current=state(null,"claim_window",1);
  await page.locator("#classic-new").click();
