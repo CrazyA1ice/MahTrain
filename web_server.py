@@ -35,6 +35,7 @@ from mahtrain_core.error_focus import (
 )
 from mahtrain_core.history import HistoryStore  # noqa: E402
 from mahtrain_core.match_archive import MatchArchive  # noqa: E402
+from mahtrain_core.next_dealer import next_dealer  # noqa: E402
 
 # Override MAHTRAIN_HISTORY_DB to relocate the local, single-user SQLite file.
 import os
@@ -52,6 +53,7 @@ _MATCH_AGENTS: dict[str, dict[int, MahjongAgent]] = {}
 _MATCH_HISTORY: dict[str, list[dict]] = {}
 _MATCH_OPENING: dict[str, dict] = {}
 _MATCH_ARCHIVE_IDS: dict[str, str] = {}
+_MATCH_SUCCESSORS: dict[str, str] = {}  # idempotent new round per completed token
 # Never reuse an automatically generated match seed during this server process.
 # Experimental fixed seeds remain opt-in for reproducible rule tests.
 _MATCH_USED_SEEDS: set[int] = set()
@@ -204,6 +206,12 @@ def _match_private_view(game: FourPlayerOpening,
                     view["ready_after_discards"].append({
                         "discard": cut, "waits": waits,
                     })
+    view["series_round"] = getattr(game, "series_round", 1)
+    view["dealer_origin"] = getattr(game, "dealer_origin", "首局随机庄")
+    # Next-dealer derivation is disclosed only after the authoritative
+    # round has finished, so no future action or private inference leaks.
+    if game.phase in ("finished", "wall_exhausted"):
+        view["next_dealer"] = next_dealer(game.public_state())
     view["ai_opponents"] = [
         {"seat": seat, "difficulty": agents[seat].level,
          "description": agents[seat].policy_description()}
@@ -551,32 +559,72 @@ def _process(action: str, payload: dict) -> dict:
                 "privacy":"public_board_and_public_action_only",
                 "notes":"其他家暗手、未来牌墙、私有合法响应选项及逐家向听不公开",
             }}
-        if action == "match_new":
-            # Ordinary matches are generated server-side; explicit numeric
-            # seeds are reserved for the separate lab/reproducibility mode.
+        if action in ("match_new", "match_next"):
+            # "match_new" begins an independent series with RANDOM dealer.
+            # "match_next" requires a terminal authenticated previous match
+            # and ignores all client-supplied dealer/seed/AI settings.
+            predecessor = None
+            inherited = None
+            if action == "match_next":
+                old_token = payload.get("match_token")
+                predecessor = (_MATCH_SESSIONS.get(old_token)
+                               if type(old_token) is str else None)
+                if predecessor is None:
+                    raise ValueError("上一局会话已失效，无法继承庄家")
+                if predecessor.phase not in ("finished", "wall_exhausted"):
+                    raise ValueError("本局尚未结束，不允许提前继承庄家")
+                if any(key in payload for key in (
+                        "dealer", "dealer_override", "seed", "ai_levels",
+                        "room_coefficient", "kong_base", "fan_cap",
+                        "self_draw_mode")):
+                    raise ValueError("续局庄家和规则只能由服务器上一局结算决定")
+                successor = _MATCH_SUCCESSORS.get(old_token)
+                if successor in _MATCH_SESSIONS:
+                    next_game = _MATCH_SESSIONS[successor]
+                    next_agents = _MATCH_AGENTS[successor]
+                    return {"match_token": successor,
+                            "match": _match_private_view(next_game, next_agents)}
+                inherited = next_dealer(predecessor.public_state())
+                levels = [_MATCH_AGENTS[old_token][seat].level
+                          for seat in (1, 2, 3)]
+                room_coefficient = predecessor.ledger.room_coefficient
+                fan_cap = predecessor.ledger.fan_cap
+                kong_base = predecessor.kong_ledger.base
+                self_draw_mode = predecessor.ledger.self_draw_mode
+            # An experimental fixed seed remains available for an
+            # independent match only; every continued round uses a new one.
             manual_seed="seed" in payload
             seed=payload["seed"] if manual_seed else _automatic_match_seed()
             if type(seed) is not int or not 0 <= seed <= 2**32 - 1:
                 raise ValueError("实验室四人对局种子须为0至2^32-1")
-            levels=payload.get("ai_levels",["challenge","challenge","challenge"])
+            if action == "match_new":
+                levels=payload.get("ai_levels",["challenge","challenge","challenge"])
             if (type(levels) is not list or len(levels)!=3 or
                 any(type(level) is not str or level not in AI_LEVELS
                     for level in levels)):
                 raise ValueError("三位AI必须分别选择入门、进阶或挑战难度")
             # Existing API callers without a mode retain legacy scoring.
             # Browser games explicitly select one of two house rules.
-            self_draw_mode=payload.get("self_draw_mode","legacy")
+            if action == "match_new":
+                room_coefficient=payload.get("room_coefficient",100)
+                fan_cap=payload.get("fan_cap",3)
+                kong_base=payload.get("kong_base",room_coefficient)
+                self_draw_mode=payload.get("self_draw_mode","legacy")
             if (type(self_draw_mode) is not str or
-                    ("self_draw_mode" in payload and self_draw_mode not in ("add_base","add_fan"))):
+                    ("self_draw_mode" in payload and self_draw_mode not in
+                     ("legacy", "add_base","add_fan"))):
                 raise ValueError("自摸计分仅支持加底或加番模式")
             game=FourPlayerOpening(
                 seed,
-                room_coefficient=payload.get("room_coefficient",100),
-                fan_cap=payload.get("fan_cap",3),
-                kong_base=payload.get("kong_base",
-                    payload.get("room_coefficient",100)),
+                room_coefficient=room_coefficient,
+                fan_cap=fan_cap,
+                kong_base=kong_base,
                 self_draw_mode=self_draw_mode,
+                dealer_override=(inherited["dealer"] if inherited else None),
             )
+            game.series_round=(getattr(predecessor,"series_round",1)+1
+                               if predecessor else 1)
+            game.dealer_origin=(inherited["label"] if inherited else "首局随机庄")
             agents={
                 seat: MahjongAgent(levels[seat-1],seed=seed,seat=seat)
                 for seat in (1,2,3)
@@ -590,6 +638,12 @@ def _process(action: str, payload: dict) -> dict:
                 _MATCH_HISTORY.pop(stale,None)
                 _MATCH_OPENING.pop(stale,None)
                 _MATCH_ARCHIVE_IDS.pop(stale,None)
+                _MATCH_SUCCESSORS.pop(stale,None)
+                for previous, child in list(_MATCH_SUCCESSORS.items()):
+                    if child == stale:
+                        _MATCH_SUCCESSORS.pop(previous,None)
+            if predecessor is not None:
+                _MATCH_SUCCESSORS[old_token]=token
             _MATCH_SESSIONS[token]=game
             _MATCH_AGENTS[token]=agents
             _MATCH_HISTORY[token]=[]
