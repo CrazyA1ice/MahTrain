@@ -1,0 +1,86 @@
+name: M3.87 official inherited dealer and four-seat turn avatars
+on:
+  push:
+    branches: [feat/m387-dealer-inheritance-turn-avatars]
+  pull_request:
+    paths:
+      - "src/mahtrain_core/four_player.py"
+      - "src/mahtrain_core/next_dealer.py"
+      - "web_server.py"
+      - "tests/test_next_dealer.py"
+      - "frontend_2d/src/**"
+      - "frontend_2d/test/browser-turn-avatar.mjs"
+      - "web/match.js"
+      - "web/match_table_v2.css"
+      - ".github/workflows/dealer-inheritance-avatars.yml"
+permissions:
+  contents: write
+jobs:
+  official-dealer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Next-round multi-Hu and losing-three authoritative regression
+        run: python -m unittest discover -s tests -p 'test_next_dealer.py' -v
+      - name: Four-player legal rules and real match HTTP regression
+        run: |
+          python -m unittest discover -s tests -p 'test_four_player*.py' -v
+          python -m unittest discover -s tests -p 'test_http_disconnect.py' -v
+  avatars-classic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/m387-dealer-inheritance-turn-avatars
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build live classic 2D frontend assets
+        working-directory: frontend_2d
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+          node --test test/*.test.mjs
+      - name: Chromium with four avatar turn markers
+        working-directory: frontend_2d
+        run: npx playwright-core install --with-deps chromium
+      - name: Four-seat active avatar, dealer badge, next-round button and fixed board
+        run: |
+          python web_server.py > /tmp/m387-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/classic/game.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node frontend_2d/test/browser-turn-avatar.mjs
+          node frontend_2d/test/browser-kong-layout.mjs
+          node frontend_2d/test/browser-multi-meld-capacity.mjs
+      - name: Publish rebuilt tracked classic static assets
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f frontend_2d/dist/
+          if git diff --cached --quiet; then
+            echo "Classic dist already current"
+          else
+            git commit -m "build(M3.87): publish active avatars and next dealer prompt"
+            git push origin HEAD:feat/m387-dealer-inheritance-turn-avatars
+          fi
+      - name: Capture Chromium avatar evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m387-four-seat-dealer-avatar-preview
+          path: |
+            /tmp/m387-*.png
+            /tmp/m387-server.log
+          retention-days: 14
+          if-no-files-found: warn
