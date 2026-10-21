@@ -612,7 +612,7 @@ def _process(action: str, payload: dict) -> dict:
                 self_draw_mode=payload.get("self_draw_mode","legacy")
             if (type(self_draw_mode) is not str or
                     ("self_draw_mode" in payload and self_draw_mode not in
-                     ("legacy", "add_base","add_fan"))):
+                     ("add_base","add_fan"))):
                 raise ValueError("自摸计分仅支持加底或加番模式")
             game=FourPlayerOpening(
                 seed,
