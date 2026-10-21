@@ -184,6 +184,18 @@ function draw(){
   const plate=el("classic-player-"+s);
   const outcome=seatOutcome(state,s);
   plate.replaceChildren();
+  const playing=["dealer_discard","await_discard","await_draw"].includes(state.phase)
+      && state.turn===s && !state.won?.[s];
+  plate.classList.toggle("classic-seat-active",playing);
+  plate.classList.toggle("classic-seat-dealer",state.dealer===s);
+  plate.setAttribute("aria-label",
+    (s===0?"你":s+"号AI")+(state.dealer===s?"，本局庄家":"")+
+    (playing?"，当前行动玩家":"")+(outcome.won?"，已胡牌":""));
+  const avatar=document.createElement("span");
+  avatar.className="classic-seat-avatar classic-seat-avatar-"+s;
+  avatar.textContent=s===0?"我":String(s);
+  avatar.setAttribute("aria-hidden","true");
+  plate.append(avatar);
   const playerName=document.createElement("span");
   playerName.className="classic-seat-name";
   playerName.textContent=(s===0?"自己":s+"号AI")+suffix;
@@ -204,10 +216,12 @@ function draw(){
    " · 已胡 "+outcome.center:suffix+" · "+state.hand_counts[s]+"张");
   score.title=outcome.won?outcome.detail:"";
   score.classList.toggle("classic-score-won",outcome.won);
-  score.classList.toggle("lunban",state.turn===s);
+  score.classList.toggle("lunban",playing);
  }
  el("classic-wall-count").textContent=String(state.wall_count??"—");
+ el("classic-round").textContent="第"+String(state.series_round??1)+"局 · 血战到底";
  el("classic-dealer").textContent=String(state.dealer??"—")+"号";
+ el("classic-dealer").title=state.dealer_origin||"首局随机庄";
  const nodes=[...document.querySelectorAll(".shoupai.main .bingpai > img.pai"),
   ...document.querySelectorAll(".shoupai.main .bingpai .zimo img.pai")];
  if(nodes.length!==view.indexed.length){
@@ -259,13 +273,15 @@ function draw(){
   center(buttons.length?"可自摸或杠，也可直接出牌":"",buttons);
   status("点击手牌选中、再点同一张打出；按 Esc 可取消选牌");
  }else if(DONE.has(state.phase)){
-  center("本局结束",[
+  const next=state.next_dealer;
+  const dealerNote=next?" · 下局庄家 "+next.dealer+"号（"+next.label+"）":"";
+  center("本局结束"+dealerNote,[
    btn("查看结算",()=>el("classic-result-report").scrollIntoView({
     behavior:"smooth",block:"start",
    }),true),
-   btn("再来一局",()=>void submit({action:"match_new"}),false,busy),
+   btn("下一局 · 继承庄家",()=>void submit({action:"match_next"}),false,busy),
   ]);
-  status("本局结束");
+  status("本局结束"+dealerNote);
  }else {center("",[]);status("AI 行动中 · 等待服务器同步")}
  const available=TURN.has(state.phase)&&state.turn===0&&
   state.won?.[0]!==true;
@@ -326,13 +342,14 @@ async function submit(cmd){
  if(busy)return;
  busy=true;if(timer!==null)clearTimeout(timer);
  try{
-  const previous=cmd.action==="match_new"?null:state;
+  const newRound=["match_new","match_next"].includes(cmd.action);
+  const previous=newRound?null:state;
   const result=await api(cmd);
   token=result.match_token;state=result.match;selected.clear();
   // A change of turn/hand invalidates all reference counts, even if the
   // same tile values later recur. Do not show stale advice after a move.
   clearHint();
-  if(cmd.action==="match_new"){
+  if(newRound){
    voice?.reset();
    if(terminalScrollTimeout!==null)clearTimeout(terminalScrollTimeout);
   }

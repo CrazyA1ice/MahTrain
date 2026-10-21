@@ -48,12 +48,21 @@
   background:transparent;border:0;border-radius:0;box-shadow:none;
 }
 #match-board .match-seat.is-won{opacity:.76;background:transparent}
+/* M3.87: current DRAW/DISCARD turn is unambiguous at every edge;
+   the highlight is within each original fixed seat box, no page reflow. */
 #match-board .match-seat.is-active{
-  border:0;background:transparent;box-shadow:none;
+  outline:2px solid #ffdc83;
+  background:linear-gradient(130deg,#285944,#183d35);
+  box-shadow:0 0 0 2px #e7c47766,0 0 16px 4px #ffd37c66;
 }
 #match-board .match-seat.is-active .match-seat-avatar,
 #match-board .match-seat.is-active .match-seat-avatar--self{
-  box-shadow:0 0 0 2px #f4cf79,0 0 12px #efbe6b70;
+  border-radius:50%;border-color:#ffe2a3;
+  box-shadow:0 0 0 3px #ffde897a,0 0 12px 5px #f5c654a8;
+  background:#936c2d;
+}
+#match-board .match-seat.is-active .match-seat-name::after{
+  content:" · 行动中";font-size:10px;color:#ffdc82;font-weight:800;
 }
 #match-board .match-seat-avatar{
   display:inline-flex;align-items:center;justify-content:center;

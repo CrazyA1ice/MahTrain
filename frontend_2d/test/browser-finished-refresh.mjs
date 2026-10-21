@@ -53,7 +53,7 @@ await page.addInitScript((storageKey)=>{
 await page.route("**/api/action",async route=>{
  const input=route.request().postDataJSON();
  requests.push({action:input.action,token:input.match_token});
- const renew=input.action==="match_new";
+ const renew=input.action==="match_next"||input.action==="match_new";
  const isFresh=renew||input.match_token==="fresh-token";
  await route.fulfill({
   status:200,contentType:"application/json",
@@ -98,7 +98,7 @@ try{
  assert.ok(requests.every(x=>x.token==="completed-token"),
   "no phantom match_new during finished-game reload");
 
- await page.getByRole("button",{name:"再来一局"}).click();
+ await page.getByRole("button",{name:"下一局 · 继承庄家"}).click();
  await page.waitForFunction(key=>{
   return sessionStorage.getItem(key)==="fresh-token" &&
    document.getElementById("classic-result-report").hidden;
@@ -107,8 +107,8 @@ try{
   "new game must clear the old winner badges");
  assert.deepEqual(await geometry(),initial,
   "new game must reuse the same stable physical Mahjong table");
- assert.equal(requests.at(-1).action,"match_new",
-  "only explicit new-round action starts another game");
+ assert.equal(requests.at(-1).action,"match_next",
+  "terminal continuation must ask server to inherit official dealer");
 
  await page.reload({waitUntil:"load"});
  await page.waitForFunction(()=>
