@@ -1,0 +1,71 @@
+name: M4.00 public pre bu-gang sealed rob Hu pilot
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_public_bugang_rob_pilot.py"
+      - "tests/test_m400_public_bugang_rob.py"
+      - "examples/evaluate_public_bugang_rob_pilot.py"
+      - ".github/workflows/m400-public-bugang-rob.yml"
+permissions:
+  contents: read
+jobs:
+  public-bugang:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Public-only features and sealed true-Hu labels with privacy regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m400_public_bugang_rob.py' -v
+          python -m unittest discover -s tests -p 'test_m399_bugang_repeat_risk.py' -v
+          python -m unittest discover -s tests -p 'test_four_player_claims.py' -v
+      - name: New fixed independent 8 plus 8 seeds and four-seat complete official games
+        run: |
+          python examples/evaluate_public_bugang_rob_pilot.py --development 24000 --holdout 25000 --seeds 8 --output /tmp/m400-public-rob.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/m400-public-rob.json",encoding="utf8"))
+          assert d["protocol"]=="m400_public_bugang_potential_rob_seed_split_v1"
+          assert d["live_policy_modified"] is False
+          assert d["feature_source"]=="public_state_only"
+          assert d["label_source"]=="retrospective_trusted_hidden_legality_only"
+          for cohort,start in (("development",24000),("holdout",25000)):
+              group=d[cohort]
+              assert group["independent_seeds"]==8
+              assert group["four_seat_positions"]==32
+              assert {x["seed"] for x in group["per_seed"]}==set(range(start,start+8))
+              total=group["counts"]
+              assert total.get("windows",0)==total.get("first_distinct",0)+total.get("repeated",0)
+              assert total.get("attempted",0)==total.get("successful",0)+total.get("robbed",0)
+              assert group["estimated_rob_probability"] is None
+              assert sum(x["candidate_n"] for x in group["by_public_band"].values())==total.get("first_distinct",0)
+              for entry in group["positions"]:
+                  assert entry["offered_windows"]==len(entry["first_distinct_candidates"])+entry["repeated_windows"]
+                  ledger=entry["official_score"]
+                  assert ledger["official_net"]==sum(ledger[x] for x in (
+                      "win_points","kong_points","exhaustive_points"))
+                  for first in entry["first_distinct_candidates"]:
+                      assert first["rob_possible"]==int(first["potential_robbers"]>0)
+                      assert first["potential_robbers"]<=first["features"]["dingque_eligible_opponents"]
+                      if first["features"]["band"]=="dingque_excluded":
+                          assert first["rob_possible"]==0
+              print("M4.00 VERIFIED",cohort,json.dumps({
+                  "counts":group["counts"],
+                  "by_public_band":group["by_public_band"],
+                  "validation":group["predictive_validation_status"],
+                  "per_seed":group["per_seed"],
+              },ensure_ascii=False))
+          blob=json.dumps(d,ensure_ascii=False)
+          for forbidden in ("future_wall","opponent_hands","offer_signature","_sealed_potential_robbers","_hands"):
+              assert forbidden not in blob,forbidden
+          PY
+      - name: Save audit-only public features and anonymized sealed labels
+        uses: actions/upload-artifact@v4
+        with:
+          name: m400-public-bugang-hidden-label-validation
+          path: /tmp/m400-public-rob.json
+          if-no-files-found: error
+          retention-days: 30
