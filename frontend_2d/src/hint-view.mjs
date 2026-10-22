@@ -85,3 +85,42 @@ export function renderClassicHint(root,report){
   "它不是实际期望积分、真实胜率或牌墙剩余张数。"+
   "浅金底色仅表示此局部规则下的候选优先级；行动后需重新查看。"));
 }
+
+/* Operation opportunity guidance is advisory and NEVER chooses for the player.
+ * A verified Hu is an immediate authorized win; pong/kong scores are
+ * one-step public-copy references, not actual end-of-match EV.
+ */
+export function renderClassicOperationHint(root,report){
+ root.replaceChildren();
+ if(!report||report.status!=="choose_operation"){root.hidden=true;return;}
+ root.hidden=false;
+ root.append(element("h3","","碰、杠、胡行动参考 · 当前局面"));
+ const recommend=report.candidates?.find(x=>x.reference_best);
+ if(recommend){
+  root.append(element("p","classic-hint-note",
+   "当前建议："+recommend.label+"。"+recommend.reason));
+ }
+ const table=element("table","classic-hint-table");
+ const head=element("thead"),tr=element("tr");
+ for(const heading of ["可选操作","向听","有效张上界","番值加权代理值","参考原因"]){
+  tr.append(element("th","",heading));
+ }
+ head.append(tr);table.append(head);
+ const body=element("tbody");
+ for(const candidate of report.candidates||[]){
+  const row=element("tr",candidate.reference_best?"classic-hint-reference":"");
+  row.append(element("td","",candidate.label));
+  row.append(element("td","",candidate.shanten===null?"即时胡牌":
+   candidate.shanten===0?"听牌":candidate.shanten+"向听"));
+  row.append(element("td","",candidate.effective_copies===null?"—":
+   "≤ "+candidate.effective_copies+" 张"));
+  row.append(element("td","",candidate.fan_weighted===null?"—":
+   String(candidate.fan_weighted)));
+  row.append(element("td","",candidate.reason));
+  body.append(row);
+ }
+ table.append(body);root.append(table);
+ root.append(element("p","classic-hint-footnote",report.limitations+
+  " 金色标注代表当前挑战级公开信息启发式参考；可自行选择其他合法行动，"
+  +"实际行动由服务器规则确认。本表不会读取其他玩家暗手。"));
+}
