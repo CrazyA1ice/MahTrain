@@ -78,6 +78,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Multiple history/review commits can reach this feature branch
+          # while Chromium checks run. Rebuild from freshest remote HEAD.
+          git fetch origin feat/m388-history-review-periods-scoreboard-fit
+          git reset --hard origin/feat/m388-history-review-periods-scoreboard-fit
+          (cd frontend_2d && npm run build)
           git add -A -f frontend_2d/dist/
           if git diff --cached --quiet; then
             echo "Build identical to tracked dist."
