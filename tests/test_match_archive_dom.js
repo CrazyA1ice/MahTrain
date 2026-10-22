@@ -225,11 +225,14 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   const terminalHands=[
     ["m1","m2","p4","m9"],["p4","p5"],["s1","s2"],["m7","m8"]
   ];
+  const afterCutHands=[
+    ["m2","p4","m9"],["p4","p5"],["s1","s2"],["m7","m8"]
+  ];
   result.report.terminal_review={
     opening:terminalHands,
     scope:"terminal_replay_only",
     steps:[
-      {hands_after:terminalHands,cut_review:{
+      {hands_before:terminalHands,hands_after:afterCutHands,cut_review:{
         discard:"m1",rank:1,optimal:true,
         top3:[
           {tile:"m1",shanten:1,effective_copies:8,
@@ -260,6 +263,28 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.match(reviewText,/切m2/);
   assert.match(reviewText,/切p4/);
   assert.match(reviewText,/有效张上界/);
+  // M3.91: a cut must show cards on which the adviser actually scored,
+  // not the three-card post-discard remainder. The public board is always
+  // labelled as post-action to avoid implying an omniscient pre-action view.
+  const reviewRoot=dom["match-archives-board"];
+  const getSwitch=()=>reviewRoot.children.find(x=>x.className==="match-archive-hand-switch");
+  const getSeat0=()=>reviewRoot.children.find(x=>x.className==="match-archive-four-seats").children[0];
+  assert.ok(getSwitch(),"complete terminal snapshot offers pre/post hand comparison");
+  assert.equal(getSwitch().children[0].attributes["aria-pressed"],"true");
+  assert.match(collect(reviewRoot),/出牌前手牌和当时可见公开信息/);
+  assert.match(getSeat0().children[0].textContent,/暗手4张（动作前）/);
+  const getTiles=()=>getSeat0().children.find(x=>
+    x.className==="match-archive-back-count").children;
+  assert.ok(getTiles().some(x=>
+    x.textContent==="1万"&&x.classes.has("match-archive-actual-cut")),
+    "the actual selected tile type is marked in the pre-discard hand");
+  getSwitch().children[1].handlers.click();
+  assert.equal(getSwitch().children[1].attributes["aria-pressed"],"true");
+  assert.match(getSeat0().children[0].textContent,/暗手3张（动作后）/);
+  assert.doesNotMatch(collect(getSeat0()),/1万/);
+  assert.match(collect(reviewRoot),/牌河、副露、已胡标记及牌山数量始终来自动作后/);
+  getSwitch().children[0].handlers.click();
+  assert.equal(getSwitch().children[0].attributes["aria-pressed"],"true");
   const decisionTimeline=dom["match-archives-cut-timeline"];
   assert.equal(decisionTimeline.children.length,3);
   assert.match(collect(decisionTimeline),/逐巡切牌对照/);
@@ -273,6 +298,8 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-archives-action"].value,"all");
   assert.match(collect(dom["match-archives-board"]),/第2步/);
   assert.match(collect(dom["match-archives-board"]),/切m2/);
+  assert.equal(getSwitch().children[0].attributes["aria-pressed"],"true",
+    "clicking the cut timeline resets hand perspective to the pre-cut default");
   assert.equal(dom["match-archives-stage-summary"].children.length,5,
     "phase name, 3 stage cards and an honest limitations note");
   // A newer completed archive records the ACTUAL choice even when ranked
@@ -309,6 +336,15 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   await settle();
   assert.match(collect(dom["match-archives-cut-timeline"]),/无法计算差距/);
   assert.match(collect(dom["match-archives-stage-summary"]),/历史指标缺失 1 巡/);
+  // Older terminal fixtures can have an after snapshot but not a before
+  // snapshot. Never present the after hand as if it were the scoring input.
+  delete result.report.terminal_review.steps[0].hands_before;
+  rows[0].children[2].handlers.click();
+  await settle();
+  dom["match-archives-actions"].children[1].handlers.click();
+  assert.equal(getSwitch(),undefined);
+  assert.match(collect(reviewRoot),/本档案只有动作后手牌/);
+  assert.match(collect(reviewRoot),/暗手3张（动作后）/);
 
   // M3.88: one period control governs server-side leaderboard, chart,
   // history list and the grouping totals. Never substitute stale all-time
