@@ -126,7 +126,12 @@ def _take_action(game: FourPlayerOpening, agents: dict[int, Any],
             "effective_copies":row["effective_tile_count"],
             "locally_optimal":bool(row["local_optimal"]),
         }
-        if level in ("challenge", "challenge_no_pressure"):
+        if (level in ("challenge", "challenge_no_pressure") and not
+                getattr(agent, "_offline_reference_cut", False)):
+            # Offline reference-cut controls deliberately do NOT make a
+            # challenge-policy choice. Its pressure tiebreak probe checks
+            # equality to the live challenge decision, so it is inapplicable.
+            # The real challenge agent and live game remain unchanged.
             # Private, aggregate-only instrumentation. The unplayed shadow
             # tile never enters the trace, public replay or network result.
             event["pressure_probe"]=diagnose_pressure_tiebreak(
