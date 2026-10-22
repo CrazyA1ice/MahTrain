@@ -143,6 +143,13 @@ class FirstOpportunityAgent(MahjongAgent):
         return chosen
 
     def response(self, view: Mapping[str, Any], *, rob: bool = False) -> str:
+        # Validate at the authorization boundary BEFORE asking the strategy
+        # to score an unexpected (possibly structurally invalid) hand.
+        if (not rob and self.target == "claim" and self.offer is None
+                and self.expected_signature is not None
+                and _decision_space("claim", view)
+                and _signature(view) != self.expected_signature):
+            raise RuntimeError("counterfactual did not reach the SAME decision")
         baseline = super().response(view, rob=rob)
         # Hu and robbing Hu MUST remain untouched, including multi-winner Hu.
         if rob or "hu" in (view.get("claim_options") or []):
@@ -150,6 +157,11 @@ class FirstOpportunityAgent(MahjongAgent):
         return self._resolve("claim", view, baseline)
 
     def kong(self, view: Mapping[str, Any]) -> dict[str, str] | None:
+        if (self.target == "own_kong" and self.offer is None
+                and self.expected_signature is not None
+                and _decision_space("own_kong", view)
+                and _signature(view) != self.expected_signature):
+            raise RuntimeError("counterfactual did not reach the SAME decision")
         baseline = super().kong(view)
         return self._resolve("own_kong", view, baseline)
 
