@@ -380,6 +380,57 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
     "older delayed archive reply must not revert freshly loaded stats");
   assert.ok(dom["match-scorecard-status"].textContent.includes("已核验 3 局"));
   overrideList=null;
+  // M3.92: a genuinely separate AI-seat cut is scored independently.
+  // Pre-M3.92 human-only step remains seat zero by default.
+  const aic={seat:1,discard:"p4",rank:2,optimal:false,
+    top3:[
+      {tile:"p5",shanten:1,effective_copies:12,
+        fan_weighted:null,reference_best:true},
+      {tile:"p4",shanten:1,effective_copies:6,
+        fan_weighted:null,reference_best:false}
+    ],
+    played_candidate:{tile:"p4",shanten:1,
+      effective_copies:6,fan_weighted:null,reference_best:false},
+  };
+  result.report.terminal_review.steps[1]={
+    hands_before:terminalHands,hands_after:terminalHands,
+    cut_review:aic,
+  };
+  rows=dom["match-archives-list"].children;
+  rows[0].children[2].handlers.click();
+  await settle();
+  const summary=dom["match-archives-review-summary"];
+  const seatButtons=()=>summary.children.find(x=>
+    x.className==="match-archive-seat-compare").children;
+  assert.equal(seatButtons().length,4);
+  assert.match(seatButtons()[0].textContent,/100\.0%/);
+  assert.match(seatButtons()[1].textContent,/0\.0%/);
+  assert.match(seatButtons()[2].textContent,/无有效切牌评分/);
+  assert.equal(seatButtons()[0].attributes["aria-pressed"],"true");
+  seatButtons()[1].handlers.click();
+  assert.equal(seatButtons()[1].attributes["aria-pressed"],"true");
+  assert.match(collect(summary),/1号AI切牌参考符合率：0\.0%/);
+  assert.match(collect(dom["match-archives-cut-timeline"]),/1号AI逐巡切牌对照/);
+  assert.doesNotMatch(collect(dom["match-archives-cut-timeline"]),/前三：m1/);
+  const aiJump=dom["match-archives-cut-timeline"].children[2].children[0];
+  aiJump.handlers.click();
+  assert.match(collect(reviewRoot),/本巡1号AI切 p4/);
+  assert.match(collect(reviewRoot),/1号出牌前手牌/);
+  const aiSeat1=()=>reviewRoot.children.find(x=>
+    x.className==="match-archive-four-seats").children[1];
+  assert.ok(aiSeat1().children.find(x=>
+    x.className==="match-archive-back-count").children.some(x=>
+      x.textContent==="4筒"&&x.classes.has("match-archive-actual-cut")));
+  seatButtons()[2].handlers.click();
+  assert.match(collect(summary),/2号AI切牌参考符合率：不可计算/);
+  assert.match(collect(dom["match-archives-cut-timeline"]),/2号AI没有已保存/);
+  seatButtons()[0].handlers.click();
+  assert.match(collect(dom["match-archives-cut-timeline"]),/我的逐巡切牌对照/);
+  // A newly opened archive resets any seat selector to seat zero.
+  rows[0].children[2].handlers.click();
+  await settle();
+  assert.equal(seatButtons()[0].attributes["aria-pressed"],"true");
+  console.log("M3.92 four-seat review stats, AI timeline, legal snapshot highlight: PASS");
   console.log("M3.47 stale history chart response is ignored: PASS");
   console.log("M3.28 audited four-seat official scoreboard and recent net trend DOM: PASS");
   console.log("M3.22 SQLite archive browser, two-game comparison, reopen and privacy: PASS");
