@@ -370,7 +370,7 @@
       heading.replaceChildren();
       heading.append(el("strong","","整局最优切符合率："+(reviewed?
         (optimal/reviewed*100).toFixed(1)+"%（"+optimal+"/"+reviewed+"巡）":
-        "不可计算"));
+        "不可计算")));
       heading.append(el("p","",reviewed?
         "按每次出牌前己方手牌与当时公开信息，用向听数优先、有效进张与听牌番值加权排序；并列第一也视为符合。此项不是完全信息下的保证最优策略。":
         "本局缺少可验证的逐巡切牌数据，不能根据最终胜负推测最优切符合率。"));
