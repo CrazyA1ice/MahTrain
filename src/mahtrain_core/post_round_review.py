@@ -61,7 +61,8 @@ def _rank(one):
                                 if r["discard"]==played),None),
             "optimal_ties":good}
 
-def completed_review(rows: list[dict], *, maximum=2048):
+def completed_review(rows: list[dict], *, maximum=2048,
+                     opening_hands=None):
     """Validate private review data before a completed archive exposes it."""
     if type(rows) is not list or len(rows)>maximum:
         raise ValueError("invalid completed replay frame count")
@@ -90,7 +91,16 @@ def completed_review(rows: list[dict], *, maximum=2048):
         if seat==0 and assessed["optimal"] is not None:
             evaluated+=1
             compliant+=int(assessed["optimal"])
+    opening=None
+    if opening_hands is not None:
+        if (type(opening_hands) is not list or len(opening_hands)!=4
+                or any(type(h) is not list or len(h)>14 or
+                       any(type(t) is not str or t not in TILE_INDEX for t in h)
+                       for h in opening_hands)):
+            raise ValueError("invalid completed opening four-seat hands")
+        opening=[list(h) for h in opening_hands]
     return {"availability":"complete_post_round",
+            "opening_hands":opening,
             "frames":all_frames,"decisions":decisions,
             "player0":{"compared":evaluated,"optimal":compliant,
                        "rate":round(100*compliant/evaluated,2)
