@@ -155,7 +155,7 @@ class M398UnselectedActionStudyTests(unittest.TestCase):
     def test_all_four_cohorts_nonoverlap_even_if_running_just_one_mode(self):
         for kwargs in (
             {"coverage_development":16000,"coverage_holdout":16006},
-            {"coverage_development":17000,"coverage_holdout":16000},
+            {"coverage_development":17000,"coverage_holdout":17000},
             {"paired_development":17000},
             {"coverage_seeds":True},{"coverage_seeds":0},
             {"coverage_seeds":33},{"paired_seeds":17},
