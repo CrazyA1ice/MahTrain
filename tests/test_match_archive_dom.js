@@ -273,7 +273,9 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(getSwitch().children[0].attributes["aria-pressed"],"true");
   assert.match(collect(reviewRoot),/出牌前手牌和当时可见公开信息/);
   assert.match(getSeat0().children[0].textContent,/暗手4张（动作前）/);
-  assert.ok(getSeat0().children[1].children.some(x=>
+  const getTiles=()=>getSeat0().children.find(x=>
+    x.className==="match-archive-back-count").children;
+  assert.ok(getTiles().some(x=>
     x.textContent==="1万"&&x.classes.has("match-archive-actual-cut")),
     "the actual selected tile type is marked in the pre-discard hand");
   getSwitch().children[1].handlers.click();
