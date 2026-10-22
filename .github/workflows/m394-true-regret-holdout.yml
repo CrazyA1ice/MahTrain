@@ -1,0 +1,56 @@
+name: M3.94 true-regret paired holdout
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_challenge_regret_holdout.py"
+      - "tests/test_m394_true_regret_holdout.py"
+      - "examples/compare_challenge_regret_holdout.py"
+      - "src/mahtrain_core/ai_challenge_reference_paired.py"
+      - "src/mahtrain_core/classic_hint.py"
+      - ".github/workflows/m394-true-regret-holdout.yml"
+permissions:
+  contents: read
+jobs:
+  genuine-regret:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prove equal-best cuts untouched, classify regret, real match and seed isolation
+        run: python -m unittest discover -s tests -p 'test_m394_true_regret_holdout.py' -v
+      - name: M3.93 and M3.92 unchanged scoring and access
+        run: |
+          python -m unittest discover -s tests -p 'test_m393_challenge_reference_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m392_four_seat_cut.py' -v
+      - name: Disjoint predeclared independent seed cohorts across four seats
+        run: |
+          python examples/compare_challenge_regret_holdout.py --development 8420 --holdout 9400 --seeds 3 --rotations 4 --output /tmp/mahtrain-m394-result.json
+          python - <<'PY'
+          import json
+          a=json.load(open("/tmp/mahtrain-m394-result.json",encoding="utf-8"))
+          assert a["protocol"]=="m394_true_reference_regret_independent_holdout_v1"
+          assert a["holdout_predeclared"] and not a["live_ai_modified"]
+          for name in ("development","holdout"):
+              g=a[name]
+              assert g["independent_seeds"]==3
+              assert g["paired_games"]==12
+              assert len(g["per_seed"])==3
+              assert all(row["rotations"]==4 for row in ({"rotations":len(v["rotation_deltas"])} for v in g["per_seed"]))
+              print("M3.94 GROUP",name,json.dumps({
+                  "mean_net_delta":g["mean_delta_net"],
+                  "positive_seed_clusters":g["positive_seed_clusters"],
+                  "negative_seed_clusters":g["negative_seed_clusters"],
+                  "tied_seed_clusters":g["tied_seed_clusters"],
+                  "win_event_delta":g["win_event_delta"],
+                  "deal_in_event_delta":g["deal_in_event_delta"],
+                  "decision_counts":g["decision_counts"],
+                  "seed_rows":g["per_seed"],
+                  "exploratory_interval":g["cluster_interval_exploratory"],
+              },ensure_ascii=False))
+          dev={x["seed"] for x in a["development"]["per_seed"]}
+          out={x["seed"] for x in a["holdout"]["per_seed"]}
+          assert not dev.intersection(out)
+          PY
