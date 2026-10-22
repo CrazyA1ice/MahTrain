@@ -116,7 +116,8 @@ const fetch=async url=>{
   };
   return {ok:true,json:async()=>data};
 };
-const win={MahTrainPlayback:require("../web/match_playback.js"),
+const win={MahTrainCutQuality:require("../web/match_cut_quality.js"),
+  MahTrainPlayback:require("../web/match_playback.js"),
   MahTrainMatchStats:require("../web/match_stats.js")};
 const context={document:{
   getElementById:id=>{
