@@ -1078,8 +1078,10 @@ class Handler(BaseHTTPRequestHandler):
                         limit = int(query.get("limit", ["50"])[0])
                         offset = int(query.get("offset", ["0"])[0])
                         period = query.get("period", ["all"])[0]
-                        result = _MATCH_ARCHIVE.list_completed(
-                            limit, period=period, offset=offset)
+                        result = (_MATCH_ARCHIVE.list_completed(limit)
+                                  if period=="all" and offset==0 else
+                                  _MATCH_ARCHIVE.list_completed(
+                                      limit, period=period, offset=offset))
             except (ValueError, TypeError) as exc:
                 self._json(400, {"error": str(exc)})
             else:
