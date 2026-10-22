@@ -1,0 +1,36 @@
+name: M3.92 four-seat terminal cut review
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/classic_hint.py"
+      - "src/mahtrain_core/match_archive.py"
+      - "web_server.py"
+      - "web/match_archives.js"
+      - "tests/test_m392_four_seat_cut.py"
+      - "tests/test_match_archive_dom.js"
+      - ".github/workflows/m392-four-seat-cut.yml"
+permissions:
+  contents: read
+jobs:
+  four-seat-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Four-seat terminal review and per-seat permissions
+        run: python -m unittest discover -s tests -p 'test_m392_four_seat_cut.py' -v
+      - name: Existing human cut and legacy snapshot compatibility
+        run: |
+          python -m unittest discover -s tests -p 'test_m390_cut_quality.py' -v
+          python -m unittest discover -s tests -p 'test_m388_match_review.py' -v
+          python -m unittest discover -s tests -p 'test_classic_hint.py' -v
+      - name: Per-seat archive UI and stage interpretation
+        run: |
+          node --test tests/test_match_archive_dom.js
+          node --test tests/test_match_cut_quality.js
