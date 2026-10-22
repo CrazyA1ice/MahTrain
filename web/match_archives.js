@@ -264,6 +264,37 @@
       root.append(el("p","review-footnote",
         "旧档案只记录公开牌和牌背：当时各家暗手未保存，无法真实还原或计算逐巡最优切符合率。"));
     }
+    const actionReviews=(terminal?.operation_reviews||[])
+      .filter(x=>x.sequence===frame.sequence);
+    for(const operation of actionReviews){
+      const label=(kind,tile)=>({
+        pass:"过 / 暂不杠",hu:"胡",peng:"碰",ming_gang:"明杠",
+        an_gang:"暗杠",bu_gang:"补杠"
+      }[kind]||kind)+(tile?" "+tile:"");
+      const who=operation.seat===0?"你":operation.seat+"号AI";
+      const recommended=operation.candidates.find(x=>x.reference_best);
+      const chosen=operation.candidates.find(x=>
+        x.action===operation.actual.action&&x.tile===operation.actual.tile);
+      root.append(el("strong","match-archive-cut-note",
+        who+"的碰杠胡选择 · 实际"+label(operation.actual.action,operation.actual.tile)+
+        " · 参考"+label(operation.recommended.action,operation.recommended.tile)+
+        (chosen?.reference_best?"（符合参考）":"（与参考不同）")));
+      if(recommended)root.append(el("p","match-archive-cut-diagnosis",
+        "建议理由："+recommended.reason));
+      const alternatives=el("div","match-archive-cut-top3");
+      for(const item of operation.candidates){
+        alternatives.append(el("span","",
+          item.label+(item.reference_best?"（参考首选）":"")+
+          (item.shanten===null?" · 服务器确认可胡":
+           " · 向听"+item.shanten+" · 有效张≤"+item.effective_copies+
+           " · 番值代理"+item.fan_weighted)+
+          " · "+item.reason));
+      }
+      root.append(alternatives);
+      root.append(el("p","review-footnote",
+        "仅使用当时行动玩家的授权手牌和公开信息；过牌可能不产生公开动作，"
+        +"因此此处按邻近公开步骤定位，不能据后续展示的牌推断当时暗手。"));
+    }
     if(snapshot?.cut_review){
       const cut=snapshot.cut_review;
       const who=(cut.seat??0)===0?"你":(cut.seat+"号AI");
@@ -418,6 +449,45 @@
       " 巡。点击任一巡可回到当时四家真实手牌和前三种切牌的逐步对照。"));
     root.append(choices);
   }
+  function renderOperationTimeline(report,seat=0){
+    const root=$("match-archives-cut-timeline");
+    const records=(report?.terminal_review?.operation_reviews||[])
+      .filter(row=>row.seat===seat);
+    if(!records.length)return;
+    root.append(el("strong","",
+      (seat===0?"我的":seat+"号AI")+"碰、杠、胡行动比较 · "+
+      records.length+"次合法操作机会"));
+    const same=records.filter(x=>
+      x.actual.action===x.recommended.action&&
+      x.actual.tile===x.recommended.tile).length;
+    root.append(el("p","review-footnote",
+      "实际选择与当前参考一致 "+same+"/"+records.length+
+      " 次；胡牌优先、其他操作按当前公开信息的有限牌效启发式判断，"
+      +"不代表整局完美策略。"));
+    const group=el("div","match-archive-cut-timeline-list");
+    for(const x of records){
+      const actual=x.candidates.find(c=>c.action===x.actual.action&&
+                                       c.tile===x.actual.tile);
+      const best=x.candidates.find(c=>c.reference_best);
+      const button=makeButton(
+        "操作："+(actual?.label||x.actual.action)+
+        "｜参考："+(best?.label||x.recommended.action)+
+        "｜第"+x.sequence+"步附近",
+        ()=>{
+          $("match-archives-seat").value="all";
+          $("match-archives-action").value="all";
+          active=x.sequence;
+          handPhase="auto";
+          renderSteps();
+          $("match-archives-board").scrollIntoView?.({
+            behavior:"smooth",block:"nearest"
+          });
+        });
+      button.classList.add(actual?.reference_best?"is-optimal":"is-review");
+      group.append(button);
+    }
+    root.append(group);
+  }
   function cutReviewsForSeat(report,seat){
     return (report?.terminal_review?.steps||[])
       .map(step=>step.cut_review)
@@ -475,6 +545,7 @@
       }
     }
     renderCutTimeline(report,reviewSeat);
+    renderOperationTimeline(report,reviewSeat);
   }
   async function openMatch(archiveId){
     try{
