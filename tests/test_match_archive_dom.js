@@ -293,7 +293,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   rows=dom["match-archives-list"].children;
   rows[0].children[2].handlers.click();
   await settle();
-  assert.match(collect(dom["match-archives-review-summary"]),/50\\.0%/);
+  assert.match(collect(dom["match-archives-review-summary"]),/50\.0%/);
   assert.match(collect(dom["match-archives-stage-summary"]),/退向听 1 巡/);
   const detail=dom["match-archives-cut-timeline"];
   assert.equal(detail.children[2].children.length,2,
