@@ -2612,3 +2612,19 @@
 .match-archive-cut-metrics{
  font-size:12px;line-height:1.5;overflow-wrap:anywhere;
 }
+
+/* M3.91: completed-archive hand perspective is independent of the
+   action-after public river, meld and win indicators. */
+.match-archive-hand-switch{display:flex;flex-wrap:wrap;gap:8px}
+.match-archive-hand-switch .match-archive-button[aria-pressed="true"]{
+  background:#d7ead9;border-color:#368257;color:#20543a;
+}
+.match-archive-revealed-tile{
+  display:inline-flex;justify-content:center;align-items:center;
+  min-width:30px;min-height:38px;padding:2px 4px;
+  background:#fffdf5;border:1px solid #c7bfa3;border-radius:4px;
+  color:#242d27;font-size:13px;font-weight:700;
+}
+.match-archive-revealed-tile.match-archive-actual-cut{
+  outline:2px solid #cc673b;outline-offset:1px;background:#fff0dc;
+}
