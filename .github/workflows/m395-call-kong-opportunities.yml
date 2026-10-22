@@ -1,0 +1,60 @@
+name: M3.95 optional call and kong opportunity study
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_challenge_call_kong_ablation.py"
+      - "tests/test_m395_call_kong_opportunities.py"
+      - "examples/compare_challenge_call_kong_ablations.py"
+      - ".github/workflows/m395-call-kong-opportunities.yml"
+permissions:
+  contents: read
+jobs:
+  call-kong-ablation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compare legal peng/kong ablations, authoritative score and no private-data leakage
+        run: python -m unittest discover -s tests -p 'test_m395_call_kong_opportunities.py' -v
+      - name: Check existing call and kong regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+          python -m unittest discover -s tests -p 'test_ai_call_research.py' -v
+          python -m unittest discover -s tests -p 'test_ai_kong_tiers.py' -v
+      - name: Two independent predeclared cohorts four-seat three-arm official score
+        run: |
+          python examples/compare_challenge_call_kong_ablations.py --development 12000 --holdout 13000 --seeds 2 --output /tmp/m395.json
+          python - <<'PY'
+          import json
+          doc=json.load(open("/tmp/m395.json",encoding="utf-8"))
+          assert doc["protocol"]=="m395_offline_challenge_call_kong_ablation_v1"
+          assert doc["live_policy_changed"] is False
+          a={x["seed"] for x in doc["development"]["per_seed"]}
+          b={x["seed"] for x in doc["holdout"]["per_seed"]}
+          assert not a&b
+          assert a=={12000,12001} and b=={13000,13001}
+          for name in ("development","holdout"):
+              group=doc[name]
+              assert group["complete_games"]==24
+              assert group["paired_positions"]==8
+              for arm in ("no_tie_peng","no_kong"):
+                  row=group["comparisons"][arm]
+                  assert row["interval_95pct"] is None
+                  assert row["opportunity_counts"]["interventions"]==sum(
+                      row["opportunity_counts"].get(key,0)
+                      for key in ("changed_claim","changed_own_kong"))
+                  assert len(row["scenario_examples"])<=12
+                  print("M3.95 RESULT",name,arm,json.dumps({
+                      "mean_net_delta":row["mean_seed_cluster_net_delta"],
+                      "positive_seeds":row["positive_seeds"],
+                      "negative_seeds":row["negative_seeds"],
+                      "tied_seeds":row["tied_seeds"],
+                      "opportunities":row["opportunity_counts"],
+                      "per_seed":[{"seed":x["seed"],
+                          "paired_delta":x["four_seat_delta"][arm]}
+                          for x in group["per_seed"]],
+                  },ensure_ascii=False))
+          PY
