@@ -185,5 +185,22 @@ class M396OperationHintTests(unittest.TestCase):
         self.assertGreaterEqual(len(game._events),before_events)
 
 
+    def test_actual_discard_records_rejected_own_kong_offer(self):
+        game,seat,view=offer_kongs()
+        self.assertGreater(len(view["kong_options"]),0)
+        game._terminal_review_trace=[]
+        game._terminal_operation_reviews=[]
+        web_server._match_record(
+            game,[],lambda: game.discard(seat,"p4"),
+            decision=(seat,"pass",None))
+        self.assertEqual(len(game._terminal_operation_reviews),1)
+        review=game._terminal_operation_reviews[0]
+        self.assertEqual(review["seat"],seat)
+        self.assertEqual(review["actual"],{"action":"pass","tile":None})
+        self.assertTrue(any(row["action"]=="an_gang" for row in review["candidates"]))
+        self.assertIn("cut_review",game._terminal_review_trace[-1])
+
+
+
 if __name__=="__main__":
     unittest.main()
