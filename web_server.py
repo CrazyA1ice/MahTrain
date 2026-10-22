@@ -1058,8 +1058,9 @@ class Handler(BaseHTTPRequestHandler):
                     if "archive_id" in query:
                         result = _MATCH_ARCHIVE.detail(query["archive_id"][0])
                     else:
-                        limit = int(query.get("limit", ["30"])[0])
-                        result = _MATCH_ARCHIVE.list_completed(limit)
+                        limit = int(query.get("limit", ["500"])[0])
+                        period = query.get("period", ["all"])[0]
+                        result = _MATCH_ARCHIVE.list_completed(limit, period=period)
             except (ValueError, TypeError) as exc:
                 self._json(400, {"error": str(exc)})
             else:
