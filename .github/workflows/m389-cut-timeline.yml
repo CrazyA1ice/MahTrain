@@ -1,0 +1,31 @@
+name: M3.89 historical per-turn decision timeline
+on:
+  push:
+    branches: [feat/m389-historical-cut-review-navigation]
+  pull_request:
+    paths:
+      - "web/match_archives.js"
+      - "web/index.html"
+      - "web/match_table_v2.css"
+      - "tests/test_match_archive_dom.js"
+      - ".github/workflows/m389-cut-timeline.yml"
+permissions:
+  contents: read
+jobs:
+  historical-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify archive UI, all-time statistics and per-turn links
+        run: |
+          node tests/test_match_archive_dom.js
+          node tests/test_match_stats_dom.js
+          python -m unittest discover -s tests -p 'test_m388_match_review.py' -v
+          python -m unittest discover -s tests -p 'test_match_archive.py' -v
