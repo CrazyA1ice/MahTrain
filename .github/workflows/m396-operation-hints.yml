@@ -1,0 +1,40 @@
+name: M3.96 legal Hu peng kong pass action advice
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/classic_operation_hint.py"
+      - "src/mahtrain_core/match_archive.py"
+      - "web_server.py"
+      - "web/match_archives.js"
+      - "web/match.js"
+      - "frontend_2d/src/main.js"
+      - "frontend_2d/src/hint-view.mjs"
+      - "frontend_2d/src/game.html"
+      - "frontend_2d/test/full_round_http.py"
+      - "tests/test_m396_operation_hints.py"
+      - "tests/test_match_archive_dom.js"
+      - ".github/workflows/m396-operation-hints.yml"
+permissions:
+  contents: read
+jobs:
+  operation-advice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Authorized server operation advice and archive validation
+        run: |
+          python -m unittest discover -s tests -p 'test_m396_operation_hints.py' -v
+          python -m unittest discover -s tests -p 'test_classic_hint.py' -v
+          python -m unittest discover -s tests -p 'test_m392_four_seat_cut.py' -v
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: Browser archive DOM action comparisons
+        run: |
+          node tests/test_match_archive_dom.js
+          node --check web/match.js
+          node --check web/match_archives.js
+          node --check frontend_2d/src/hint-view.mjs
+          node --check frontend_2d/src/action-choice.mjs
