@@ -66,14 +66,20 @@ def _same_action(left: Any, right: Any) -> bool:
     return left == right
 
 
-def _public_label(choice: Any, kind: str) -> str:
+def _public_label(choice: Any, kind: str, legal: tuple) -> str:
     if kind == "claim":
         return str(choice)
     if choice is None:
         return "pass"
-    # Distinguish multiple legal same-kind kongs by an index in the offered
-    # ordered list, never by a concealed tile name or salted tile hash.
-    return choice["type"]
+    # Distinguish multiple legal same-kind kongs by their occurrence index,
+    # never by concealed tile identity or a reversible identity hash.
+    preceding=0
+    for offered in legal[1:]:
+        if offered["type"] == choice["type"]:
+            preceding+=1
+        if offered == choice:
+            return choice["type"]+"#"+str(preceding)
+    raise RuntimeError("illegal own-kong option was labelled")
 
 
 class FirstOpportunityAgent(MahjongAgent):
@@ -123,10 +129,10 @@ class FirstOpportunityAgent(MahjongAgent):
         self.offer = {
             "kind":kind,
             "wall_band":_wall_band(view),
-            "options":[_public_label(x,kind) for x in legal],
+            "options":[_public_label(x,kind,legal) for x in legal],
             "candidate_count":len(legal),
-            "baseline_choice":_public_label(baseline,kind),
-            "chosen_choice":_public_label(chosen,kind),
+            "baseline_choice":_public_label(baseline,kind,legal),
+            "chosen_choice":_public_label(chosen,kind,legal),
             "original_is_pass":baseline == legal[0],
             "changed":chosen != baseline,
             "self_public_melds":len(view.get("own_melds") or []),
