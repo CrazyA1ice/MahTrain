@@ -105,7 +105,12 @@ class CutQualityArchiveTests(unittest.TestCase):
     def test_actual_record_uses_only_contemporaneous_public_adviser(self):
         seed=next(i for i in range(60)
                   if FourPlayerOpening(i).dealer==0)
-        game=staged_game({},seed=seed)
+        actual_hand=[
+            "m1","m2","m4","m6","m8",
+            "p1","p2","p4","p6","p8",
+            "s1","s3","s5","s8",
+        ]
+        game=staged_game({0:actual_hand},{0:"p"},seed=seed)
         game._terminal_review_trace=[]
         before_view=game.private_view(0)
         advice=classic_hand_hint(before_view)
