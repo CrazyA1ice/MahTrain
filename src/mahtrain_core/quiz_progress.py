@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .training import MODES, RULE_VERSION
+from .history_periods import history_since
 from .training_levels import DIFFICULTIES
 from .error_focus import ERROR_LABELS, FOCUS_BY_MODE, diagnose_quiz
 
@@ -97,32 +98,49 @@ class QuizProgressMixin:
         }
 
     def quiz_progress(
-        self, mode: str, difficulty: str, limit: int = 20
+        self, mode: str, difficulty: str, limit: int = 20,
+        *, period: str = "all", offset: int = 0,
     ) -> dict[str, Any]:
         _validate_mode_level(mode, difficulty)
         if type(limit) is not int or not 1 <= limit <= 50:
             raise ValueError("单题历史查询数量应在1至50之间")
+        if type(offset) is not int or not 0 <= offset <= 10000000:
+            raise ValueError("invalid question history offset")
+        since=history_since(period)
+        when=" AND created_at >= ?" if since is not None else ""
+        params=(since,) if since is not None else ()
         with self._connect() as db:
-            groups = db.execute("""
+            groups = db.execute(f"""
                 SELECT difficulty, COUNT(*) total, SUM(correct) correct
-                FROM quiz_attempts WHERE mode=? GROUP BY difficulty
-            """, (mode,)).fetchall()
-            current = db.execute("""
+                FROM quiz_attempts WHERE mode=? {when} GROUP BY difficulty
+            """, (mode,*params)).fetchall()
+            current = db.execute(f"""
                 SELECT correct FROM quiz_attempts
-                WHERE mode=? AND difficulty=?
+                WHERE mode=? AND difficulty=? {when}
                 ORDER BY created_at DESC,answer_id DESC LIMIT ?
-            """, (mode,difficulty,RECENT_WINDOW)).fetchall()
-            rows = db.execute("""
+            """, (mode,difficulty,*params,RECENT_WINDOW)).fetchall()
+            rows = db.execute(f"""
                 SELECT answer_id,created_at,mode,difficulty,correct,family
                 FROM quiz_attempts
-                WHERE mode=? ORDER BY created_at DESC,answer_id DESC LIMIT ?
-            """, (mode,limit)).fetchall()
-            # All difficulties of this mode, last 30 FIRST attempts only.
-            errors = db.execute("""
+                WHERE mode=? {when}
+                ORDER BY created_at DESC,answer_id DESC LIMIT ? OFFSET ?
+            """, (mode,*params,limit,offset)).fetchall()
+            total_row=db.execute(f"""
+                SELECT COUNT(*) FROM quiz_attempts WHERE mode=? {when}
+            """,(mode,*params)).fetchone()
+            # All graded questions in selected period, in true time order,
+            # without the former recent-20 plot constraint.
+            trend=db.execute(f"""
+                SELECT created_at,correct,difficulty FROM quiz_attempts
+                WHERE mode=? {when}
+                ORDER BY created_at ASC,answer_id ASC
+            """,(mode,*params)).fetchall()
+            # Mistake causes use the most recent 30 errors in THIS period.
+            errors = db.execute(f"""
                 SELECT result_json FROM quiz_attempts
-                WHERE mode=? AND correct=0
+                WHERE mode=? AND correct=0 {when}
                 ORDER BY created_at DESC,answer_id DESC LIMIT 30
-            """, (mode,)).fetchall()
+            """, (mode,*params)).fetchall()
         level_totals = {
             level:{"total":0,"correct":0,"accuracy":None}
             for level in DIFFICULTIES
@@ -180,6 +198,10 @@ class QuizProgressMixin:
         return {
             "weaknesses":weakness,
             "mode":mode,"difficulty":difficulty,
+            "period":period,"offset":offset,"limit":limit,
+            "total_attempts":total_row[0],
+            "has_more":offset+len(rows)<total_row[0],
+            "trend":[dict(row) for row in trend],
             "level_totals":level_totals,
             "recent":{"attempts":completed,"correct":correct,"accuracy":accuracy,
                       "window":RECENT_WINDOW},
