@@ -81,7 +81,9 @@ def observe_game(seed:int, rotation:int)->dict[str,Any]:
     events=outcome["public_events"]
     declared=[e for e in events if e["type"]=="bu_gang_declared"]
     completed={(e["seat"],e["tile"]) for e in events if e["type"]=="bu_gang"}
-    robbed={(e["seat"],e["tile"]) for e in events if e["type"]=="rob_kong"}
+    robbed_events={(e["seat"],e["tile"]):e
+                   for e in events if e["type"]=="rob_kong"}
+    robbed=set(robbed_events)
     if completed & robbed:
         raise RuntimeError("the same attempted bu-gang both completed and was robbed")
     if len(declared)!=len(completed)+len(robbed):
@@ -94,10 +96,10 @@ def observe_game(seed:int, rotation:int)->dict[str,Any]:
         if key not in completed and key not in robbed:
             raise RuntimeError("declared bu-gang lacks authoritative outcome")
         chosen=latest[key]
-        hu_winners=sum(
-            w["kind"]=="rob_kong" and w["source"]==event["seat"]
-            and w.get("seat") != event["seat"] and w.get("tile") == event["tile"]
-            for w in outcome["winners"])
+        # The public 'rob_kong' resolution binds exactly this owner's
+        # visible tile and lists ALL winners (including multi-ron); the
+        # terminal tournament winner summary intentionally omits tile names.
+        hu_winners=len(robbed_events[key]["seats"]) if key in robbed else 0
         was_robbed=key in robbed
         if (hu_winners>chosen["potential_robbers"] or
             was_robbed != (hu_winners>0)):
