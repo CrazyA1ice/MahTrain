@@ -69,3 +69,11 @@ jobs:
           for leaked in ('future_wall','opponent_hands','offer_signature','_private_choices'):
               assert leaked not in s,leaked
           PY
+      - name: Retain audited per-position experiment JSON
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m397-first-operation-terminal-results
+          path: /tmp/m397.json
+          if-no-files-found: error
+          retention-days: 30
