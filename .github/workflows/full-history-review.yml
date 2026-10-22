@@ -29,14 +29,21 @@ jobs:
         with:
           node-version: "22"
       - name: New completed-only replay, all-time periods and cutoff parity
-        run: python -m unittest discover -s tests -p 'test_post_round_review.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_post_round_review.py' -v
+          python -m unittest discover -s tests -p 'test_all_history_periods.py' -v
       - name: Existing archive, server and partial live privacy regressions
         run: |
           python -m unittest discover -s tests -p 'test_match_archive.py' -v
           python -m unittest discover -s tests -p 'test_http_disconnect.py' -v
           python -m unittest discover -s tests -p 'test_classic_hint.py' -v
+          python -m unittest discover -s tests -p 'test_history_store.py' -v
+          python -m unittest discover -s tests -p 'test_quiz_progress.py' -v
       - name: Archived-score visualization DOM and period/date browser scripting
         run: |
+          node --check web/history.js
+          node --check web/quiz_history.js
+          node --check web/match_archives.js
           node tests/test_match_archive_dom.js
           node tests/test_match_stats_dom.js
   classic-center-board:
