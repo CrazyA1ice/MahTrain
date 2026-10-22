@@ -1054,7 +1054,7 @@ class WebUI(unittest.TestCase):
             self.get("/api/match_archives?archive_id=not-found")
         self.assertEqual(exc.exception.code,400)
         with self.assertRaises(HTTPError) as exc:
-            self.get("/api/match_archives?limit=500")
+            self.get("/api/match_archives?limit=5001")
         self.assertEqual(exc.exception.code,400)
 
     def test_m321_filterable_replay_uses_public_historical_frames(self):
