@@ -299,6 +299,50 @@
     }
     renderArchiveBoard(shown.find(f=>f.sequence===active));
   }
+  function renderCutTimeline(report){
+    const root=$("match-archives-cut-timeline");
+    if(!root)return;
+    root.replaceChildren();
+    const review=report?.terminal_review;
+    const decisions=(review?.steps||[]).flatMap((step,index)=>
+      step.cut_review?[{step:index+2,cut:step.cut_review}]:[]);
+    if(!decisions.length){
+      root.append(el("p","review-footnote",
+        "本局无可用逐巡切牌评分；早期档案没有保存真实暗手，无法补算。"));
+      return;
+    }
+    const header=el("strong","","我的逐巡切牌对照 · 共"+decisions.length+"巡");
+    root.append(header);
+    const choices=el("div","match-archive-cut-timeline-list");
+    let optimal=0;
+    decisions.forEach(({step,cut},index)=>{
+      if(cut.optimal)optimal++;
+      const rank=cut.rank?(" · 排名"+cut.rank):"";
+      const action=makeButton(
+        "第"+(index+1)+"巡｜切"+cut.discard+
+        "｜"+(cut.optimal?"符合最优":"可改进"+rank)+
+        "｜前三："+cut.top3.map(x=>x.tile).join(" / "),
+        ()=>{
+          // Point into the exact saved public-state frame; retain history's
+          // seat/action filters by switching to the complete public trace.
+          $("match-archives-seat").value="all";
+          $("match-archives-action").value="all";
+          active=step;
+          renderSteps();
+          $("match-archives-board").scrollIntoView?.({
+            behavior:"smooth",block:"nearest"
+          });
+        }
+      );
+      action.classList.add(cut.optimal?"is-optimal":"is-review");
+      choices.append(action);
+    });
+    root.append(el("p","review-footnote",
+      "已评估 "+decisions.length+" 巡 · 符合最优 "+
+      optimal+" 巡 · 仍可改进 "+(decisions.length-optimal)+
+      " 巡。点击任一巡可回到当时四家真实手牌和前三种切牌的逐步对照。"));
+    root.append(choices);
+  }
   async function openMatch(archiveId){
     try{
       $("match-archives-message").textContent="";
@@ -376,6 +420,7 @@
       heading.append(el("p","",reviewed?
         "按每次出牌前己方手牌与当时公开信息，用向听数优先、有效进张与听牌番值加权排序；并列第一也视为符合。此项不是完全信息下的保证最优策略。":
         "本局缺少可验证的逐巡切牌数据，不能根据最终胜负推测最优切符合率。"));
+      renderCutTimeline(report);
       renderSteps();
     }catch(err){fail(err)}
   }
