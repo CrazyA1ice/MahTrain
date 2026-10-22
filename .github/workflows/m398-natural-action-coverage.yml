@@ -1,0 +1,117 @@
+name: M3.98 unbiased natural kong coverage and expanded holdout
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_action_extended_study.py"
+      - "tests/test_m398_unselected_action_coverage.py"
+      - "examples/compare_challenge_extended_action_coverage.py"
+      - ".github/workflows/m398-natural-action-coverage.yml"
+permissions:
+  contents: read
+jobs:
+  natural-coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate unselected legal actions, private-view safety and exact ledgers
+        run: |
+          python -m unittest discover -s tests -p 'test_m398_unselected_action_coverage.py' -v
+          python -m unittest discover -s tests -p 'test_m397_action_counterfactual.py' -v
+      - name: Predeclared eight plus eight natural seeds, all four challenge seats
+        run: |
+          python examples/compare_challenge_extended_action_coverage.py --mode coverage --coverage-development 16000 --coverage-holdout 17000 --coverage-seeds 8 --output /tmp/m398-coverage.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/m398-coverage.json",encoding="utf-8"))
+          assert d["protocol"]=="m398_unselected_kong_coverage_and_independent_counterfactual_v1"
+          assert d["live_ai_modified"] is False
+          a=d["coverage"]["development"]
+          b=d["coverage"]["holdout"]
+          assert {x["seed"] for x in a["per_seed"]}==set(range(16000,16008))
+          assert {x["seed"] for x in b["per_seed"]}==set(range(17000,17008))
+          for group in (a,b):
+              assert group["independent_seeds"]==8
+              assert group["four_seat_positions"]==32
+              assert group["positions_with_own_kong"]<=32
+              assert group["positions_with_claim"]<=32
+              counts=group["total_counts"]
+              assert counts.get("own_kong_windows",0) == sum(
+                  counts.get("own_kong_"+phase,0)
+                  for phase in ("early","late","critical","unknown"))
+              assert counts.get("claim_windows",0)==sum(
+                  counts.get("claim_"+phase,0)
+                  for phase in ("early","late","critical","unknown"))
+              for row in group["positions"]:
+                  official=row["official_score"]
+                  assert official["official_net"]==sum(
+                      official[k] for k in ("win_points","kong_points","exhaustive_points"))
+          text=json.dumps(d,ensure_ascii=False)
+          for leak in ("future_wall","opponent_hands","offer_signature","_private_choices"):
+              assert leak not in text,leak
+          PY
+      - name: Save natural opportunity data
+        uses: actions/upload-artifact@v4
+        with:
+          name: m398-unselected-natural-coverage
+          path: /tmp/m398-coverage.json
+          if-no-files-found: error
+          retention-days: 30
+
+  expanded-paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Four plus four disjoint seeds across true first operations
+        run: |
+          python examples/compare_challenge_extended_action_coverage.py --mode paired --paired-development 18000 --paired-holdout 19000 --paired-seeds 4 --output /tmp/m398-paired.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/m398-paired.json",encoding="utf-8"))
+          assert d["protocol"]=="m398_unselected_kong_coverage_and_independent_counterfactual_v1"
+          assert d["live_ai_modified"] is False
+          a=d["paired"]["development"]
+          b=d["paired"]["holdout"]
+          assert {x["seed"] for x in a["positions"]}==set(range(18000,18004))
+          assert {x["seed"] for x in b["positions"]}==set(range(19000,19004))
+          for group in (a,b):
+              assert group["independent_seeds"]==4
+              assert group["four_seat_positions"]==16
+              assert group["target_positions"]==32
+              for target in ("claim","own_kong"):
+                  summary=group["target_summaries"][target]
+                  assert summary["eligible_positions"]==16
+                  assert summary["opportunities"]<=16
+                  for policy in ("force_pass","force_active"):
+                      row=summary["policies"][policy]
+                      assert row["changed_positions"]<=summary["opportunities"]
+                      assert row["confidence_interval_95pct"] is None
+                      vals=row["cumulative_official_component_deltas"]
+                      assert vals["official_net"]==sum(
+                          vals[k] for k in ("win_points","kong_points","exhaustive_points"))
+              for pos in group["positions"]:
+                  official=pos["baseline"]["score"]
+                  assert official["official_net"]==sum(official[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+                  for x in pos["alternatives"].values():
+                      delta=x["delta"]
+                      assert delta["official_net"]==sum(delta[k] for k in (
+                          "win_points","kong_points","exhaustive_points"))
+          text=json.dumps(d,ensure_ascii=False)
+          for leak in ("future_wall","opponent_hands","offer_signature","_private_choices"):
+              assert leak not in text,leak
+          PY
+      - name: Save independent paired result with public prechoice strata
+        uses: actions/upload-artifact@v4
+        with:
+          name: m398-expanded-paired-first-choice
+          path: /tmp/m398-paired.json
+          if-no-files-found: error
+          retention-days: 30
