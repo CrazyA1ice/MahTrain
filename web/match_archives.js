@@ -366,21 +366,14 @@
       const cuts=(review?.steps||[]).map(x=>x.cut_review).filter(Boolean);
       const reviewed=cuts.length;
       const optimal=cuts.filter(x=>x.optimal).length;
-      const heading=el("div","match-archive-review-summary");
+      const heading=$("match-archives-review-summary");
+      heading.replaceChildren();
       heading.append(el("strong","","整局最优切符合率："+(reviewed?
         (optimal/reviewed*100).toFixed(1)+"%（"+optimal+"/"+reviewed+"巡）":
         "不可计算"));
       heading.append(el("p","",reviewed?
         "按每次出牌前己方手牌与当时公开信息，用向听数优先、有效进张与听牌番值加权排序；并列第一也视为符合。此项不是完全信息下的保证最优策略。":
         "本局缺少可验证的逐巡切牌数据，不能根据最终胜负推测最优切符合率。"));
-      const detailRoot=$("match-archives-board");
-      detailRoot.before(heading);
-      const previous=detailRoot.previousElementSibling;
-      if(previous!==heading)heading.remove();
-      // Replace any prior review heading rather than accumulating results.
-      for(const node of document.querySelectorAll(".match-archive-review-summary")){
-        if(node!==heading)node.remove();
-      }
       renderSteps();
     }catch(err){fail(err)}
   }
