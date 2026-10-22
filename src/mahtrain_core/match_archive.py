@@ -453,10 +453,13 @@ def sanitize_private_review(value: dict | None) -> dict | None:
         item={"hands_before":before,"hands_after":after,"events":ev}
         cut=row.get("cut_review")
         if cut is not None:
-            if type(cut) is not dict or cut.get("seat")!=0:
-                raise ValueError("invalid player cut review")
+            # M3.88-M3.91 wrote seat-zero only; completed archives
+            # re-read from SQLite have no stored seat attribute.
+            seat=cut.get("seat",0) if type(cut) is dict else None
+            if type(seat) is not int or seat not in (0,1,2,3):
+                raise ValueError("invalid cut review seat")
             tile=_tile(cut.get("discard"))
-            if tile is None or tile not in before[0]:
+            if tile is None or tile not in before[seat]:
                 raise ValueError("cut review tile not in prior hand")
             top=cut.get("top3")
             if type(top) is not list or len(top)>3:
@@ -464,7 +467,7 @@ def sanitize_private_review(value: dict | None) -> dict | None:
             choices=[]
             for cand in top:
                 if (type(cand) is not dict or
-                        _tile(cand.get("tile")) not in before[0] or
+                        _tile(cand.get("tile")) not in before[seat] or
                         type(cand.get("shanten")) is not int or
                         type(cand.get("effective_copies")) is not int or
                         cand["effective_copies"]<0 or
@@ -483,7 +486,7 @@ def sanitize_private_review(value: dict | None) -> dict | None:
             if type(cut.get("optimal")) is not bool:
                 raise ValueError("invalid cut optimal flag")
             item["cut_review"]={
-                "discard":tile,"rank":rank,"optimal":cut["optimal"],
+                "seat":seat,"discard":tile,"rank":rank,"optimal":cut["optimal"],
                 "top3":choices}
             # M3.90: the player's actual cut can be below the third
             # recommendation. Preserve its REAL contemporaneous metrics
