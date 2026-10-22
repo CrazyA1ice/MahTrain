@@ -286,7 +286,7 @@ def _archived_score_components(report: dict) -> tuple[list[int], list[int]]:
     No concealed tiles, events or opponent hand information are materialized.
     """
     if (type(report) is not dict or
-            report.get("privacy") != "public_board_only" or
+            report.get("privacy") not in ("public_board_only","post_round_full_reveal") or
             report.get("phase") not in _TERMINAL):
         raise ValueError("not a completed public archive")
     ledger = report.get("win_ledger")
@@ -644,7 +644,7 @@ class MatchArchive:
             rows = db.execute("""
                 SELECT archive_id,created_at,record_json
                 FROM completed_matches
-                ${"WHERE created_at >= ?" if since is not None else ""}
+                {"WHERE created_at >= ?" if since is not None else ""}
                 ORDER BY created_at ASC,archive_id ASC
             """, (since,) if since is not None else ())
             for row in rows:
