@@ -161,11 +161,11 @@ class M398UnselectedActionStudyTests(unittest.TestCase):
             {"coverage_seeds":33},{"paired_seeds":17},
             {"paired_seeds":0},{"paired_seeds":True},
             {"coverage_development":True},{"paired_holdout":2**32-2},
-            {"mode":"not_valid"},
-        ):
+         ):
             with self.subTest(kwargs=kwargs),self.assertRaises(ValueError):
-                study(mode="coverage",**{**kwargs,
-                    **({} if "mode" not in kwargs else {"mode":"not_valid"})})
+                study(mode="coverage",**kwargs)
+        with self.assertRaises(ValueError):
+            study(mode="not_valid")
         with patch("mahtrain_core.ai_action_extended_study.natural_coverage",
                    return_value={"independent_seeds":8}) as cov,patch(
                    "mahtrain_core.ai_action_extended_study.paired_cohort",
@@ -175,8 +175,8 @@ class M398UnselectedActionStudyTests(unittest.TestCase):
         self.assertEqual(pair.call_count,2)
         self.assertFalse(result["live_ai_modified"])
         self.assertEqual(result["protocol"],PROTOCOL)
-        self.assertEqual(result["coverage_seed_ranges"],[[16000,16008],[17000,17008]]
-                         if False else [(16000,16008),(17000,17008)])
+        self.assertEqual(result["coverage_seed_ranges"],
+                         [(16000,16008),(17000,17008)])
 
 
 if __name__=="__main__":
