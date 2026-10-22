@@ -1,0 +1,79 @@
+name: M3.97 single optional operation full-terminal counterfactual
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_challenge_action_counterfactual.py"
+      - "tests/test_m397_action_counterfactual.py"
+      - "examples/compare_challenge_first_action_counterfactual.py"
+      - ".github/workflows/m397-action-counterfactual.yml"
+permissions:
+  contents: read
+jobs:
+  first-operation-terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Optional action counterfactual/Hu/permission/component unit tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m397_action_counterfactual.py' -v
+          python -m unittest discover -s tests -p 'test_m396_operation_hints.py' -v
+          python -m unittest discover -s tests -p 'test_m395_call_kong_opportunities.py' -v
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: Disjoint seed groups four-seat matched real matches until terminal
+        run: |
+          python examples/compare_challenge_first_action_counterfactual.py --development 14000 --holdout 15000 --seeds 2 --output /tmp/m397.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/m397.json',encoding='utf-8'))
+          assert d['protocol']=='m397_first_optional_action_terminal_counterfactual_v1'
+          assert d['live_policy_changed'] is False
+          assert d['frozen_targets']==['claim','own_kong']
+          assert d['frozen_policies']==['baseline','force_pass','force_active']
+          assert {x['seed'] for x in d['development']['positions']}=={14000,14001}
+          assert {x['seed'] for x in d['holdout']['positions']}=={15000,15001}
+          for name in ('development','holdout'):
+              c=d[name]
+              assert c['independent_seeds']==2
+              assert c['four_seat_positions']==8
+              assert c['target_positions']==16
+              for target in ('claim','own_kong'):
+                  rows=[p for p in c['positions'] if p['target']==target]
+                  assert len(rows)==8
+                  for row in rows:
+                      assert row['baseline']['score']['official_net']==sum(
+                          row['baseline']['score'][key] for key in (
+                            'win_points','kong_points','exhaustive_points'))
+                      if row['offered']:
+                          assert set(row['alternatives'])=={'force_pass','force_active'}
+                          for arm,alternative in row['alternatives'].items():
+                              values=alternative['delta']
+                              assert values['official_net']==sum(values[key] for key in (
+                                  'win_points','kong_points','exhaustive_points'))
+                              assert alternative['changed']!=alternative['reused_unchanged_baseline']
+                      else:assert row['alternatives']=={}
+                  for arm,metric in c['targets'][target]['policy_comparisons'].items():
+                      assert metric['interval_95pct'] is None
+                      assert metric['changed_positions'] <= c['targets'][target]['offered_positions']
+                      print('M3.97 VERIFIED',name,target,arm,json.dumps({
+                          'offered':c['targets'][target]['offered_positions'],
+                          'changed':metric['changed_positions'],
+                          'mean_seed_cluster_net_delta':metric['mean_seed_cluster_net_delta'],
+                          'component_deltas':metric['cumulative_official_component_deltas'],
+                          'per_seed':c['targets'][target]['per_seed'],
+                      },ensure_ascii=False))
+          s=json.dumps(d,ensure_ascii=False)
+          for leaked in ('future_wall','opponent_hands','offer_signature','_private_choices'):
+              assert leaked not in s,leaked
+          PY
+      - name: Retain audited per-position experiment JSON
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m397-first-operation-terminal-results
+          path: /tmp/m397.json
+          if-no-files-found: error
+          retention-days: 30
