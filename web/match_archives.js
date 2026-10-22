@@ -176,14 +176,17 @@
     const version=++refreshVersion;
     try{
       $("match-archives-message").textContent="";
-      const response=await api("/api/match_archives?limit=50");
+      const period=$("match-archives-period")?.value||"all";
+      const response=await api("/api/match_archives?limit=5000&period="+encodeURIComponent(period));
       // Slow earlier replies must never overwrite a newer visit's chart.
       if(version!==refreshVersion)return;
       listed=response.matches||[];
+      const limited=response.summary.games>listed.length;
+      const periodName={all:"全部历史",week:"最近一周",month:"最近一月",year:"最近一年"}[period]||period;
       selected=new Set([...selected].filter(id=>
         listed.some(x=>x.archive_id===id)));
       $("match-archives-summary").textContent=
-        "已保存 "+response.summary.games+" 局 · 0号平均正式净额 "+
+        periodName+"：已保存 "+response.summary.games+" 局"+(limited?"（列表显示最新"+listed.length+"局）":"")+" · 0号平均正式净额 "+
         Number(response.summary.average_player0_settled_balance??
           response.summary.average_player0_win_balance).toFixed(1)+
         "（平均胡牌 "+Number(
@@ -324,6 +327,7 @@
     }catch(err){fail(err)}
   }
   function init(){
+    $("match-archives-period")?.addEventListener("change",refresh);
     $("match-history-groups-mode").addEventListener("change",renderGroupings);
     $("match-archives-refresh").addEventListener("click",refresh);
     $("match-archives-compare").addEventListener("click",comparison);
