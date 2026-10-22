@@ -2627,3 +2627,11 @@
  .match-review-open-tile{width:23px;height:33px}
  .match-archive-back-count .match-review-open-tile{width:18px;height:26px}
 }
+
+.history-period-trend{
+ box-sizing:border-box;width:100%;min-width:0;
+ margin:6px 0 10px;padding:10px 12px;
+ background:#f3faf5;border:1px solid #d1e4d6;border-radius:10px;
+}
+.history-period-trend svg{display:block;width:100%;height:auto;max-height:240px}
+.history-period-trend small{font-size:11px;color:#426e52}
