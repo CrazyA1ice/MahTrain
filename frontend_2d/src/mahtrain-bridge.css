@@ -328,3 +328,15 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
  white-space:nowrap;line-height:1.2;
 }
 #classic-score .defen{isolation:isolate}
+
+/* M3.96 action-choice advice stays UNDER, never overlays or resizes, the
+ * fixed Mahjong table. Reuse the proven classic hint table typography. */
+#classic-operation-hint-panel{
+ box-sizing:border-box;max-width:800px;width:calc(100% - 16px);
+ margin:8px auto;padding:14px;background:#e8eee5;color:#1b3527;
+ border:1px solid #aac0b0;border-radius:6px;font-size:12px;
+ line-height:1.5;overflow-x:auto;
+}
+#classic-operation-hint-panel[hidden]{display:none}
+#classic-operation-hint-panel h3{margin:0 0 8px;font-size:16px}
+#classic-operation-hint-panel p{margin:7px 0}
