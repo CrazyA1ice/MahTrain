@@ -119,7 +119,11 @@ class M396OperationHintTests(unittest.TestCase):
             def private_view(self,index):
                 self.calls.append(index)
                 return copy.deepcopy(self.v)
-        game=ReadOnly(view)
+        authorized=copy.deepcopy(view)
+        authorized["seat"]=0
+        authorized["turn"]=0
+        authorized["missing_suits"][0]=view["missing_suits"][seat]
+        game=ReadOnly(authorized)
         with patch.dict(web_server._MATCH_SESSIONS,{"m396":game}),patch.dict(
                 web_server._MATCH_AGENTS,{"m396":{1:object()} }):
             result=web_server._process("match_operation_hint",{
