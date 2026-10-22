@@ -93,6 +93,23 @@ def classic_operation_hint(view: Mapping[str, Any], seat: int) -> dict[str, Any]
     phase = view.get("phase")
     if phase not in (*_CLAIMS, *_TURNS):
         raise ValueError("no current operation window")
+    # Most actual discards/AI passes contain NO optional operation.
+    # Reject those cheaply before counting public tiles or enumerating Hu
+    # fan values, so advisory instrumentation does not slow normal turns.
+    if phase in _TURNS:
+        if (view.get("turn") != seat or
+            view.get("won", [False]*4)[seat] or
+            not view.get("kong_options") and
+            view.get("can_self_draw_win") is not True):
+            raise ValueError("no optional self-turn operation")
+    else:
+        early_options = view.get(
+            "rob_options" if phase == "rob_kong_window"
+            else "claim_options") or []
+        if (type(early_options) is not list or
+            len(early_options) < 2 or "pass" not in early_options or
+            seat in (view.get("claim_submitted") or [])):
+            raise ValueError("no optional response")
     hand, melds, missing = _own_view(view)
     public, cap, tian = _call_settings(view)
     rows: list[dict[str, Any]] = []
