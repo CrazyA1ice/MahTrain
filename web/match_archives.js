@@ -285,8 +285,10 @@
       // Live play NEVER exposes opponent concealed hands. A completed
       // post-round archive can explicitly reveal this stage's server
       // captured hands. Prior public-only records retain backs.
-      const snapshots=opened?.report?.post_round_review?.frames;
-      const hand=snapshots?.[frame.sequence-2]?.hands?.[seat];
+      const review=opened?.report?.post_round_review;
+      const hand=(frame.sequence===1
+        ?review?.opening_hands
+        :review?.frames?.[frame.sequence-2]?.hands)?.[seat];
       if(Array.isArray(hand)){
         backs.append(handTiles(hand));
       }else{
@@ -312,10 +314,11 @@
     const seat=$("match-archives-seat").value||"all";
     const kind=$("match-archives-action").value||"all";
     const matching=playback().filterReviewEntries(frames,seat,kind);
-    const shown=matching.slice(-200);
+    // Every genuine historical action must be traceable. Never silently
+    // throw away older frames from a completed replay.
+    const shown=matching;
     const count=$("match-archives-count");
-    count.textContent="符合条件 "+matching.length+"步"+
-      (matching.length>shown.length?" · 仅列最后200条":"");
+    count.textContent="符合条件 "+matching.length+"步 · 可逐步查看";
     const root=$("match-archives-actions");
     root.replaceChildren();
     for(const f of shown){
