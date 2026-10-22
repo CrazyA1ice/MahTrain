@@ -1,0 +1,117 @@
+name: M3.99 repeat-aware bu-gang and robbed-kong audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_bugang_repeat_risk.py"
+      - "tests/test_m399_bugang_repeat_risk.py"
+      - "examples/compare_challenge_bugang_repeat_risk.py"
+      - ".github/workflows/m399-bugang-repeat-risk.yml"
+permissions:
+  contents: read
+jobs:
+  natural-bugang:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Authoritative distinct/recurring and robbed bu-gang unit regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m399_bugang_repeat_risk.py' -v
+          python -m unittest discover -s tests -p 'test_m398_unselected_action_coverage.py' -v
+          python -m unittest discover -s tests -p 'test_kong_and_exhaustive_review.py' -v
+      - name: Genuine natural new 8 plus 8 seed four-seat matches
+        run: |
+          python examples/compare_challenge_bugang_repeat_risk.py --mode natural --seeds 8 --output /tmp/m399-natural.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/m399-natural.json',encoding='utf-8'))
+          assert d['protocol']=='m399_same_tile_bugang_repeat_rob_audit_v1'
+          assert d['live_ai_modified'] is False
+          for name,start in [('development',20000),('holdout',21000)]:
+              group=d['natural'][name]
+              assert group['independent_seeds']==8
+              assert group['four_seat_positions']==32
+              assert {x['seed'] for x in group['per_seed']}==set(range(start,start+8))
+              for entry in group['positions']:
+                  c=entry['counts']
+                  for kind in ('an_gang','bu_gang'):
+                      assert c.get('own_kong_offer_'+kind,0)==(
+                          c.get('distinct_'+kind+'_tiles',0)+
+                          c.get('repeat_'+kind+'_candidate_windows',0))
+                      assert c.get('returned_after_gap_'+kind,0)<=c.get(
+                          'repeat_'+kind+'_candidate_windows',0)
+                  assert c.get('attempted_bu_gang',0)==(
+                      c.get('successful_bu_gang',0)+c.get('robbed_bu_gang',0))
+                  assert c.get('attempted_bu_gang',0)==c.get('own_kong_original_bu_gang',0)
+                  sc=entry['official_score']
+                  assert sc['official_net']==sum(sc[k] for k in (
+                      'win_points','kong_points','exhaustive_points'))
+              print('M3.99 NATURAL VERIFIED',name,json.dumps({
+                  'counts':group['total_counts'],
+                  'per_seed':group['per_seed'],
+              },ensure_ascii=False))
+          raw=json.dumps(d,ensure_ascii=False)
+          for secret in ('future_wall','opponent_hands','_ever','_previous','offer_signature'):
+              assert secret not in raw
+          PY
+      - name: Save count-audited official match results
+        uses: actions/upload-artifact@v4
+        with:
+          name: m399-natural-bugang-audit
+          path: /tmp/m399-natural.json
+          if-no-files-found: error
+          retention-days: 30
+
+  independent-first-kong:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Never pick favorable seeds, test first own Kong across eight-plus-eight
+        run: |
+          python examples/compare_challenge_bugang_repeat_risk.py --mode paired --seeds 8 --output /tmp/m399-paired.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/m399-paired.json',encoding='utf-8'))
+          assert d['protocol']=='m399_same_tile_bugang_repeat_rob_audit_v1'
+          assert d['live_ai_modified'] is False
+          for name,start in [('development',22000),('holdout',23000)]:
+              group=d['paired'][name]
+              assert group['independent_seeds']==8
+              assert group['four_seat_positions']==32
+              assert {x['seed'] for x in group['per_seed']}==set(range(start,start+8))
+              for arm in ('force_pass','force_active'):
+                  row=group['arms'][arm]
+                  assert row['offered_positions']<=32
+                  assert row['changed_positions']<=row['offered_positions']
+                  assert row['confidence_interval_95pct'] is None
+                  balance=row['cumulative_official_component_deltas']
+                  assert balance['official_net']==sum(balance[k] for k in (
+                      'win_points','kong_points','exhaustive_points'))
+                  print('M3.99 PAIRED VERIFIED',name,arm,json.dumps({
+                      'offered':row['offered_positions'],
+                      'changed':row['changed_positions'],
+                      'mean_net_delta':row['mean_seed_cluster_net_delta'],
+                      'positive_seeds':row['positive_seeds'],
+                      'negative_seeds':row['negative_seeds'],
+                      'kind_counts':row['candidate_types'],
+                      'official_components':balance,
+                      'per_seed':group['per_seed'],
+                  },ensure_ascii=False))
+          raw=json.dumps(d,ensure_ascii=False)
+          for secret in ('future_wall','opponent_hands','offer_signature','_private_choices'):
+              assert secret not in raw
+          PY
+      - name: Archive newly reserved first-own-kong terminal outcomes
+        uses: actions/upload-artifact@v4
+        with:
+          name: m399-first-kong-eight-seed-holdout
+          path: /tmp/m399-paired.json
+          if-no-files-found: error
+          retention-days: 30
