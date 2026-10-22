@@ -1,0 +1,90 @@
+name: M4.02 all-seat natural bu-gang Hu truth vs real settlement
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_all_seat_bugang_audit.py"
+      - "tests/test_m402_all_seat_bugang.py"
+      - "examples/audit_all_seat_bugang.py"
+      - ".github/workflows/m402-all-seat-bugang.yml"
+permissions:
+  contents: read
+jobs:
+  all-seat-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Same-owner last legal window, multi-Hu and official ledger unit tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m402_all_seat_bugang.py' -v
+          python -m unittest discover -s tests -p 'test_m401_physical_rob_scenarios.py' -v
+          python -m unittest discover -s tests -p 'test_m400_public_bugang_rob.py' -v
+  all-seat-cohort:
+    runs-on: ubuntu-latest
+    timeout-minutes: 29
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            first: 28000
+          - cohort: holdout
+            first: 29000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Full four-agent 108-tile games and real Hu settlement with fixed initial seeds
+        run: |
+          python examples/audit_all_seat_bugang.py --development 28000 --holdout 29000 --seeds 8 --cohort ${{ matrix.cohort }} --output /tmp/m402-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"]
+          start=int(os.environ["START"])
+          d=json.load(open("/tmp/m402-"+cohort+".json",encoding="utf8"))
+          assert d["protocol"]=="m402_all_seat_prechoice_bugang_legal_vs_realized_v1"
+          assert d["live_policy_modified"] is False
+          c=d[cohort]
+          assert c["independent_initial_shuffle_seeds"]==8
+          assert c["completed_games"]==32 and c["observed_seat_positions"]==128
+          assert {s["seed"] for s in c["per_seed"]}==set(range(start,start+8))
+          counts=c["counts"]
+          assert counts.get("eligible_candidate_windows",0)==(
+              counts.get("first_distinct",0)+counts.get("repeated_candidate_windows",0))
+          assert counts.get("robbed",0)<=counts.get("attempted_potential",0)
+          assert c["estimated_rob_probability"] is None
+          assert sum(x.get("first",0) for x in c["by_public_band"].values())==counts.get("first_distinct",0)
+          for row in c["positions"]:
+              assert len(row["seat_level"])==4
+              assert len(row["official_net_by_seat"])==4
+              assert sum(row["official_net_by_seat"])==0
+              for actual in row["actual_bugang_decisions"]:
+                  assert actual["actual_rob_winners"]<=actual["potential_robbers"]
+                  assert actual["actual_robbed"]==int(actual["actual_rob_winners"]>0)
+          raw=json.dumps(d,ensure_ascii=False)
+          for forbidden in ("future_wall","opponent_hands","offer_signature","_hands"):
+              assert forbidden not in raw,forbidden
+          print("M4.02 COHORT VERIFIED",cohort,json.dumps({
+              "seed_count":c["independent_initial_shuffle_seeds"],
+              "full_games":c["completed_games"],
+              "all_seat_positions":c["observed_seat_positions"],
+              "total":counts,"by_band":c["by_public_band"],
+              "by_level":c["by_agent_level"],
+              "per_seed":c["per_seed"],
+              "validation_status":c["status"],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.first }}
+      - name: Archive safe offline all-seat observed decisions and true outcomes
+        uses: actions/upload-artifact@v4
+        with:
+          name: m402-all-seat-${{ matrix.cohort }}
+          path: /tmp/m402-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
