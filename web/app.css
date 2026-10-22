@@ -2642,3 +2642,29 @@
 .match-archive-seat-compare .match-archive-button[aria-pressed="true"]{
   background:#cce7d3;border-color:#368257;color:#20543a;
 }
+
+/* M3.96: compact action recommendation; long alternative evidence folds
+ * instead of spilling outside the fixed-size central decision panel. */
+.match-operation-advice{
+ display:flex;flex-direction:column;align-items:center;gap:4px;
+ width:100%;max-width:100%;box-sizing:border-box;
+ font-size:12px;line-height:1.4;overflow-wrap:anywhere;
+}
+.match-operation-advice strong{color:#ffdfa0}
+.match-operation-advice p{margin:0}
+.match-operation-alternatives{
+ box-sizing:border-box;width:100%;max-width:100%;
+ text-align:left;color:#e6f0dc;font-size:11px;
+}
+.match-operation-alternatives summary{
+ cursor:pointer;text-align:center;padding:4px 5px;
+ border:1px solid #9fc1b5;border-radius:5px;
+}
+.match-operation-alternatives[open]{
+ max-height:160px;overflow-y:auto;padding:3px 4px;
+}
+.match-operation-alternatives span{
+ display:block;border-bottom:1px solid #a6cabc47;
+ padding:3px 2px;
+}
+.match-operation-alternatives small{display:block;margin-top:5px}
