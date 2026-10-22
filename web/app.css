@@ -2579,3 +2579,51 @@
     grid-template-columns:repeat(4,minmax(0,1fr));
   }
 }
+
+/* M3.88 — period-scoped whole archive and transparent completed-game teaching. */
+.match-history-period-tools,.match-archive-pages{
+ display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+ padding:9px 12px;border-radius:9px;background:#e9f4e8;
+ font-size:12px;color:#31533d;
+}
+.match-history-period-tools label{display:flex;align-items:center;gap:9px;font-weight:700}
+.match-history-period-tools select{
+ border:1px solid #91ae96;border-radius:6px;background:#fff;color:#1b412b;
+ padding:6px 9px;font-size:12px;
+}
+.match-archive-pages{justify-content:center}
+.match-archive-pages button{
+ padding:6px 12px;border:1px solid #89a48b;border-radius:6px;
+ background:#fff;color:#245637;cursor:pointer;
+}
+.match-archive-pages button:disabled{cursor:default;opacity:.45}
+.match-archives-coaching{
+ margin-top:12px;background:#edf6f0;border:1px solid #bfd6c5;
+ border-radius:10px;padding:14px;display:grid;gap:8px;min-width:0;
+}
+.match-archives-coaching h4{margin:0;font-size:16px;color:#244b34}
+.match-review-rate{font-size:15px;font-weight:750;color:#256444;margin:0}
+.match-review-turn-list{
+ display:grid;gap:8px;max-height:600px;overflow-y:auto;
+}
+.match-review-turn{
+ background:#fff;border:1px solid #cfdfd2;border-radius:8px;
+ padding:9px 12px;font-size:12px;
+}
+.match-review-turn summary{font-weight:700;cursor:pointer;color:#244d39}
+.match-review-turn p{margin:7px 0}
+.match-review-open-hand{
+ display:flex;gap:3px;flex-wrap:wrap;align-items:flex-end;max-width:100%;
+}
+.match-review-open-tile{
+ display:block;width:28px;height:40px;object-fit:fill;flex:0 0 auto;
+ border:1px solid #a6bda9;border-radius:2px;
+}
+.match-review-topcuts{margin:7px 0;padding-left:21px;line-height:1.9}
+.match-review-topcuts li:first-child{font-weight:700;color:#21764d}
+.match-archive-back-count .match-review-open-hand{padding:1px;gap:2px}
+.match-archive-back-count .match-review-open-tile{width:22px;height:32px}
+@media (max-width:700px){
+ .match-review-open-tile{width:23px;height:33px}
+ .match-archive-back-count .match-review-open-tile{width:18px;height:26px}
+}
