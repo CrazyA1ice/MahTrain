@@ -10,7 +10,7 @@ import json
 import re
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .settlement import SELF_DRAW_MODES, payer_multiplier
@@ -425,6 +425,72 @@ def _group_rows(groups: dict, kind: str) -> list[dict]:
                                       x["fan_cap"]))
 
 
+def sanitize_private_review(value: dict | None) -> dict | None:
+    """Whitelist four-seat physical HAND histories, accessible only in
+    the terminal read-only archive, NEVER the in-progress public API.
+    Pre-M3.88 archives remain honestly public-only."""
+    if value is None:
+        return None
+    if not isinstance(value,dict):
+        raise ValueError("invalid terminal review")
+    def hands(raw):
+        if (type(raw) is not list or len(raw)!=4 or
+                any(type(h) is not list or len(h)>14 or
+                    any(_tile(t) is None for t in h) for h in raw)):
+            raise ValueError("invalid review hand snapshot")
+        return [list(h) for h in raw]
+    first=hands(value.get("opening"))
+    rows=value.get("steps")
+    if type(rows) is not list or len(rows)>_MAX_ARCHIVE_STEPS:
+        raise ValueError("invalid review step count")
+    clean=[]
+    for row in rows:
+        if not isinstance(row,dict):
+            raise ValueError("invalid terminal review step")
+        before=hands(row.get("hands_before"))
+        after=hands(row.get("hands_after"))
+        ev=sanitize_events(row.get("events") or [])
+        item={"hands_before":before,"hands_after":after,"events":ev}
+        cut=row.get("cut_review")
+        if cut is not None:
+            if type(cut) is not dict or cut.get("seat")!=0:
+                raise ValueError("invalid player cut review")
+            tile=_tile(cut.get("discard"))
+            if tile is None or tile not in before[0]:
+                raise ValueError("cut review tile not in prior hand")
+            top=cut.get("top3")
+            if type(top) is not list or len(top)>3:
+                raise ValueError("invalid top three alternatives")
+            choices=[]
+            for cand in top:
+                if (type(cand) is not dict or
+                        _tile(cand.get("tile")) not in before[0] or
+                        type(cand.get("shanten")) is not int or
+                        type(cand.get("effective_copies")) is not int or
+                        cand["effective_copies"]<0 or
+                        (cand.get("fan_weighted") is not None and
+                         type(cand["fan_weighted"]) is not int) or
+                        type(cand.get("reference_best")) is not bool):
+                    raise ValueError("invalid recorded candidate")
+                choices.append({
+                    "tile":cand["tile"],"shanten":cand["shanten"],
+                    "effective_copies":cand["effective_copies"],
+                    "fan_weighted":cand["fan_weighted"],
+                    "reference_best":cand["reference_best"]})
+            rank=cut.get("rank")
+            if rank is not None and (type(rank) is not int or rank<1 or rank>27):
+                raise ValueError("invalid cut rank")
+            if type(cut.get("optimal")) is not bool:
+                raise ValueError("invalid cut optimal flag")
+            item["cut_review"]={
+                "discard":tile,"rank":rank,"optimal":cut["optimal"],
+                "top3":choices}
+        clean.append(item)
+    return {"opening":first,"steps":clean,
+            "scope":"terminal_replay_only",
+            "ranking":"public_information_shanten_ukeire_fan_weighted"}
+
+
 class MatchArchive:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -460,7 +526,8 @@ class MatchArchive:
         return db
 
     def save_completed(self, public: dict, history: list[dict],
-                       initial_board: dict, ai_levels: list[str]) -> str:
+                       initial_board: dict, ai_levels: list[str],
+                       private_review: dict | None = None) -> str:
         if public.get("phase") not in _TERMINAL:
             raise ValueError("only completed matches can be archived")
         if (type(ai_levels) is not list or len(ai_levels) != 3 or
@@ -541,6 +608,10 @@ class MatchArchive:
                      if kong_included else
                      "历史兼容模式：杠钱仅为试验积分，不计入正式净额。"),
         }
+        terminal_review=sanitize_private_review(private_review)
+        if terminal_review is not None:
+            payload["terminal_review"]=terminal_review
+            payload["version"]=2
         archive_id = secrets.token_urlsafe(18)
         stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with self._connect() as db:
@@ -561,39 +632,60 @@ class MatchArchive:
             raise ValueError("invalid match archive id")
         return value
 
-    def list_completed(self, limit: int=30) -> dict:
-        if type(limit) is not int or not 1 <= limit <= 100:
-            raise ValueError("match archive limit must be between 1 and 100")
+    def list_completed(self, limit: int=500, *, period: str='all') -> dict:
+        if type(limit) is not int or not 1 <= limit <= 5000:
+            raise ValueError("match archive limit must be between 1 and 5000")
+        after = self._period_after(period)
+        clause = "WHERE created_at >= ?" if after else ""
+        args = (after,) if after else ()
         with self._connect() as db:
             rows = db.execute("""
                 SELECT archive_id,created_at,phase,dealer,win_count,
                        steps_count,win_b0,
                        COALESCE(settled_b0,win_b0) AS settled_b0
                        FROM completed_matches
-                ORDER BY created_at DESC,archive_id DESC LIMIT ?""",(limit,)).fetchall()
+                """ + clause + """
+                ORDER BY created_at DESC,archive_id DESC LIMIT ?""",
+                (*args,limit)).fetchall()
             total = db.execute("""
                 SELECT COUNT(*) AS games,COALESCE(AVG(win_b0),0) AS average_b0,
                 COALESCE(AVG(COALESCE(settled_b0,win_b0)),0)
                     AS average_settled_b0,
                 COALESCE(SUM(win_count),0) AS paid_wins
-                FROM completed_matches""").fetchone()
+                FROM completed_matches """ + clause,
+                args).fetchone()
         return {"matches":[dict(x) for x in rows],
+                "period":period,"listed":len(rows),
                 "summary":{"games":total["games"],
                            "average_player0_win_balance":total["average_b0"],
                            "average_player0_settled_balance":
                                total["average_settled_b0"],
                            "paid_wins":total["paid_wins"]},
-                "scorecard":self.four_seat_scorecard()}
+                "scorecard":self.four_seat_scorecard(period=period)}
 
-    def four_seat_scorecard(self, *, trend_limit: int = 30) -> dict:
+    @staticmethod
+    def _period_after(period: str) -> str | None:
+        # UTC archive stamps and a UTC cutoff, never mixed local offsets.
+        spans={"all":None,"week":timedelta(days=7),
+               "month":timedelta(days=30),"year":timedelta(days=365)}
+        if type(period) is not str or period not in spans:
+            raise ValueError("period must be all/week/month/year")
+        delta=spans[period]
+        return ((datetime.now(timezone.utc)-delta).isoformat(timespec="seconds")
+                if delta is not None else None)
+
+    def four_seat_scorecard(self, *, trend_limit: int | None = None,
+                            period: str = "all") -> dict:
         """Aggregate ALL completed public archive scores for fixed seats.
 
         Seats 1-3 are positions, NOT persistent AI identities: difficulty
         assignments may change between games. Exclude malformed legacy
         archives visibly instead of fabricating missing settled scores.
         """
-        if type(trend_limit) is not int or not 1 <= trend_limit <= 100:
-            raise ValueError("trend limit must be from 1 to 100")
+        if trend_limit is not None and (
+                type(trend_limit) is not int or not 1 <= trend_limit <= 10000):
+            raise ValueError("trend limit must be from 1 to 10000")
+        after=self._period_after(period)
         totals = [[0] * 4 for _ in range(4)]  # HU, draw, kong, official
         kong_included_games = 0
         pos = [0] * 4
@@ -609,8 +701,9 @@ class MatchArchive:
             rows = db.execute("""
                 SELECT archive_id,created_at,record_json
                 FROM completed_matches
+                """ + ("WHERE created_at >= ?" if after else "") + """
                 ORDER BY created_at ASC,archive_id ASC
-            """)
+            """, (after,) if after else ())
             for row in rows:
                 try:
                     report = json.loads(row["record_json"])
@@ -654,14 +747,15 @@ class MatchArchive:
                     "score": official[0],
                     "cumulative": cumulative,
                 })
-                if len(trends) > trend_limit:
+                if trend_limit is not None and len(trends) > trend_limit:
                     trends.pop(0)
         if any(sum(values) != 0 for values in totals):
             raise ValueError("non-zero-sum archived history")
         return {
             "valid_games": valid,
             "excluded_games": skipped,
-            "scope": "all_saved_completed_games",
+            "scope": "period_filtered_completed_games",
+            "period":period,
             "kong_included": kong_included_games > 0,
             "kong_included_games": kong_included_games,
             "seats": [{

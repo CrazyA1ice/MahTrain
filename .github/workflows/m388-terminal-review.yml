@@ -1,0 +1,110 @@
+name: M3.88 terminal review, all-period history and fixed black panel
+on:
+  push:
+    branches: [feat/m388-history-period-private-review]
+    paths:
+      - "web_server.py"
+      - "src/mahtrain_core/match_archive.py"
+      - "web/match_archives.js"
+      - "web/index.html"
+      - "web/match_stats.js"
+      - "web/match_table_v2.css"
+      - "tests/test_match_archive.py"
+      - "tests/test_web_app.py"
+      - "tests/test_http_disconnect.py"
+      - "tests/test_match_archive_dom.js"
+      - "frontend_2d/test/browser-turn-avatar.mjs"
+      - "frontend_2d/test/full_round_http.py"
+      - "frontend_2d/src/**"
+      - "tests/test_m388_match_review.py"
+      - ".github/workflows/m388-terminal-review.yml"
+  pull_request:
+    paths:
+      - "web_server.py"
+      - "src/mahtrain_core/match_archive.py"
+      - "web/match_archives.js"
+      - "web/index.html"
+      - "web/match_stats.js"
+      - "web/match_table_v2.css"
+      - "tests/test_match_archive.py"
+      - "tests/test_web_app.py"
+      - "tests/test_http_disconnect.py"
+      - "tests/test_match_archive_dom.js"
+      - "frontend_2d/test/browser-turn-avatar.mjs"
+      - "frontend_2d/test/full_round_http.py"
+      - "frontend_2d/src/**"
+      - "tests/test_m388_match_review.py"
+      - ".github/workflows/m388-terminal-review.yml"
+permissions:
+  contents: write
+jobs:
+  history-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: New period and private review archive tests
+        run: python -m unittest discover -s tests -p 'test_m388_match_review.py' -v
+      - name: Existing legacy archive, web, HTTP recovery and hint regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_match_archive.py' -v
+          python -m unittest discover -s tests -p 'test_web_app.py' -v
+          python -m unittest discover -s tests -p 'test_classic_hint.py' -v
+          python -m unittest discover -s tests -p 'test_http_disconnect.py' -v
+      - name: Existing history visualization and client mock regressions
+        run: |
+          node --test tests/test_match_archive_dom.js
+          node --test tests/test_match_stats_dom.js
+  classic-board:
+    runs-on: ubuntu-latest
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/m388-history-period-private-review
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Rebuild tracked classic frontend
+        working-directory: frontend_2d
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+          node --test test/*.test.mjs
+      - name: Real Chromium integration tests
+        working-directory: frontend_2d
+        run: npx playwright-core install --with-deps chromium
+      - name: Four seat board, black panel, gang placement and terminal replay
+        run: |
+          python web_server.py > /tmp/m388-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/classic/game.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node frontend_2d/test/browser-turn-avatar.mjs
+          node frontend_2d/test/browser-kong-layout.mjs
+          node frontend_2d/test/browser-multi-meld-capacity.mjs
+          python frontend_2d/test/full_round_http.py
+      - name: Save newly built classic distribution
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A -f frontend_2d/dist/
+          if ! git diff --cached --quiet; then
+            git commit -m "build(M3.88): contain classic scoreboard text within dark panel"
+            git push origin HEAD:feat/m388-history-period-private-review
+          fi
+      - name: Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m388-terminal-review-trace
+          path: /tmp/m388-server.log
+          retention-days: 10

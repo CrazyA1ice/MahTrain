@@ -130,7 +130,7 @@ class LocalHTTPClientDisconnect(unittest.TestCase):
         self.assertEqual(len(captured), 5)
         self.assertEqual([status for status, _ in captured],
                          [200, 200, 200, 200, 404])
-        fake_archive.list_completed.assert_called_once_with(25)
+        fake_archive.list_completed.assert_called_once_with(25, period='all')
         fake_archive.detail.assert_called_once_with("a")
         fake_history.list_history.assert_called_once_with(20)
         fake_history.detail.assert_called_once_with("b")

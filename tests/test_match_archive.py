@@ -99,7 +99,7 @@ class MatchArchiveTests(unittest.TestCase):
                 self.store.detail(bad)
         with self.assertRaises(ValueError):
             self.store.detail("not-found")
-        for bad in (0,101,1.5,True):
+        for bad in (0,5001,1.5,True):
             with self.assertRaises(ValueError):
                 self.store.list_completed(bad)
 
@@ -397,7 +397,7 @@ class MatchArchiveTests(unittest.TestCase):
         after=self.store.four_seat_scorecard()
         self.assertEqual(after["valid_games"],1)
         self.assertEqual(after["excluded_games"],2)
-        for limit in (0,101,True,1.0):
+        for limit in (0,10001,True,1.0):
             with self.subTest(limit=limit),self.assertRaises(ValueError):
                 self.store.four_seat_scorecard(trend_limit=limit)
 

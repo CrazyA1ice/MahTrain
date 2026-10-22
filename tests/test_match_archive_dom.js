@@ -19,6 +19,7 @@ class Node{
 }
 const ids=[
   "match-archives-refresh","match-archives-list","match-archives-summary",
+  "match-archives-period","match-archives-review-summary",
   "match-archives-detail","match-archives-compare","match-archives-export",
   "match-archives-board","match-archives-seat","match-archives-action",
   "match-archives-message","match-archives-comparison",
@@ -32,6 +33,7 @@ const ids=[
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
 dom["match-archives-seat"].value="all";
+dom["match-archives-period"].value="all";
 dom["match-archives-action"].value="all";
 dom["match-history-groups-mode"].value="ai";
 const board=(n,wall,won)=>({
@@ -197,6 +199,59 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-archives-board"].children[0].textContent.includes("牌山53张"));
   assert.ok(!JSON.stringify(dom).includes("never-show"));
   assert.ok(requests.every(url=>url.startsWith("/api/match_archives")));
+  // M3.88 version-2 terminal archive: every seat's genuine archived tiles
+  // become visible ONLY here, and an actual human discard has a top-three
+  // explanation plus series-level optimal-cut compliance.
+  const terminalHands=[
+    ["m1","m2"],["p4","p5"],["s1","s2"],["m7","m8"]
+  ];
+  result.report.terminal_review={
+    opening:terminalHands,
+    scope:"terminal_replay_only",
+    steps:[
+      {hands_after:terminalHands,cut_review:{
+        discard:"m1",rank:1,optimal:true,
+        top3:[
+          {tile:"m1",shanten:1,effective_copies:8,
+           fan_weighted:null,reference_best:true},
+          {tile:"m2",shanten:1,effective_copies:6,
+           fan_weighted:null,reference_best:false},
+          {tile:"p4",shanten:2,effective_copies:4,
+           fan_weighted:null,reference_best:false},
+        ],
+      }},
+      {hands_after:terminalHands},
+    ],
+  };
+  rows=dom["match-archives-list"].children;
+  rows[0].children[2].handlers.click();
+  await settle();
+  const collect=node=>[node.textContent||"",
+    ...node.children.flatMap(collect)].join(" ");
+  assert.match(collect(dom["match-archives-review-summary"]),/100\.0%/);
+  dom["match-archives-action"].value="all";
+  dom["match-archives-action"].handlers.change();
+  dom["match-archives-actions"].children[1].handlers.click();
+  const reviewText=collect(dom["match-archives-board"]);
+  assert.match(reviewText,/1万/);
+  assert.match(reviewText,/4筒/);
+  assert.match(reviewText,/1条/);
+  assert.match(reviewText,/切m1/);
+  assert.match(reviewText,/切m2/);
+  assert.match(reviewText,/切p4/);
+  assert.match(reviewText,/有效张上界/);
+  // M3.88: one period control governs server-side leaderboard, chart,
+  // history list and the grouping totals. Never substitute stale all-time
+  // aggregates after the selector changes.
+  dom["match-archives-period"].value="month";
+  dom["match-archives-period"].handlers.change();
+  await settle();
+  assert.ok(requests.at(-1).includes("period=month"));
+  assert.ok(dom["match-archives-summary"].textContent.includes("最近一月"));
+  dom["match-archives-period"].value="all";
+  dom["match-archives-period"].handlers.change();
+  await settle();
+  assert.ok(requests.at(-1).includes("period=all"));
   // M3.47: simulate two rapid visits to history. The SLOW response
   // from the first request cannot replace the new SQLite scorecard.
   const baselineResponse=await fetch("/api/match_archives?limit=50");

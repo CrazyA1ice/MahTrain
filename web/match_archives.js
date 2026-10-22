@@ -176,14 +176,17 @@
     const version=++refreshVersion;
     try{
       $("match-archives-message").textContent="";
-      const response=await api("/api/match_archives?limit=50");
+      const period=$("match-archives-period")?.value||"all";
+      const response=await api("/api/match_archives?limit=5000&period="+encodeURIComponent(period));
       // Slow earlier replies must never overwrite a newer visit's chart.
       if(version!==refreshVersion)return;
       listed=response.matches||[];
+      const limited=response.summary.games>listed.length;
+      const periodName={all:"全部历史",week:"最近一周",month:"最近一月",year:"最近一年"}[period]||period;
       selected=new Set([...selected].filter(id=>
         listed.some(x=>x.archive_id===id)));
       $("match-archives-summary").textContent=
-        "已保存 "+response.summary.games+" 局 · 0号平均正式净额 "+
+        periodName+"：已保存 "+response.summary.games+" 局"+(limited?"（列表显示最新"+listed.length+"局）":"")+" · 0号平均正式净额 "+
         Number(response.summary.average_player0_settled_balance??
           response.summary.average_player0_win_balance).toFixed(1)+
         "（平均胡牌 "+Number(
@@ -203,8 +206,38 @@
       root.append(el("p","","请选择一项公开历史动作。"));return;
     }
     const board=frame.board;
+    const terminal=opened?.report?.terminal_review;
+    // Public steps carry no private cards. Finished version-2 archives
+    // unlock their separately sanitized authentic all-seat snapshots;
+    // historical version-1 archives MUST remain visibly incomplete.
+    const snapshot=terminal?.steps?.[frame.sequence-2]||
+      (frame.sequence===1&&terminal?
+       {hands_after:terminal.opening}:null);
     root.append(el("strong","","第"+frame.sequence+"步 · "+frame.label+
       " · 牌山"+board.wall_count+"张"));
+    if(!terminal){
+      root.append(el("p","review-footnote",
+        "旧档案只记录公开牌和牌背：当时各家暗手未保存，无法真实还原或计算逐巡最优切符合率。"));
+    }
+    if(snapshot?.cut_review){
+      const cut=snapshot.cut_review;
+      const head=el("p","match-archive-cut-note",
+        "本巡你切 "+cut.discard+" · "+
+        (cut.optimal?"符合并列最优方案":("未符合最优方案"+
+        (cut.rank?"（排序第"+cut.rank+"）":""))));
+      root.append(head);
+      const three=el("div","match-archive-cut-top3");
+      three.append(el("strong","","当前公开信息下，切牌参考前三名："));
+      cut.top3.forEach((cand,i)=>{
+        three.append(el("span","",
+          (i+1)+". 切"+cand.tile+
+          " · 向听"+cand.shanten+
+          " · 有效张上界"+cand.effective_copies+
+          (cand.fan_weighted!==null?" · 番值加权"+cand.fan_weighted:"")+
+          (cand.reference_best?"（最优）":"")));
+      });
+      root.append(three);
+    }
     const groups=el("div","match-archive-four-seats");
     for(let seat=0;seat<4;seat++){
       const cell=el("div","match-archive-public-seat");
@@ -212,9 +245,18 @@
         seat+"号"+(board.won[seat]?" · 已胡":"")+
         " · 暗手"+board.hand_counts[seat]+"张"));
       const backs=el("div","match-archive-back-count");
-      // Pure backs, not the saved values of concealed cards.
-      for(let i=0;i<board.hand_counts[seat];i++)
-        backs.append(el("span","match-archive-back",""));
+      const actual=snapshot?.hands_after?.[seat];
+      if(Array.isArray(actual)){
+        const suit={m:"万",p:"筒",s:"条"};
+        for(const tile of actual){
+          backs.append(el("span","match-archive-revealed-tile",
+            tile.slice(1)+(suit[tile[0]]||tile[0])));
+        }
+        cell.append(el("small","", "终局复盘：当时真实手牌已公开"));
+      }else{
+        for(let i=0;i<board.hand_counts[seat];i++)
+          backs.append(el("span","match-archive-back",""));
+      }
       cell.append(backs);
       cell.append(el("p","",
         "公开副露："+board.melds[seat].map(m=>
@@ -320,10 +362,23 @@
           e.amount+(e.stage==="da_jiao"?
             " · "+e.effective_fan+"番":"")));
       }
+      const review=report.terminal_review;
+      const cuts=(review?.steps||[]).map(x=>x.cut_review).filter(Boolean);
+      const reviewed=cuts.length;
+      const optimal=cuts.filter(x=>x.optimal).length;
+      const heading=$("match-archives-review-summary");
+      heading.replaceChildren();
+      heading.append(el("strong","","整局最优切符合率："+(reviewed?
+        (optimal/reviewed*100).toFixed(1)+"%（"+optimal+"/"+reviewed+"巡）":
+        "不可计算")));
+      heading.append(el("p","",reviewed?
+        "按每次出牌前己方手牌与当时公开信息，用向听数优先、有效进张与听牌番值加权排序；并列第一也视为符合。此项不是完全信息下的保证最优策略。":
+        "本局缺少可验证的逐巡切牌数据，不能根据最终胜负推测最优切符合率。"));
       renderSteps();
     }catch(err){fail(err)}
   }
   function init(){
+    $("match-archives-period")?.addEventListener("change",refresh);
     $("match-history-groups-mode").addEventListener("change",renderGroupings);
     $("match-archives-refresh").addEventListener("click",refresh);
     $("match-archives-compare").addEventListener("click",comparison);

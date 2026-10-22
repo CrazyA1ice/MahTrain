@@ -189,6 +189,29 @@ def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
     assert view["wall_count"]==0 or sum(view["won"])>=3
     assert view["match_archive_id"] is not None
     assert seen_kinds.get("discard",0)>0
+    # M3.88: terminal archive has genuine 4-hand snapshots unavailable
+    # to any in-progress bearer-token view.
+    assert "terminal_review" not in view
+    with urlopen(ORIGIN+"/api/match_archives?archive_id="+
+                 view["match_archive_id"],timeout=35) as response:
+        archived=json.load(response)["report"]
+    detail=archived.get("terminal_review")
+    assert detail is not None,"missing terminal review from real HTTP game"
+    assert len(detail["opening"])==4
+    assert sum(map(len,detail["opening"]))==53
+    assert all(len(row["hands_after"])==4 for row in detail["steps"])
+    cuts=[row["cut_review"] for row in detail["steps"]
+          if row.get("cut_review") is not None]
+    actual=sum(e.get("type")=="discard" and e.get("seat")==0
+               for row in detail["steps"] for e in row["events"])
+    assert len(cuts)==actual,(len(cuts),actual)
+    assert cuts,"finished game must record at least one human cut"
+    assert all(len(row["top3"])<=3 for row in cuts)
+    assert all(row["cut_review"]["discard"] in row["hands_before"][0]
+               for row in detail["steps"] if row.get("cut_review") is not None)
+    print("REAL COMPLETED GAME FOUR-HAND HISTORY/TOP3: PASS",{
+        "seed":seed,"steps":len(detail["steps"]),"human_cuts":len(cuts),
+        "optimal":sum(row["optimal"] for row in cuts)},flush=True)
     return {"seed":seed,"level":level,"token":token,"steps":step,
             "events":seen_kinds,"match_archive_id":view["match_archive_id"],
             "win_count":len(view["win_ledger"]["wins"]),

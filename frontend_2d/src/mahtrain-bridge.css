@@ -312,3 +312,19 @@ body.board{background:#101916;color:#f5f7ef;font-family:system-ui,"Microsoft Yah
 #board>.board .shoupai.main .bingpai .pai.is-picked.is-hint-cut{
  outline-style:solid
 }
+
+/* M3.88: score text MUST stay inside the original fixed dark panel. */
+#classic-score{box-sizing:border-box;overflow:hidden!important}
+#classic-score .juchang,#classic-score .shan,#classic-score .defen{
+ box-sizing:border-box;max-width:100%;overflow:hidden;
+}
+#classic-score .juchang *,#classic-score .shan *{
+ box-sizing:border-box;max-width:100%;min-width:0;
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+#classic-score .defen>div{
+ box-sizing:border-box;overflow:hidden!important;
+ max-width:100%;min-width:0;text-overflow:ellipsis;
+ white-space:nowrap;line-height:1.2;
+}
+#classic-score .defen{isolation:isolate}
