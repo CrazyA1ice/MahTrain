@@ -17,6 +17,7 @@ from typing import Any
 from .retry import MistakeRetry
 from .review import build_round_review
 from .quiz_progress import QuizProgressMixin
+from .history_periods import history_since
 
 SCHEMA_VERSION = 2
 
@@ -151,42 +152,54 @@ class HistoryStore(QuizProgressMixin):
             "retry": self.retry_list(archive_id),
         }
 
-    def list_history(self, limit: int = 30) -> dict[str, Any]:
+    def list_history(self, limit: int = 30, *, period: str = "all",
+                     offset: int = 0) -> dict[str, Any]:
         if type(limit) is not int or limit < 1 or limit > 100:
             raise ValueError("history limit must be 1 to 100")
+        if type(offset) is not int or not 0 <= offset <= 10000000:
+            raise ValueError("invalid history page")
+        since=history_since(period)
+        where="WHERE created_at >= ?" if since is not None else ""
+        params=(since,) if since is not None else ()
         with self._connect() as db:
-            rows = db.execute("""
+            rows = db.execute(f"""
                 SELECT archive_id,created_at,session_id,missing_suit,
                        completed_rounds,correct_rounds,mistake_count,accuracy
-                FROM local_history ORDER BY created_at DESC,archive_id DESC
-                LIMIT ?""", (limit,)).fetchall()
-            aggregate = db.execute("""
+                FROM local_history {where}
+                ORDER BY created_at DESC,archive_id DESC
+                LIMIT ? OFFSET ?""", (*params,limit,offset)).fetchall()
+            aggregate = db.execute(f"""
                 SELECT COUNT(*) AS sessions, COALESCE(SUM(completed_rounds),0) AS rounds,
                        COALESCE(SUM(correct_rounds),0) AS correct,
                        COALESCE(SUM(mistake_count),0) AS mistakes,
                        COALESCE(AVG(accuracy),0) AS average_accuracy
-                FROM local_history""").fetchone()
-            # Compare the earliest and latest 5 *completed* sessions.
-            recent = db.execute("""
-                SELECT accuracy,completed_rounds,correct_rounds FROM local_history
-                ORDER BY created_at DESC,archive_id DESC LIMIT 5""").fetchall()
-            oldest = db.execute("""
-                SELECT accuracy,completed_rounds,correct_rounds FROM local_history
-                ORDER BY created_at ASC,archive_id ASC LIMIT 5""").fetchall()
+                FROM local_history {where}""",params).fetchone()
+            recent = db.execute(f"""
+                SELECT accuracy FROM local_history {where}
+                ORDER BY created_at DESC,archive_id DESC LIMIT 5""",
+                params).fetchall()
+            oldest = db.execute(f"""
+                SELECT accuracy FROM local_history {where}
+                ORDER BY created_at ASC,archive_id ASC LIMIT 5""",
+                params).fetchall()
+            trend = db.execute(f"""
+                SELECT created_at,accuracy FROM local_history {where}
+                ORDER BY created_at ASC,archive_id ASC""",params).fetchall()
         return {
-            "sessions": [dict(row) for row in rows],
-            "summary": {
-                "session_count": aggregate["sessions"],
-                "rounds_total": aggregate["rounds"],
-                "correct_total": aggregate["correct"],
-                "mistake_total": aggregate["mistakes"],
-                "average_session_accuracy": aggregate["average_accuracy"],
-                "first_five_average": (
-                    sum(x["accuracy"] for x in oldest)/len(oldest) if oldest else None
-                ),
-                "latest_five_average": (
-                    sum(x["accuracy"] for x in recent)/len(recent) if recent else None
-                ),
+            "period":period,"offset":offset,"limit":limit,
+            "has_more":offset+len(rows)<aggregate["sessions"],
+            "sessions":[dict(row) for row in rows],
+            "trend":[dict(row) for row in trend],
+            "summary":{
+                "session_count":aggregate["sessions"],
+                "rounds_total":aggregate["rounds"],
+                "correct_total":aggregate["correct"],
+                "mistake_total":aggregate["mistakes"],
+                "average_session_accuracy":aggregate["average_accuracy"],
+                "first_five_average":(
+                    sum(x["accuracy"] for x in oldest)/len(oldest) if oldest else None),
+                "latest_five_average":(
+                    sum(x["accuracy"] for x in recent)/len(recent) if recent else None),
             },
         }
 
