@@ -9,6 +9,7 @@ on:
       - "web_server.py"
       - "web/index.html"
       - "web/match_archives.js"
+      - "web/app.css"
       - "frontend_2d/src/**"
       - "tests/test_post_round_review.py"
       - "tests/test_match_archive_dom.js"
@@ -67,6 +68,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8765/classic/game.html >/dev/null; then break; fi
             sleep 1
           done
+          node frontend_2d/test/browser-center-overflow.mjs
           node frontend_2d/test/browser-fixed-table.mjs
           node frontend_2d/test/browser-settlement.mjs
           node frontend_2d/test/browser-turn-avatar.mjs
