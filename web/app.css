@@ -2579,3 +2579,36 @@
     grid-template-columns:repeat(4,minmax(0,1fr));
   }
 }
+
+/* M3.90: replay-only instructional comparisons, outside the fixed game
+   table. Keep four-seat geometry immutable while displaying long traces. */
+.match-archive-stage-summary{
+ display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));
+ gap:8px;margin:10px 0;align-items:stretch;
+}
+.match-archive-stage-summary>strong,
+.match-archive-stage-summary>.review-footnote{
+ grid-column:1/-1;
+}
+.match-archive-stage-card{
+ min-width:0;border-radius:7px;border:1px solid #a5c0ad;
+ padding:10px;display:flex;flex-direction:column;gap:6px;
+ background:#f2f7f1;color:#264432;
+}
+.match-archive-stage-card>strong{font-size:13px}
+.match-archive-stage-card>span,.match-archive-stage-card>small{
+ font-size:12px;line-height:1.55;overflow-wrap:anywhere;
+}
+.match-archive-cut-diagnosis{
+ margin:8px 0 4px;padding:7px 9px;border-left:3px solid #c7a45c;
+ background:#fff4dd;color:#624013;overflow-wrap:anywhere;
+}
+.match-archive-cut-diagnosis.match-archive-cut-optimal{
+ border-left-color:#409b73;background:#e6f4ec;color:#20563a;
+}
+.match-archive-cut-diagnosis.match-archive-cut-unrated{
+ background:#f3f3f3;border-left-color:#999;color:#545454;
+}
+.match-archive-cut-metrics{
+ font-size:12px;line-height:1.5;overflow-wrap:anywhere;
+}
