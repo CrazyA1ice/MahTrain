@@ -20,6 +20,7 @@ class Node{
 const ids=[
   "match-archives-refresh","match-archives-list","match-archives-summary",
   "match-archives-period","match-archives-review-summary",
+  "match-archives-cut-timeline",
   "match-archives-detail","match-archives-compare","match-archives-export",
   "match-archives-board","match-archives-seat","match-archives-action",
   "match-archives-message","match-archives-comparison",
