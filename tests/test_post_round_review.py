@@ -66,6 +66,29 @@ class ArchiveReviewTests(unittest.TestCase):
             self.store.save_completed(g.public_state(),[],g.public_state(),
                   ["basic"]*3,sealed_review=[])
 
+    def test_real_rule_transition_seals_every_seat_before_public_http(self):
+        import web_server
+        from test_four_player import to_dealer_turn
+        game=to_dealer_turn(27)
+        seat=game.turn
+        before=list(game._hands[seat])
+        game._sealed_review=[]
+        outgoing=[]
+        played=before[0]
+        web_server._match_record(
+            game,outgoing,lambda:game.discard(seat,played))
+        self.assertEqual(len(outgoing),1)
+        self.assertEqual(len(game._sealed_review),1)
+        self.assertEqual(game._sealed_review[0]["decision"]["seat"],seat)
+        self.assertEqual(game._sealed_review[0]["decision"]["played"],played)
+        self.assertEqual(game._sealed_review[0]["decision"]["hand"],before)
+        self.assertEqual(len(game._sealed_review[0]["hands"]),4)
+        public=json.dumps(outgoing)
+        self.assertNotIn('"decision"',public)
+        self.assertNotIn('"hands"',public)
+        self.assertNotIn('"future_wall"',public)
+        self.assertEqual(game.debug_tile_counts()["total"],108)
+
     def test_top_three_and_compliance_are_based_on_actual_pre_cut(self):
         # Synthetic but physically plausible full hand, one forced-suit cut.
         g=FourPlayerOpening(57)
