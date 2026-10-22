@@ -346,6 +346,34 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.match(collect(reviewRoot),/本档案只有动作后手牌/);
   assert.match(collect(reviewRoot),/暗手3张（动作后）/);
 
+  // M3.96: terminal-only PASS/PENG/HU/KONG advice remains accessible
+  // even if PASS generated no independently displayed public board event.
+  result.report.terminal_review.steps[0].hands_before=terminalHands;
+  result.report.terminal_review.operation_reviews=[{
+    seat:0,sequence:2,
+    actual:{action:"pass",tile:null},
+    recommended:{action:"peng",tile:null},
+    candidates:[
+      {action:"peng",tile:null,label:"碰",shanten:1,
+       effective_copies:12,fan_weighted:12,
+       reason:"碰后有效张更多",reference_best:true},
+      {action:"pass",tile:null,label:"过",shanten:1,
+       effective_copies:8,fan_weighted:8,
+       reason:"保留手牌",reference_best:false},
+    ],
+  }];
+  rows=dom["match-archives-list"].children;
+  rows[0].children[2].handlers.click();
+  await settle();
+  assert.match(collect(dom["match-archives-cut-timeline"]),/碰、杠、胡行动比较/);
+  assert.match(collect(dom["match-archives-cut-timeline"]),/参考：碰/);
+  dom["match-archives-actions"].children[1].handlers.click();
+  assert.match(collect(dom["match-archives-board"]),/实际过/);
+  assert.match(collect(dom["match-archives-board"]),/参考碰/);
+  assert.match(collect(dom["match-archives-board"]),/碰后有效张更多/);
+  assert.doesNotMatch(collect(dom["match-archives-board"]),/opponent_hands/);
+  delete result.report.terminal_review.operation_reviews;
+
   // M3.88: one period control governs server-side leaderboard, chart,
   // history list and the grouping totals. Never substitute stale all-time
   // aggregates after the selector changes.

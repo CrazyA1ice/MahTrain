@@ -513,7 +513,81 @@ def sanitize_private_review(value: dict | None) -> dict | None:
                 else:
                     item["cut_review"]["played_candidate"]=None
         clean.append(item)
+    actions=value.get("operation_reviews",[])
+    if type(actions) is not list or len(actions)>4096:
+        raise ValueError("invalid terminal operation review count")
+    safe_actions=[]
+    kinds={"pass","hu","peng","ming_gang","an_gang","bu_gang"}
+    def operation(value):
+        if type(value) is not dict or value.get("action") not in kinds:
+            raise ValueError("invalid operation identity")
+        action=value["action"]
+        tile=value.get("tile")
+        if action in ("an_gang","bu_gang"):
+            if _tile(tile) is None:
+                raise ValueError("own kong requires a legal tile")
+        elif tile is not None:
+            raise ValueError("only own kong action names have a tile suffix")
+        return {"action":action,"tile":tile}
+    for entry in actions:
+        if type(entry) is not dict:
+            raise ValueError("invalid operation review entry")
+        seat=entry.get("seat")
+        seq=entry.get("sequence")
+        if (type(seat) is not int or seat not in range(4) or
+                type(seq) is not int or not 1<=seq<=len(clean)+2):
+            raise ValueError("invalid operation review seat/sequence")
+        actual=operation(entry.get("actual"))
+        recommended=operation(entry.get("recommended"))
+        entries=entry.get("candidates")
+        if type(entries) is not list or not 2<=len(entries)<=6:
+            raise ValueError("invalid operation candidate count")
+        choices=[]
+        seen=set()
+        for option in entries:
+            if type(option) is not dict:
+                raise ValueError("invalid operation candidate")
+            ident=operation(option)
+            pair=(ident["action"],ident["tile"])
+            if pair in seen:
+                raise ValueError("duplicate operation candidate")
+            seen.add(pair)
+            progress=option.get("shanten")
+            copies=option.get("effective_copies")
+            weighted=option.get("fan_weighted")
+            if (progress is not None and
+                    (type(progress) is not int or not -1<=progress<=20)):
+                raise ValueError("invalid candidate shanten")
+            if (copies is not None and
+                    (type(copies) is not int or not 0<=copies<=108)):
+                raise ValueError("invalid candidate copies")
+            if (weighted is not None and
+                    (type(weighted) not in (int,float) or
+                     not 0<=weighted<=100000)):
+                raise ValueError("invalid candidate weighted value")
+            if (type(option.get("label")) is not str or
+                    len(option["label"])>40 or
+                    type(option.get("reason")) is not str or
+                    len(option["reason"])>180 or
+                    type(option.get("reference_best")) is not bool):
+                raise ValueError("invalid operation advice text")
+            choices.append({**ident,"label":option["label"],
+                            "shanten":progress,"effective_copies":copies,
+                            "fan_weighted":weighted,
+                            "reason":option["reason"],
+                            "reference_best":option["reference_best"]})
+        marked=[x for x in choices if x["reference_best"]]
+        if ((actual["action"],actual["tile"]) not in seen or
+            (recommended["action"],recommended["tile"]) not in seen or
+            len(marked)!=1 or
+            (marked[0]["action"],marked[0]["tile"]) !=
+            (recommended["action"],recommended["tile"])):
+            raise ValueError("operation choice must match scored legal options")
+        safe_actions.append({"seat":seat,"sequence":seq,
+                             "actual":actual,"recommended":recommended,
+                             "candidates":choices})
     return {"opening":first,"steps":clean,
+            "operation_reviews":safe_actions,
             "scope":"terminal_replay_only",
             "ranking":"public_information_shanten_ukeire_fan_weighted"}
 

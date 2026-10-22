@@ -8,6 +8,7 @@
   const directions={clockwise:"顺时针",counterclockwise:"逆时针",opposite:"对家"};
   const actionNames={hu:"胡这张",peng:"碰",ming_gang:"明杠",pass:"过",an_gang:"暗杠",bu_gang:"补杠"};
   let token=null,state=null,choice=new Set(),busy=false;
+  let operationSource=null,operationReport=null,operationRequested=null;
   let recoveryRequired=false;
   let pendingDiscard=null,immersive=false,midnightFelt=false;
   // The owner may decline an optional self-kong without losing the right
@@ -33,6 +34,61 @@
   function clearSavedMatchToken(){
     try{window.sessionStorage?.removeItem(MATCH_SESSION_KEY)}
     catch(_){/* no storage access */}
+  }
+  function operationWindow(view){
+    if(!view||view.seat!==0||view.won?.[0])return false;
+    if(["claim_window","rob_kong_window"].includes(view.phase)){
+      const options=view.phase==="claim_window"?view.claim_options:view.rob_options;
+      const pending=view.phase==="claim_window"?view.pending_discard:view.pending_rob_kong;
+      return pending?.seat!==0&&!view.claim_submitted?.includes(0)&&
+        options?.some(k=>k!=="pass");
+    }
+    return ["await_discard","dealer_discard"].includes(view.phase)&&
+      view.turn===0&&(view.can_self_draw_win||view.kong_options?.length>0);
+  }
+  async function loadOperationAdvice(snapshot){
+    if(operationRequested===snapshot)return;
+    operationRequested=snapshot;
+    const currentToken=token;
+    try{
+      const response=await fetch("/api/action",{
+        method:"POST",headers:{"Content-Type":"application/json","X-MahTrain":"1"},
+        body:JSON.stringify({action:"match_operation_hint",
+                             match_token:currentToken}),
+      });
+      const result=await response.json();
+      if(!response.ok)throw Error(result.error||"操作参考不可用");
+      if(state!==snapshot||token!==currentToken)return;
+      if(result.hint?.status!=="choose_operation")return;
+      operationSource=state;operationReport=result.hint;
+      render();
+    }catch(err){
+      // Never block the actual server-authorized Hu/peng/kong choice.
+      if(state===snapshot)console.warn("Action advice unavailable:",err.message);
+    }
+  }
+  function operationAdvice(root){
+    if(operationSource!==state||!operationReport)return;
+    const hint=operationReport;
+    const selected=hint.candidates?.find(x=>x.reference_best);
+    if(!selected)return;
+    const container=el("section","match-decision-hint match-operation-advice");
+    container.append(el("strong","","当前参考："+selected.label));
+    container.append(el("p","",selected.reason));
+    // Keep the fixed-size central board readable: complete comparison is
+    // expandable, rather than growing the decision overlay by default.
+    const listing=el("details","match-operation-alternatives");
+    listing.append(el("summary","","展开全部合法操作对比"));
+    for(const option of hint.candidates||[]){
+      listing.append(el("span","",option.label+
+        (option.reference_best?"（推荐）":"")+
+        (option.shanten===null?" · 规则已确认可胡":
+         " · 向听"+option.shanten+" · 有效张≤"+option.effective_copies+
+         " · 番值代理"+option.fan_weighted)));
+    }
+    listing.append(el("small","",hint.limitations));
+    container.append(listing);
+    root.append(container);
   }
   function syncHomeMatchHint(){
     const label=$("home-match-state");
@@ -66,6 +122,7 @@
     voice?.reset();
     syncVoiceControls();
     token=stored;state=snapshot;
+    operationSource=null;operationReport=null;operationRequested=null;
     choice.clear();pendingDiscard=null;
     dismissedKongKey=null;kongPromptReopened=false;
     liveBoard=null;reviewHistory=[];reviewDropped=0;reviewSelected=null;
@@ -255,6 +312,7 @@
         $("match-review-type-filter").value="all";
       }
       token=data.match_token;state=data.match;choice.clear();
+      operationSource=null;operationReport=null;operationRequested=null;
       recoveryRequired=false;
       kongPromptReopened=false;
       saveMatchToken();
@@ -1124,6 +1182,9 @@
   }
 
   function render(){
+    if(operationWindow(state)&&operationRequested!==state){
+      void loadOperationAdvice(state);
+    }
     if(!state)return;
     $("match-stage").hidden=false;
     const phaseLabels={
@@ -1237,6 +1298,7 @@
         reactions.append(btn);
       }
       decision.append(reactions);
+      operationAdvice(decision);
       decision.hidden=false;
       }
     }else if(phase==="dealer_discard"||phase==="await_discard"){
@@ -1267,6 +1329,7 @@
             "按服务器当前已确认牌型和仍未胡的玩家计算；点击胡牌后正式结算，不含杠钱及流局赔付。"));
           controls.append(preview);
         }
+        operationAdvice(controls);
         controls.append(button("胡！确认自摸入账",
           "primary match-self-win-action",
           ()=>action("match_win")));
@@ -1306,6 +1369,7 @@
               render();
             }));
           decision.append(kongActions);
+          operationAdvice(decision);
           decision.hidden=false;
         }
       }
