@@ -6,7 +6,7 @@
   const cutQuality=()=>window.MahTrainCutQuality;
   let listed=[],opened=null,selected=new Set(),frames=[],active=null;
   // The saved cut adviser scored PRE-discard cards, not the post-action board.
-  let handPhase="auto";
+  let handPhase="auto",reviewSeat=0;
   let lastGrouping=null,refreshVersion=0;
   const el=(tag,kind,txt)=>{
     const n=document.createElement(tag);
@@ -250,7 +250,8 @@
         "当前显示四家"+(shownPhase==="before"?"动作前":"动作后")+
         "真实手牌；下方的牌河、副露、已胡标记及牌山数量始终来自动作后公开快照。"+
         (snapshot?.cut_review&&shownPhase==="before"?
-          "切牌前三推荐以这里的0号出牌前手牌和当时可见公开信息计算。":"")));
+          "切牌前三推荐以这里的"+(snapshot.cut_review.seat??0)+
+          "号出牌前手牌和当时可见公开信息计算。":"")));
     }else if(snapshot?.cut_review){
       root.append(el("p","review-footnote",
         "旧档案未保存本巡出牌前手牌，无法直接核对决策时刻；请勿将动作后牌面当作评分输入。"));
@@ -265,8 +266,9 @@
     }
     if(snapshot?.cut_review){
       const cut=snapshot.cut_review;
+      const who=(cut.seat??0)===0?"你":(cut.seat+"号AI");
       const head=el("p","match-archive-cut-note",
-        "本巡你切 "+cut.discard+" · "+
+        "本巡"+who+"切 "+cut.discard+" · "+
         (cut.optimal?"符合并列最优方案":("未符合最优方案"+
         (cut.rank?"（排序第"+cut.rank+"）":""))));
       root.append(head);
@@ -310,7 +312,7 @@
         for(const tile of actual){
           const tileView=el("span","match-archive-revealed-tile",
             tile.slice(1)+(suit[tile[0]]||tile[0]));
-          if(seat===0&&shownPhase==="before"&&
+          if(seat===(snapshot?.cut_review?.seat??0)&&shownPhase==="before"&&
              snapshot?.cut_review?.discard===tile){
             tileView.classList.add("match-archive-actual-cut");
             tileView.setAttribute("title","本巡实际切出的牌型");
@@ -364,19 +366,24 @@
     }
     renderArchiveBoard(shown.find(f=>f.sequence===active));
   }
-  function renderCutTimeline(report){
+  function renderCutTimeline(report,seat=0){
     const root=$("match-archives-cut-timeline");
     if(!root)return;
     root.replaceChildren();
     const review=report?.terminal_review;
     const decisions=(review?.steps||[]).flatMap((step,index)=>
-      step.cut_review?[{step:index+2,cut:step.cut_review}]:[]);
+      step.cut_review&&(step.cut_review.seat??0)===seat?
+        [{step:index+2,cut:step.cut_review}]:[]);
     if(!decisions.length){
       root.append(el("p","review-footnote",
-        "本局无可用逐巡切牌评分；早期档案没有保存真实暗手，无法补算。"));
+        (seat===0?"本局无可用逐巡切牌评分":
+          seat+"号AI没有已保存的逐巡切牌评分")+
+        "；早期档案没有保存该座位的切牌评分，无法补算。"));
       return;
     }
-    const header=el("strong","","我的逐巡切牌对照 · 共"+decisions.length+"巡");
+    const header=el("strong","",seat===0?
+      "我的逐巡切牌对照 · 共"+decisions.length+"巡":
+      seat+"号AI逐巡切牌对照 · 共"+decisions.length+"巡");
     root.append(header);
     const choices=el("div","match-archive-cut-timeline-list");
     let optimal=0;
@@ -411,6 +418,64 @@
       " 巡。点击任一巡可回到当时四家真实手牌和前三种切牌的逐步对照。"));
     root.append(choices);
   }
+  function cutReviewsForSeat(report,seat){
+    return (report?.terminal_review?.steps||[])
+      .map(step=>step.cut_review)
+      .filter(cut=>cut&&(cut.seat??0)===seat);
+  }
+  function renderReviewAnalytics(report){
+    const heading=$("match-archives-review-summary");
+    heading.replaceChildren();
+    const all=[0,1,2,3].map(seat=>cutReviewsForSeat(report,seat));
+    const cuts=all[reviewSeat],reviewed=cuts.length;
+    const optimal=cuts.filter(x=>x.optimal).length;
+    const label=reviewSeat===0?"整局最优切符合率：":
+      reviewSeat+"号AI切牌参考符合率：";
+    heading.append(el("strong","",label+(reviewed?
+      (optimal/reviewed*100).toFixed(1)+"%（"+optimal+"/"+reviewed+"巡）":
+      "不可计算")));
+    const controls=el("div","match-archive-seat-compare");
+    for(let seat=0;seat<4;seat++){
+      const choices=all[seat],pass=choices.filter(x=>x.optimal).length;
+      const title=(seat===0?"0号 · 玩家":seat+"号 · AI")+
+        "｜"+(choices.length?(pass/choices.length*100).toFixed(1)+"%"+
+          "（"+pass+"/"+choices.length+"巡）":"无有效切牌评分");
+      const btn=makeButton(title,()=>{
+        reviewSeat=seat;
+        renderReviewAnalytics(report);
+      });
+      btn.setAttribute("aria-pressed",String(reviewSeat===seat));
+      if(reviewSeat===seat)btn.classList.add("is-selected");
+      controls.append(btn);
+    }
+    heading.append(controls);
+    heading.append(el("p","",reviewed?
+      "按该座位每次出牌前自己的手牌及当时公开信息，用向听数优先、有效进张和听牌基础番值加权排序；并列第一也视为符合。此项不是完全信息最优策略；AI实际可能采用不同风险和收益权衡。":
+      "该座位缺少可验证的逐巡切牌评分；早期档案不能凭终局四家明牌补算，也不能根据胜负推测符合率。"));
+    const stages=$("match-archives-stage-summary");
+    if(stages){
+      stages.replaceChildren();
+      if(reviewed){
+        stages.append(el("strong","",
+          (reviewSeat===0?"我的":reviewSeat+"号AI")+"整局切牌质量分段 · 按已记录切牌顺序均分"));
+        for(const part of cutQuality().thirds(cuts)){
+          const card=el("div","match-archive-stage-card");
+          card.append(el("strong","",part.name+
+            " · 符合最优 "+part.optimal+"/"+part.total));
+          card.append(el("span","",
+            "退向听 "+part.regressed+" 巡 · 同向听有效张损失 "+
+            part.ukeireLoss+" 巡 · 听牌番值权重落后 "+
+            part.weightedLoss+" 巡"));
+          if(part.unrated)card.append(el("small","",
+            "历史指标缺失 "+part.unrated+" 巡，不强行补算"));
+          stages.append(card);
+        }
+        stages.append(el("p","review-footnote",
+          "有效张与番值都是该座位当时公开信息下的未知张数上界比较；不是胡牌概率、实际剩余墙牌或确定可得的分数。"));
+      }
+    }
+    renderCutTimeline(report,reviewSeat);
+  }
   async function openMatch(archiveId){
     try{
       $("match-archives-message").textContent="";
@@ -421,7 +486,7 @@
         report.steps||[],report.opening);
       frames=[...(start?[start]:[]),...steps]
         .map((frame,index)=>({...frame,sequence:index+1}));
-      opened=details;active=null;handPhase="auto";
+      opened=details;active=null;handPhase="auto";reviewSeat=0;
       $("match-archives-seat").value="all";
       $("match-archives-action").value="all";
       $("match-archives-detail").hidden=false;
@@ -476,40 +541,7 @@
           e.amount+(e.stage==="da_jiao"?
             " · "+e.effective_fan+"番":"")));
       }
-      const review=report.terminal_review;
-      const cuts=(review?.steps||[]).map(x=>x.cut_review).filter(Boolean);
-      const reviewed=cuts.length;
-      const optimal=cuts.filter(x=>x.optimal).length;
-      const heading=$("match-archives-review-summary");
-      heading.replaceChildren();
-      heading.append(el("strong","","整局最优切符合率："+(reviewed?
-        (optimal/reviewed*100).toFixed(1)+"%（"+optimal+"/"+reviewed+"巡）":
-        "不可计算")));
-      heading.append(el("p","",reviewed?
-        "按每次出牌前己方手牌与当时公开信息，用向听数优先、有效进张与听牌番值加权排序；并列第一也视为符合。此项不是完全信息下的保证最优策略。":
-        "本局缺少可验证的逐巡切牌数据，不能根据最终胜负推测最优切符合率。"));
-      const stages=$("match-archives-stage-summary");
-      if(stages){
-        stages.replaceChildren();
-        if(reviewed){
-          stages.append(el("strong","","整局切牌质量分段 · 按已记录切牌顺序均分"));
-          for(const part of cutQuality().thirds(cuts)){
-            const card=el("div","match-archive-stage-card");
-            card.append(el("strong","",part.name+
-              " · 符合最优 "+part.optimal+"/"+part.total));
-            card.append(el("span","",
-              "退向听 "+part.regressed+" 巡 · 同向听有效张损失 "+
-              part.ukeireLoss+" 巡 · 听牌番值权重落后 "+
-              part.weightedLoss+" 巡"));
-            if(part.unrated)card.append(el("small","",
-              "历史指标缺失 "+part.unrated+" 巡，不强行补算"));
-            stages.append(card);
-          }
-          stages.append(el("p","review-footnote",
-            "有效张与番值都是当时公开信息下的未知张数上界比较；不是胡牌概率、实际剩余墙牌或确定可得的分数。"));
-        }
-      }
-      renderCutTimeline(report);
+      renderReviewAnalytics(report);
       renderSteps();
     }catch(err){fail(err)}
   }

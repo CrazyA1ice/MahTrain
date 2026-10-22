@@ -202,16 +202,25 @@ def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
     assert all(len(row["hands_after"])==4 for row in detail["steps"])
     cuts=[row["cut_review"] for row in detail["steps"]
           if row.get("cut_review") is not None]
-    actual=sum(e.get("type")=="discard" and e.get("seat")==0
-               for row in detail["steps"] for e in row["events"])
-    assert len(cuts)==actual,(len(cuts),actual)
-    assert cuts,"finished game must record at least one human cut"
-    assert all(len(row["top3"])<=3 for row in cuts)
-    assert all(row["cut_review"]["discard"] in row["hands_before"][0]
+    # M3.92: scores now belong to ALL four seats; comparing the global
+    # total against human-only discards would mistake legitimate AI
+    # assessments for additional human choices.
+    recorded=[sum(cut.get("seat",0)==seat for cut in cuts)
+              for seat in range(4)]
+    actual=[sum(e.get("type")=="discard" and e.get("seat")==seat
+                for row in detail["steps"] for e in row["events"])
+            for seat in range(4)]
+    assert recorded==actual,(recorded,actual)
+    assert recorded[0]>0,"finished game must record at least one human cut"
+    assert all(len(cut["top3"])<=3 for cut in cuts)
+    assert all(row["cut_review"]["discard"] in
+               row["hands_before"][row["cut_review"].get("seat",0)]
                for row in detail["steps"] if row.get("cut_review") is not None)
     print("REAL COMPLETED GAME FOUR-HAND HISTORY/TOP3: PASS",{
-        "seed":seed,"steps":len(detail["steps"]),"human_cuts":len(cuts),
-        "optimal":sum(row["optimal"] for row in cuts)},flush=True)
+        "seed":seed,"steps":len(detail["steps"]),
+        "seat_cuts":recorded,"optimal_by_seat":[
+            sum(cut.get("seat",0)==seat and cut["optimal"] for cut in cuts)
+            for seat in range(4)]},flush=True)
     return {"seed":seed,"level":level,"token":token,"steps":step,
             "events":seen_kinds,"match_archive_id":view["match_archive_id"],
             "win_count":len(view["win_ledger"]["wins"]),

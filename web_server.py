@@ -266,8 +266,12 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
     # into live HTTP steps or public replay; archived after verified terminal.
     trace=getattr(game,"_terminal_review_trace",None)
     prior=([list(hand) for hand in game._hands] if trace is not None else None)
-    previous_view=(game.private_view(0) if trace is not None and game.turn == 0 and
-                   game.phase in ("await_discard","dealer_discard") else None)
+    # This view is captured on the trusted server before the action. Keep
+    # the live match_hint endpoint strictly seat-zero-only.
+    candidate_seat=(game.turn if trace is not None and
+                    game.phase in ("await_discard","dealer_discard") else None)
+    previous_view=(game.private_view(candidate_seat)
+                   if candidate_seat is not None else None)
     before = len(game._events)
     action()
     _match_public_step(game, before, output)
@@ -281,24 +285,25 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
                 "hands_before":prior,
                 "hands_after":[list(hand) for hand in game._hands]}
         if previous_view is not None and any(
-                e.get("type")=="discard" and e.get("seat")==0 for e in events):
-            from mahtrain_core.classic_hint import classic_hand_hint
-            # This is the same seat-zero PUBLIC-KNOWLEDGE adviser available
-            # during the live turn, never an omniscient four-hand ranking.
+                e.get("type")=="discard" and e.get("seat")==candidate_seat
+                for e in events):
+            from mahtrain_core.classic_hint import classic_archive_seat_hint
+            # M3.92: independent contemporaneous *own-seat* view for 0..3.
+            # Never pass the full terminal four-hand snapshot to the scorer.
             try:
-                report=classic_hand_hint(previous_view)
+                report=classic_archive_seat_hint(previous_view,candidate_seat)
             except (ValueError, KeyError, TypeError):
                 # A replay-advice issue must not roll back a CONFIRMED
                 # physical discard; leave the advisory result absent.
                 report={"candidates":[]}
             played=next(e["tile"] for e in events
-                        if e.get("type")=="discard" and e.get("seat")==0)
+                        if e.get("type")=="discard" and e.get("seat")==candidate_seat)
             candidates=report.get("candidates") or []
             best=next((i for i,x in enumerate(candidates)
                        if x["discard"]==played),None)
             if candidates:
                 detail["cut_review"]={
-                    "seat":0,"discard":played,
+                    "seat":candidate_seat,"discard":played,
                     "optimal":bool(best is not None and
                                    candidates[best]["reference_best"]),
                     "rank":best+1 if best is not None else None,
