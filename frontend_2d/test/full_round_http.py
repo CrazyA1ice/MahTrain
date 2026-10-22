@@ -126,6 +126,7 @@ def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
     visible={}
     seen_kinds={}
     hint_checked=False
+    operation_checked=False
     for step in range(450):
         if view["phase"] in ("finished","wall_exhausted"):
             break
@@ -160,6 +161,46 @@ def finish_round(seed:int, level:str="basic") -> tuple[dict,dict,list[dict]]:
             print("REAL AUTHORIZED HINT HTTP: PASS",{
                 "seed":seed,"status":hint["status"],
                 "candidates":len(hint["candidates"]),
+            },flush=True)
+        # M3.96: operation recommendation is only available at a real
+        # seat-zero optional claim / own-kong / verified-Hu window.
+        candidate_operation=False
+        if view["phase"] in ("claim_window","rob_kong_window"):
+            offered=(view["claim_options"] if view["phase"]=="claim_window"
+                     else view["rob_options"])
+            pending=(view["pending_discard"] if view["phase"]=="claim_window"
+                     else view["pending_rob_kong"])
+            candidate_operation=(pending and pending["seat"]!=0 and
+                not 0 in (view.get("claim_submitted") or []) and
+                any(action!="pass" for action in offered))
+        elif (view["phase"] in ("await_discard","dealer_discard")
+              and view["turn"]==0 and not view["won"][0]):
+            candidate_operation=bool(
+                view["can_self_draw_win"] or view["kong_options"])
+        if candidate_operation and not operation_checked:
+            stable=post({"action":"match_resume","match_token":token})["match"]
+            outcome=post({"action":"match_operation_hint","match_token":token})
+            report=outcome["hint"]
+            assert outcome["match_token"]==token
+            assert "match" not in outcome
+            assert report["status"]=="choose_operation"
+            assert report["seat"]==0
+            assert len(report["candidates"])>=2
+            assert sum(bool(x["reference_best"]) for x in report["candidates"])==1
+            picked=report["recommended"]
+            assert any((c["action"],c["tile"])==
+                       (picked["action"],picked["tile"])
+                       for c in report["candidates"])
+            assert "future_wall" not in str(report)
+            after=post({"action":"match_resume","match_token":token})["match"]
+            for field in ("phase","turn","hand","wall_count","discards",
+                          "win_ledger","kong_ledger"):
+                assert after[field]==stable[field],field
+            operation_checked=True
+            print("REAL OPERATION HINT HTTP: PASS",{
+                "seed":seed,"phase":view["phase"],
+                "recommended":picked["action"],
+                "candidates":len(report["candidates"]),
             },flush=True)
         cmd=next_human(view,human)
         response=post({"match_token":token,**cmd})
