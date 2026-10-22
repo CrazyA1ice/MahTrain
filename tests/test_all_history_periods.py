@@ -31,7 +31,7 @@ class HistoryPeriodCoverage(unittest.TestCase):
                   VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
                     ("quiz-"+str(i),date,"one_shanten","basic",
                      "question-"+str(i),"local",int(i>0),"",
-                     "{}","\"m1\"","{}"))
+                     "{}","\"m1\"","{\\\"error_types\\\":[]}"))
 
     def tearDown(self):self.tmp.cleanup()
 
