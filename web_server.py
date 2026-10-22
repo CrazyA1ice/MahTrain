@@ -88,6 +88,7 @@ _STATIC = {
     "/match_voice.js": ROOT / "web" / "match_voice.js",
     "/match_archives.js": ROOT / "web" / "match_archives.js",
     "/match_stats.js": ROOT / "web" / "match_stats.js",
+    "/match_cut_quality.js": ROOT / "web" / "match_cut_quality.js",
     "/navigation.js": ROOT / "web" / "navigation.js",
     "/ai_replay.js": ROOT / "web" / "ai_replay.js",
     "/ai_baseline.js": ROOT / "web" / "ai_baseline.js",
