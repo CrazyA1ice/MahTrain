@@ -32,7 +32,7 @@ python examples/compare_challenge_reference_paired.py --start 8407 --seeds 2 --r
 
 ## 首轮真实小样本结果（GitHub Actions）
 
-CI 工作流 `paired-cut-study` 已真实执行 `seed_start=8407, seeds=2, rotations=4`，即两组独立洗牌种子、各四座位轮换，**共8组配对（16局完整对战）**。实验输出取自通过的 [GitHub Actions 工作流](https://github.com/CrazyA1ice/MahTrain/actions/runs/39749325649)；若工作流编号随重跑变化，以当前 PR 的 `paired-cut-study` 日志为准。
+CI 工作流 `paired-cut-study` 已真实执行 `seed_start=8407, seeds=2, rotations=4`，即两组独立洗牌种子、各四座位轮换，**共8组配对（16局完整对战）**。实验输出取自通过的 [GitHub Actions 工作流](https://github.com/CrazyA1ice/MahTrain/actions/runs/39752837550)；若工作流编号随重跑变化，以当前 PR 的 `paired-cut-study` 日志为准。
 
 | 指标 | 测量值 |
 |---|---:|
