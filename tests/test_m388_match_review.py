@@ -93,7 +93,7 @@ class HistoryReviewTests(unittest.TestCase):
                 "events":[],"cut_review":{"seat":0,"discard":"m1",
                     "top3":[{"tile":"ILLEGAL"}]}}]},
             {"opening":hands,"steps":[{"hands_before":hands,"hands_after":hands,
-                "events":[],"cut_review":{"seat":1,"discard":"m1","top3":[]}}]},
+                "events":[],"cut_review":{"seat":4,"discard":"m1","top3":[]}}]},
         ):
             with self.assertRaises(ValueError):
                 sanitize_private_review(bad)
