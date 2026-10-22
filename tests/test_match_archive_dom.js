@@ -19,6 +19,7 @@ class Node{
 }
 const ids=[
   "match-archives-refresh","match-archives-list","match-archives-summary",
+  "match-archives-period","match-archives-review-summary",
   "match-archives-detail","match-archives-compare","match-archives-export",
   "match-archives-board","match-archives-seat","match-archives-action",
   "match-archives-message","match-archives-comparison",
@@ -32,6 +33,7 @@ const ids=[
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
 dom["match-archives-seat"].value="all";
+dom["match-archives-period"].value="all";
 dom["match-archives-action"].value="all";
 dom["match-history-groups-mode"].value="ai";
 const board=(n,wall,won)=>({
