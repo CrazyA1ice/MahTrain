@@ -94,6 +94,10 @@ try{
  const baseline=await rect();
  const labels=()=>page.locator("#classic-actions-buttons button").allTextContents();
  assert.deepEqual(await labels(),["自摸胡","暗杠 四万","补杠 七筒"]);
+ await page.waitForFunction(()=>document.querySelector(
+  "#classic-operation-hint-panel")?.textContent?.includes("当前建议：胡"));
+ assert.ok((await page.locator("#classic-actions-title").textContent())
+  .includes("参考：胡"),"central action chooser also shows current advice");
  assert.equal(await page.locator("#classic-live-action").count(),0);
  await page.getByRole("button",{name:"暗杠 四万"}).click();
  await page.waitForFunction(()=>document.querySelector("#classic-actions-title")
