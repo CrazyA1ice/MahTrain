@@ -262,7 +262,7 @@ def _match_public_step(game: FourPlayerOpening, before_events: int,
 
 
 def _match_record(game: FourPlayerOpening, output: list[dict],
-                  action) -> None:
+                  action, *, decision: tuple[int, str, str | None] | None = None) -> None:
     # Keep exact four-seat hand views server-side ONLY. They are never put
     # into live HTTP steps or public replay; archived after verified terminal.
     trace=getattr(game,"_terminal_review_trace",None)
@@ -273,9 +273,33 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
                     game.phase in ("await_discard","dealer_discard") else None)
     previous_view=(game.private_view(candidate_seat)
                    if candidate_seat is not None else None)
+    operation_advice = None
+    if decision is not None and trace is not None:
+        # A legal decision is evaluated from that SEAT's own pre-action
+        # private view. PASS decisions may not emit a public rule event.
+        try:
+            operation_advice = classic_operation_hint(
+                game.private_view(decision[0]), decision[0])
+        except (ValueError, KeyError, TypeError):
+            # Advisory failure must never roll back a legitimate physical act.
+            pass
     before = len(game._events)
     action()
     _match_public_step(game, before, output)
+    if operation_advice is not None:
+        selected = {"action": decision[1], "tile": decision[2]}
+        if any(
+            (row["action"], row["tile"]) ==
+            (selected["action"], selected["tile"])
+            for row in operation_advice["candidates"]
+        ):
+            game._terminal_operation_reviews.append({
+                "seat": decision[0],
+                "sequence": len(trace) + 2,
+                "actual": selected,
+                "recommended": operation_advice["recommended"],
+                "candidates": operation_advice["candidates"],
+            })
     events=game._events[before:]
     if events and trace is not None:
         detail={"events": [
@@ -370,10 +394,12 @@ def _match_script_until_human(
                                rob=(phase=="rob_kong_window")))
                 if phase=="claim_window":
                     _match_record(game,steps,lambda seat=seat,selection=selection:
-                                  game.respond_discard(seat,selection))
+                                  game.respond_discard(seat,selection),
+                                  decision=(seat,selection,None))
                 else:
                     _match_record(game,steps,lambda seat=seat,selection=selection:
-                                  game.respond_rob_kong(seat,selection))
+                                  game.respond_rob_kong(seat,selection),
+                                  decision=(seat,selection,None))
                 if max_actions != 512:
                     return  # One confirmed response at a time.
                 if game.phase!=phase:
@@ -392,12 +418,14 @@ def _match_script_until_human(
             view=game.private_view(seat)
             agent=agents[seat]
             if view["can_self_draw_win"]:
-                _match_record(game,steps,lambda: game.declare_self_win(seat))
+                _match_record(game,steps,lambda: game.declare_self_win(seat),
+                               decision=(seat,"hu",None))
                 continue
             chosen_kong=agent.kong(view)
             if chosen_kong is not None:
                 _match_record(game,steps,lambda: game.declare_kong(
-                    seat,chosen_kong["type"],chosen_kong["tile"]))
+                    seat,chosen_kong["type"],chosen_kong["tile"]),
+                    decision=(seat,chosen_kong["type"],chosen_kong["tile"]))
                 continue
             choice = agent.discard(view)
             _match_record(game,steps,lambda: game.discard(seat,choice))
@@ -710,6 +738,7 @@ def _process(action: str, payload: dict) -> dict:
                 _MATCH_SUCCESSORS[old_token]=token
             game._terminal_review_opening=[list(h) for h in game._hands]
             game._terminal_review_trace=[]
+            game._terminal_operation_reviews=[]
             _MATCH_SESSIONS[token]=game
             _MATCH_AGENTS[token]=agents
             _MATCH_HISTORY[token]=[]
@@ -801,18 +830,22 @@ def _process(action: str, payload: dict) -> dict:
                 # AI acts via match_continue after the short visual frame.
             elif action=="match_claim":
                 _match_record(game,steps,lambda: game.respond_discard(
-                    0,payload.get("choice")))
+                    0,payload.get("choice")),
+                    decision=(0,payload.get("choice"),None))
                 # AI acts via match_continue after the short visual frame.
             elif action=="match_rob":
                 _match_record(game,steps,lambda: game.respond_rob_kong(
-                    0,payload.get("choice")))
+                    0,payload.get("choice")),
+                    decision=(0,payload.get("choice"),None))
                 # AI acts via match_continue after the short visual frame.
             elif action=="match_kong":
                 _match_record(game,steps,lambda: game.declare_kong(
-                    0,payload.get("kind"),payload.get("tile")))
+                    0,payload.get("kind"),payload.get("tile")),
+                    decision=(0,payload.get("kind"),payload.get("tile")))
                 # AI acts via match_continue after the short visual frame.
             elif action=="match_win":
-                _match_record(game,steps,lambda: game.declare_self_win(0))
+                _match_record(game,steps,lambda: game.declare_self_win(0),
+                    decision=(0,"hu",None))
                 # AI acts via match_continue after the short visual frame.
             view=_match_private_view(game,agents)
             view["needs_continue"]=_match_requires_continue(game)
@@ -828,6 +861,7 @@ def _process(action: str, payload: dict) -> dict:
                     private_review={
                         "opening":game._terminal_review_opening,
                         "steps":game._terminal_review_trace,
+                        "operation_reviews":game._terminal_operation_reviews,
                     })
                 _MATCH_ARCHIVE_IDS[token]=archive_id
             view["match_archive_id"]=_MATCH_ARCHIVE_IDS.get(token)
