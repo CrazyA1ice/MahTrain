@@ -428,7 +428,10 @@ def _match_script_until_human(
                     decision=(seat,chosen_kong["type"],chosen_kong["tile"]))
                 continue
             choice = agent.discard(view)
-            _match_record(game,steps,lambda: game.discard(seat,choice))
+            # Declining an offered own kong/Hu is itself a real operation
+            # decision. The subsequent discard is how PASS becomes final.
+            _match_record(game,steps,lambda: game.discard(seat,choice),
+                          decision=(seat,"pass",None))
             continue
         raise RuntimeError("unexpected AI match phase: "+str(phase))
     if max_actions == 512:
@@ -824,9 +827,12 @@ def _process(action: str, payload: dict) -> dict:
                                   game.select_missing(s,suit))
                 # AI acts via match_continue after the short visual frame.
             elif action=="match_discard":
+                # Do not lose the decision to skip a legal own Hu/kong; both
+                # AI and human may explicitly continue by discarding.
                 _match_record(game,steps,lambda: game.discard(
                     0,payload.get("tile"),
-                    from_draw=payload.get("from_draw")))
+                    from_draw=payload.get("from_draw")),
+                    decision=(0,"pass",None))
                 # AI acts via match_continue after the short visual frame.
             elif action=="match_claim":
                 _match_record(game,steps,lambda: game.respond_discard(
