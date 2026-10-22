@@ -21,7 +21,7 @@ from mahtrain_core.ai_public_bugang_rob_pilot import (
 def public_snapshot():
     return {
         "phase":"await_discard","turn":0,"wall_count":35,
-        "missing_suits":["p","m","p","m"],
+        "missing_suits":["p","m","s","m"],
         "won":[False,False,False,False],
         "melds":[
             [{"type":"peng","tile":"s9"}],
