@@ -44,3 +44,18 @@ node tests/test_match_archive_dom.js
 ## 下一步研究
 
 “**最优行动**”还需要在多局真实完整净积分环境下验证。未来要建立严格训练/保留种子分组，比较风险衰减、合法碰后损失未来番型、尾牌杠分和抢杠成本，并把新增公共候选参考与真实胜负收益清楚分开。本轮提供**能够逐项比较并解释的操作推荐**，但不把启发式误写成已证明博弈最优。
+
+### 本地更新与2D前端构建
+
+`web/match.js` 的经典网页版直接由本地 Python 服务提供。独立的 `/classic/game.html` 2D牌桌则使用 Vite 编译产物目录 `frontend_2d/dist`，修改其 `src/*.mjs` 后，需要重新构建才能在本地运行的新界面看见操作建议：
+
+```bash
+git pull origin main
+cd frontend_2d
+npm ci
+npm run build
+cd ..
+python web_server.py
+```
+
+工作流中的经典浏览器集成检查也会在启动浏览器测试前编译2D资源。不要仅更新 `src` 而继续使用旧 `dist`，否则新提示 UI 看不到；此情况并不代表后端没有实现。更新不会覆盖真实对局数据库。
