@@ -10,7 +10,7 @@ import json
 import re
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from .settlement import SELF_DRAW_MODES, payer_multiplier
@@ -561,39 +561,60 @@ class MatchArchive:
             raise ValueError("invalid match archive id")
         return value
 
-    def list_completed(self, limit: int=30) -> dict:
-        if type(limit) is not int or not 1 <= limit <= 100:
-            raise ValueError("match archive limit must be between 1 and 100")
+    def list_completed(self, limit: int=500, *, period: str='all') -> dict:
+        if type(limit) is not int or not 1 <= limit <= 5000:
+            raise ValueError("match archive limit must be between 1 and 5000")
+        after = self._period_after(period)
+        clause = "WHERE created_at >= ?" if after else ""
+        args = (after,) if after else ()
         with self._connect() as db:
             rows = db.execute("""
                 SELECT archive_id,created_at,phase,dealer,win_count,
                        steps_count,win_b0,
                        COALESCE(settled_b0,win_b0) AS settled_b0
                        FROM completed_matches
-                ORDER BY created_at DESC,archive_id DESC LIMIT ?""",(limit,)).fetchall()
+                """ + clause + """
+                ORDER BY created_at DESC,archive_id DESC LIMIT ?""",
+                (*args,limit)).fetchall()
             total = db.execute("""
                 SELECT COUNT(*) AS games,COALESCE(AVG(win_b0),0) AS average_b0,
                 COALESCE(AVG(COALESCE(settled_b0,win_b0)),0)
                     AS average_settled_b0,
                 COALESCE(SUM(win_count),0) AS paid_wins
-                FROM completed_matches""").fetchone()
+                FROM completed_matches """ + clause,
+                args).fetchone()
         return {"matches":[dict(x) for x in rows],
+                "period":period,"listed":len(rows),
                 "summary":{"games":total["games"],
                            "average_player0_win_balance":total["average_b0"],
                            "average_player0_settled_balance":
                                total["average_settled_b0"],
                            "paid_wins":total["paid_wins"]},
-                "scorecard":self.four_seat_scorecard()}
+                "scorecard":self.four_seat_scorecard(period=period)}
 
-    def four_seat_scorecard(self, *, trend_limit: int = 30) -> dict:
+    @staticmethod
+    def _period_after(period: str) -> str | None:
+        # UTC archive stamps and a UTC cutoff, never mixed local offsets.
+        spans={"all":None,"week":timedelta(days=7),
+               "month":timedelta(days=30),"year":timedelta(days=365)}
+        if type(period) is not str or period not in spans:
+            raise ValueError("period must be all/week/month/year")
+        delta=spans[period]
+        return ((datetime.now(timezone.utc)-delta).isoformat(timespec="seconds")
+                if delta is not None else None)
+
+    def four_seat_scorecard(self, *, trend_limit: int | None = None,
+                            period: str = "all") -> dict:
         """Aggregate ALL completed public archive scores for fixed seats.
 
         Seats 1-3 are positions, NOT persistent AI identities: difficulty
         assignments may change between games. Exclude malformed legacy
         archives visibly instead of fabricating missing settled scores.
         """
-        if type(trend_limit) is not int or not 1 <= trend_limit <= 100:
-            raise ValueError("trend limit must be from 1 to 100")
+        if trend_limit is not None and (
+                type(trend_limit) is not int or not 1 <= trend_limit <= 10000):
+            raise ValueError("trend limit must be from 1 to 10000")
+        after=self._period_after(period)
         totals = [[0] * 4 for _ in range(4)]  # HU, draw, kong, official
         kong_included_games = 0
         pos = [0] * 4
@@ -609,8 +630,9 @@ class MatchArchive:
             rows = db.execute("""
                 SELECT archive_id,created_at,record_json
                 FROM completed_matches
+                """ + ("WHERE created_at >= ?" if after else "") + """
                 ORDER BY created_at ASC,archive_id ASC
-            """)
+            """, (after,) if after else ())
             for row in rows:
                 try:
                     report = json.loads(row["record_json"])
@@ -654,14 +676,15 @@ class MatchArchive:
                     "score": official[0],
                     "cumulative": cumulative,
                 })
-                if len(trends) > trend_limit:
+                if trend_limit is not None and len(trends) > trend_limit:
                     trends.pop(0)
         if any(sum(values) != 0 for values in totals):
             raise ValueError("non-zero-sum archived history")
         return {
             "valid_games": valid,
             "excluded_games": skipped,
-            "scope": "all_saved_completed_games",
+            "scope": "period_filtered_completed_games",
+            "period":period,
             "kong_included": kong_included_games > 0,
             "kong_included_games": kong_included_games,
             "seats": [{
