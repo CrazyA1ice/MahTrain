@@ -574,7 +574,7 @@
         <section id="match-archives-detail" class="match-archives-detail" hidden>
           <div class="match-archives-detail-head">
             <strong id="match-archives-title">已保存对局</strong>
-            <a id="match-archives-export" href="#" download="mahtrain_match.json">导出完整公开复盘 JSON</a>
+            <a id="match-archives-export" href="#" download="mahtrain_match.json">导出历史复盘 JSON</a>
           </div>
           <p id="match-archives-detail-summary"></p>
           <div id="match-archives-balances" class="match-archives-balances"></div>
@@ -598,8 +598,9 @@
           </div>
           <p id="match-archives-count"></p>
           <div id="match-archives-actions" class="match-archives-actions"></div>
+          <div id="match-archives-review-summary" class="match-archive-review-summary" aria-live="polite"></div>
           <div id="match-archives-board" class="match-archives-board"></div>
-          <p class="review-footnote">这里仅能查看公开局面，不会恢复对战或暴露任何历史暗手。浏览器刷新后可从 SQLite 重新打开已完成对局；本地档案没有账户登录或云同步。</p>
+          <p class="review-footnote">仅完成对局的新版档案可展示当时真实四家手牌及出牌前三参考；旧版没有保存暗手的档案仅能公开复盘，不会伪造历史。复盘不等于实时窥牌，无法恢复对战。本地档案不提供账户云同步。</p>
         </section>
       </section>
       <section id="four-player-demo" class="panel table-demo">
