@@ -2628,3 +2628,17 @@
 .match-archive-revealed-tile.match-archive-actual-cut{
   outline:2px solid #cc673b;outline-offset:1px;background:#fff0dc;
 }
+
+/* M3.92: compare the exact same public-knowledge reference across seats,
+   without enlarging or disturbing the fixed live mahjong table. */
+.match-archive-seat-compare{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+  gap:8px;margin:9px 0;
+}
+.match-archive-seat-compare .match-archive-button{
+  min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere;
+  line-height:1.5;
+}
+.match-archive-seat-compare .match-archive-button[aria-pressed="true"]{
+  background:#cce7d3;border-color:#368257;color:#20543a;
+}
