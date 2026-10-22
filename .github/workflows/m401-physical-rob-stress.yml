@@ -1,0 +1,109 @@
+name: M4.01 physical rob-Hu positive negative and natural holdout
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_rob_physical_scenarios.py"
+      - "tests/test_m401_physical_rob_scenarios.py"
+      - "examples/verify_rob_physical_scenarios.py"
+      - ".github/workflows/m401-physical-rob-stress.yml"
+permissions:
+  contents: read
+jobs:
+  physical-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Full physical positive, double Hu, dingque, public false-alarm tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m401_physical_rob_scenarios.py' -v
+          python -m unittest discover -s tests -p 'test_m400_public_bugang_rob.py' -v
+          python -m unittest discover -s tests -p 'test_four_player_claims.py' -v
+      - name: True rules engine 108 tiles x eight constructed predeclared scenarios
+        run: |
+          python examples/verify_rob_physical_scenarios.py /tmp/m401-physical.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/m401-physical.json",encoding="utf8"))
+          assert d["protocol"]=="m401_physical_108_bugang_rob_stress_v1"
+          assert d["scenario_count"]==8 and d["calibrated_rob_probability"] is None
+          assert d["live_policy_modified"] is False
+          x={row["scenario"]:row for row in d["constructed_cases"]}
+          assert x["two_robbers"]["sealed_eligible_robbers"]==2
+          assert x["two_robbers"]["rob_hu_winners"]==2
+          assert x["two_robbers"]["robbed"]==1
+          assert x["decline_legal_hu"]["sealed_eligible_robbers"]==1
+          assert x["decline_legal_hu"]["robbed"]==0
+          assert x["focused_false_alarm"]["public_band"]=="same_suit_focus"
+          assert x["focused_false_alarm"]["sealed_eligible_robbers"]==0
+          assert x["focused_positive"]["public_band"]=="same_suit_focus"
+          assert x["focused_positive"]["sealed_eligible_robbers"]==1
+          assert x["all_dingque_excluded"]["public_band"]=="dingque_excluded"
+          assert x["all_dingque_excluded"]["sealed_eligible_robbers"]==0
+          assert x["critical_wall_positive"]["wall_band"]=="critical"
+          for case in x.values():
+              assert case["physical_tiles"]==108
+              assert case["official_zero_sum"] is True
+              assert case["official_legal_robbers"]==case["sealed_eligible_robbers"]
+              assert case["attempted"]==case["robbed"]+case["successful"]
+              assert case["origin"]=="constructed_fixture_not_natural_sample"
+          PY
+      - name: Archive deterministic synthetic scenarios (NOT random incidence)
+        uses: actions/upload-artifact@v4
+        with:
+          name: m401-physical-rob-positive-negative
+          path: /tmp/m401-physical.json
+          if-no-files-found: error
+          retention-days: 30
+
+  new-natural-holdout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: New 8+8 independent seed groups, four seats, full terminal
+        run: |
+          python examples/evaluate_public_bugang_rob_pilot.py --development 26000 --holdout 27000 --seeds 8 --output /tmp/m401-natural.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/m401-natural.json",encoding="utf8"))
+          assert d["protocol"]=="m400_public_bugang_potential_rob_seed_split_v1"
+          assert d["live_policy_modified"] is False
+          for name,start in (("development",26000),("holdout",27000)):
+              c=d[name]
+              assert c["independent_seeds"]==8
+              assert c["four_seat_positions"]==32
+              assert {p["seed"] for p in c["per_seed"]}==set(range(start,start+8))
+              counts=c["counts"]
+              assert counts.get("windows",0)==counts.get("first_distinct",0)+counts.get("repeated",0)
+              assert counts.get("attempted",0)==counts.get("successful",0)+counts.get("robbed",0)
+              assert c["estimated_rob_probability"] is None
+              assert sum(v["candidate_n"] for v in c["by_public_band"].values())==counts.get("first_distinct",0)
+              for p in c["positions"]:
+                  official=p["official_score"]
+                  assert official["official_net"]==sum(official[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+                  for item in p["first_distinct_candidates"]:
+                      assert item["potential_robbers"]<=item["features"]["dingque_eligible_opponents"]
+              print("M4.01 NATURAL VERIFIED",name,json.dumps({
+                  "counts":counts,"by_public_band":c["by_public_band"],
+                  "validation":c["predictive_validation_status"],
+                  "per_seed":c["per_seed"]
+              },ensure_ascii=False))
+          raw=json.dumps(d,ensure_ascii=False)
+          for banned in ("opponent_hands","future_wall","offer_signature","_hands"):
+              assert banned not in raw
+          PY
+      - name: Save genuinely natural unseen-seed public-only pilot
+        uses: actions/upload-artifact@v4
+        with:
+          name: m401-new-independent-natural-rob-pilot
+          path: /tmp/m401-natural.json
+          if-no-files-found: error
+          retention-days: 30
