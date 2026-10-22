@@ -35,6 +35,26 @@ const rob={...common,phase:"rob_kong_window",turn:2,
  pending_rob_kong:{seat:2,tile:"s8"},drawn_tile:null,
  rob_options:["pass","hu"]};
 let discardCount=0;const commands=[];
+let current=start;
+const sampleActionAdvice=()=>{
+ const options=current.phase==="claim_window"?
+   ["hu","ming_gang","peng","pass"]:
+   current.phase==="rob_kong_window"?["hu","pass"]:
+   ["hu","an_gang","bu_gang","pass"];
+ const labels={hu:"胡",ming_gang:"明杠",peng:"碰",
+   pass:"过",an_gang:"暗杠 四万",bu_gang:"补杠 七筒"};
+ const candidates=options.map(action=>({
+   action,tile:action==="an_gang"?"m4":action==="bu_gang"?"p7":null,
+   label:labels[action],shanten:action==="hu"?null:1,
+   effective_copies:action==="hu"?null:6,
+   fan_weighted:action==="hu"?null:6,
+   reason:action==="hu"?"规则已确认可立即胡牌":"公开牌效对照",
+   reference_best:action==="hu",
+ }));
+ return {status:"choose_operation",seat:0,phase:current.phase,
+   recommended:{action:"hu",tile:null},candidates,
+   limitations:"仅为单步牌效参考，并非已知牌墙的完全信息最优。"};
+};
 const responseFor=cmd=>{
  if(cmd.action==="match_new")return start;
  if(cmd.action==="match_kong")return claimed;
@@ -51,9 +71,16 @@ const commonAwait=()=>({...common,phase:"await_discard",turn:0,
 await page.route("**/api/action",async route=>{
  const command=route.request().postDataJSON();
  commands.push(command);
+ if(command.action==="match_operation_hint"){
+  await route.fulfill({status:200,contentType:"application/json",
+   body:JSON.stringify({match_token:"claim-ux-browser-fixture",
+    hint:sampleActionAdvice()})});
+  return;
+ }
+ current=responseFor(command);
  await route.fulfill({status:200,contentType:"application/json",
   body:JSON.stringify({match_token:"claim-ux-browser-fixture",
-   match:responseFor(command)})});
+   match:current})});
 });
 const rect=()=>page.evaluate(()=>{
  const r=document.querySelector("#classic-board-host").getBoundingClientRect();
@@ -108,12 +135,16 @@ try{
  assert.deepEqual(discards().map(x=>({tile:x.tile,from_draw:x.from_draw})),
   [{tile:"s8",from_draw:true},{tile:"s8",from_draw:false}],
   "two identical tile faces must preserve drawn vs hand physical copy");
- assert.deepEqual(commands.slice(1,4).map(x=>({action:x.action,kind:x.kind,
+ const mutations=commands.filter(x=>
+  x.action!=="match_operation_hint"&&x.action!=="match_new");
+ assert.deepEqual(mutations.slice(0,3).map(x=>({action:x.action,kind:x.kind,
   choice:x.choice,tile:x.tile})),[
    {action:"match_kong",kind:"an_gang",choice:undefined,tile:"m4"},
    {action:"match_claim",kind:undefined,choice:"peng",tile:undefined},
    {action:"match_rob",kind:undefined,choice:"pass",tile:undefined},
  ]);
+ assert.ok(commands.some(x=>x.action==="match_operation_hint"),
+  "a real Hu/kong/claim window must query the read-only action reference");
  assert.deepEqual(await rect(),baseline,"no human action may resize the table");
  assert.deepEqual(errors,[]);
  console.log("CLASSIC CHINESE DECISIONS + ROB KONG + KEYBOARD + DRAWN COPY: PASS",
