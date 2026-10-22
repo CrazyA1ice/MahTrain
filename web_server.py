@@ -36,6 +36,7 @@ from mahtrain_core.error_focus import (
 from mahtrain_core.history import HistoryStore  # noqa: E402
 from mahtrain_core.match_archive import MatchArchive  # noqa: E402
 from mahtrain_core.next_dealer import next_dealer  # noqa: E402
+from mahtrain_core.post_round_review import record_transition  # noqa: E402
 
 # Override MAHTRAIN_HISTORY_DB to relocate the local, single-user SQLite file.
 import os
@@ -262,8 +263,20 @@ def _match_public_step(game: FourPlayerOpening, before_events: int,
 def _match_record(game: FourPlayerOpening, output: list[dict],
                   action) -> None:
     before = len(game._events)
+    prior = len(output)
+    hands_before = [list(h) for h in game._hands]
+    # Only obtain the authorized, actual deciding seat BEFORE a discard.
+    # These private captures never enter public_steps or live HTTP views.
+    seats = {}
+    if game.phase in ("await_discard", "dealer_discard") and game.turn is not None:
+        seats[game.turn] = game.private_view(game.turn)
     action()
     _match_public_step(game, before, output)
+    if len(output)>prior:
+        review=getattr(game,"_sealed_review",None)
+        if review is not None:
+            review.append(record_transition(
+                game,game._events[before:],hands_before,seats))
 
 
 def _match_script_until_human(
@@ -644,6 +657,9 @@ def _process(action: str, payload: dict) -> dict:
                         _MATCH_SUCCESSORS.pop(previous,None)
             if predecessor is not None:
                 _MATCH_SUCCESSORS[old_token]=token
+            # Private training replay exists only in process memory during
+            # the game; never put it in game.public_state() or HTTP steps.
+            game._sealed_review=[]
             _MATCH_SESSIONS[token]=game
             _MATCH_AGENTS[token]=agents
             _MATCH_HISTORY[token]=[]
@@ -748,7 +764,8 @@ def _process(action: str, payload: dict) -> dict:
                 published=game.public_state()
                 archive_id=_MATCH_ARCHIVE.save_completed(
                     published,_MATCH_HISTORY[token],_MATCH_OPENING[token],
-                    [agents[n].level for n in (1,2,3)])
+                    [agents[n].level for n in (1,2,3)],
+                    sealed_review=getattr(game,"_sealed_review",None))
                 _MATCH_ARCHIVE_IDS[token]=archive_id
             view["match_archive_id"]=_MATCH_ARCHIVE_IDS.get(token)
             return {"match_token":token,"match":view}
@@ -1058,8 +1075,11 @@ class Handler(BaseHTTPRequestHandler):
                     if "archive_id" in query:
                         result = _MATCH_ARCHIVE.detail(query["archive_id"][0])
                     else:
-                        limit = int(query.get("limit", ["30"])[0])
-                        result = _MATCH_ARCHIVE.list_completed(limit)
+                        limit = int(query.get("limit", ["50"])[0])
+                        offset = int(query.get("offset", ["0"])[0])
+                        period = query.get("period", ["all"])[0]
+                        result = _MATCH_ARCHIVE.list_completed(
+                            limit, period=period, offset=offset)
             except (ValueError, TypeError) as exc:
                 self._json(400, {"error": str(exc)})
             else:
