@@ -74,7 +74,7 @@
       svg.setAttribute("viewBox","0 0 720 240");
       svg.setAttribute("role","img");
       svg.setAttribute("aria-label",
-        "最近"+history.length+"局正式累计积分走势，从"+
+        "所选周期"+history.length+"局正式累计积分走势，从"+
         sign(points[0].value)+"到"+sign(points.at(-1).value));
       const svgNode=(tag,attrs={})=>{
         const n=d.createElementNS(NS,tag);
@@ -117,7 +117,7 @@
       }
       curve.append(svg);
       curve.append(el("p","match-stats-chart-summary",
-        "最近显示的"+history.length+"局："+
+        "所选周期显示的"+history.length+"局："+
         sign(points[0].value)+" → "+sign(points.at(-1).value)+
         "，最新单局 "+sign(history.at(-1).score)));
     }
