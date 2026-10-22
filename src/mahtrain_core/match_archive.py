@@ -641,7 +641,7 @@ class MatchArchive:
         ai_groups, room_groups = {}, {}
         missing_ai, missing_rules = 0, 0
         with self._connect() as db:
-            rows = db.execute("""
+            rows = db.execute(f"""
                 SELECT archive_id,created_at,record_json
                 FROM completed_matches
                 {"WHERE created_at >= ?" if since is not None else ""}
