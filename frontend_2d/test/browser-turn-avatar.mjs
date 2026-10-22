@@ -67,6 +67,25 @@ try{
    document.querySelectorAll(".classic-seat-avatar").length===4);
  const initial=await rows();
  assert.deepEqual(initial.result.map(x=>x.avatar),["我","1","2","3"]);
+ // M3.88 regression: arbitrarily long pattern/scores must be clipped
+ // within the original BLACK central scoreboard without table reflow.
+ const scoreClip=await page.evaluate(()=>{
+   const score=document.getElementById("classic-score");
+   const seat=document.getElementById("classic-score-2");
+   seat.textContent="2号已胡 · "+("清一色七对杠上花分数明细".repeat(26));
+   return {
+     parentOverflow:getComputedStyle(score).overflowX,
+     cellOverflow:getComputedStyle(seat).overflowX,
+     ellipsis:getComputedStyle(seat).textOverflow,
+     clientWidth:seat.clientWidth,
+     scrollWidth:seat.scrollWidth,
+   };
+ });
+ assert.equal(scoreClip.parentOverflow,"hidden");
+ assert.equal(scoreClip.cellOverflow,"hidden");
+ assert.equal(scoreClip.ellipsis,"ellipsis");
+ assert.ok(scoreClip.scrollWidth>scoreClip.clientWidth,
+   "fixture must actually stress the central label width");
  for(const seat of [0,1,2,3]){
   current=state(seat,"await_discard",1);
   await page.locator("#classic-new").click();
