@@ -199,6 +199,18 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-archives-board"].children[0].textContent.includes("牌山53张"));
   assert.ok(!JSON.stringify(dom).includes("never-show"));
   assert.ok(requests.every(url=>url.startsWith("/api/match_archives")));
+  // M3.88: one period control governs server-side leaderboard, chart,
+  // history list and the grouping totals. Never substitute stale all-time
+  // aggregates after the selector changes.
+  dom["match-archives-period"].value="month";
+  dom["match-archives-period"].handlers.change();
+  await settle();
+  assert.ok(requests.at(-1).includes("period=month"));
+  assert.ok(dom["match-archives-summary"].textContent.includes("最近一月"));
+  dom["match-archives-period"].value="all";
+  dom["match-archives-period"].handlers.change();
+  await settle();
+  assert.ok(requests.at(-1).includes("period=all"));
   // M3.47: simulate two rapid visits to history. The SLOW response
   // from the first request cannot replace the new SQLite scorecard.
   const baselineResponse=await fetch("/api/match_archives?limit=50");
