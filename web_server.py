@@ -263,14 +263,15 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
                   action) -> None:
     # Keep exact four-seat hand views server-side ONLY. They are never put
     # into live HTTP steps or public replay; archived after verified terminal.
-    prior=[list(hand) for hand in game._hands]
-    previous_view=(game.private_view(0) if game.turn == 0 and
+    trace=getattr(game,"_terminal_review_trace",None)
+    prior=([list(hand) for hand in game._hands] if trace is not None else None)
+    previous_view=(game.private_view(0) if trace is not None and game.turn == 0 and
                    game.phase in ("await_discard","dealer_discard") else None)
     before = len(game._events)
     action()
     _match_public_step(game, before, output)
     events=game._events[before:]
-    if events:
+    if events and trace is not None:
         detail={"events": [
                     {"type":event["type"],
                      **({"seat":event["seat"]} if type(event.get("seat")) is int else {}),
@@ -283,29 +284,32 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
             from mahtrain_core.classic_hint import classic_hand_hint
             # This is the same seat-zero PUBLIC-KNOWLEDGE adviser available
             # during the live turn, never an omniscient four-hand ranking.
-            report=classic_hand_hint(previous_view)
+            try:
+                report=classic_hand_hint(previous_view)
+            except (ValueError, KeyError, TypeError):
+                # A replay-advice issue must not roll back a CONFIRMED
+                # physical discard; leave the advisory result absent.
+                report={"candidates":[]}
             played=next(e["tile"] for e in events
                         if e.get("type")=="discard" and e.get("seat")==0)
             candidates=report.get("candidates") or []
             best=next((i for i,x in enumerate(candidates)
                        if x["discard"]==played),None)
-            detail["cut_review"]={
-                "seat":0,"discard":played,
-                "optimal":bool(candidates and candidates[0]["reference_best"]
-                               and best is not None and
-                               candidates[best]["reference_best"]),
-                "rank":best+1 if best is not None else None,
-                "top3":[{
-                    "tile":x["discard"],"shanten":x["shanten"],
-                    "effective_copies":x["effective_tile_count_upper_bound"],
-                    "fan_weighted":x["fan_weighted_unknown_copies"],
-                    "reference_best":x["reference_best"],
-                } for x in candidates[:3]],
-            }
-        trace=getattr(game,"_terminal_review_trace",None)
-        if trace is not None:
-            trace.append(detail)
-            if len(trace)>2048:del trace[:-2048]
+            if candidates:
+                detail["cut_review"]={
+                    "seat":0,"discard":played,
+                    "optimal":bool(best is not None and
+                                   candidates[best]["reference_best"]),
+                    "rank":best+1 if best is not None else None,
+                    "top3":[{
+                        "tile":x["discard"],"shanten":x["shanten"],
+                        "effective_copies":x["effective_tile_count_upper_bound"],
+                        "fan_weighted":x["fan_weighted_unknown_copies"],
+                        "reference_best":x["reference_best"],
+                    } for x in candidates[:3]],
+                }
+        trace.append(detail)
+        if len(trace)>2048:del trace[:-2048]
 
 
 def _match_script_until_human(
