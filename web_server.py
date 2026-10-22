@@ -660,6 +660,7 @@ def _process(action: str, payload: dict) -> dict:
             # Private training replay exists only in process memory during
             # the game; never put it in game.public_state() or HTTP steps.
             game._sealed_review=[]
+            game._sealed_opening_hands=[list(h) for h in game._hands]
             _MATCH_SESSIONS[token]=game
             _MATCH_AGENTS[token]=agents
             _MATCH_HISTORY[token]=[]
@@ -765,7 +766,8 @@ def _process(action: str, payload: dict) -> dict:
                 archive_id=_MATCH_ARCHIVE.save_completed(
                     published,_MATCH_HISTORY[token],_MATCH_OPENING[token],
                     [agents[n].level for n in (1,2,3)],
-                    sealed_review=getattr(game,"_sealed_review",None))
+                    sealed_review=getattr(game,"_sealed_review",None),
+                    sealed_opening_hands=getattr(game,"_sealed_opening_hands",None))
                 _MATCH_ARCHIVE_IDS[token]=archive_id
             view["match_archive_id"]=_MATCH_ARCHIVE_IDS.get(token)
             return {"match_token":token,"match":view}
