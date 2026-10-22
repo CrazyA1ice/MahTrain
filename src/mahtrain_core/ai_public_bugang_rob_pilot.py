@@ -111,13 +111,21 @@ def natural_position(seed:int, rotation:int)->dict[str,Any]:
         nonlocal windows,repeats
         if game.turn!=seat or game._won[seat]:
             return
+        # The overwhelming majority of own turns contain no legal bu-gang.
+        # Use the authority's cheap legal-option list BEFORE materializing a
+        # second full private_view/public_state. The actual MahjongAgent still
+        # evaluates its normal private_view exactly as before.
+        available=[x for x in game.kong_options(seat)
+                   if x["type"]=="bu_gang"]
+        if not available:
+            return
         private=game.private_view(seat)
         if private["can_self_draw_win"]:
             return  # confirmed win cannot be overridden by analysis
+        if any(x not in private["kong_options"] for x in available):
+            raise RuntimeError("public-risk probe disagrees with own legal kongs")
         board=game.public_state()
-        for option in private["kong_options"]:
-            if option["type"]!="bu_gang":
-                continue
+        for option in available:
             windows+=1
             tile=option["tile"]
             if tile in seen:
