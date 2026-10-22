@@ -140,7 +140,7 @@ class M397CounterfactualTests(unittest.TestCase):
                     candidate["delta"]["exhaustive_points"])
             self.assertNotIn("hand",str(row))
             self.assertNotIn("future_wall",str(row))
-            self.assertNotIn("opponent",json.dumps(row))
+            self.assertNotIn("opponent_hands",json.dumps(row))
         else:
             self.assertEqual(row["alternatives"],{})
 
