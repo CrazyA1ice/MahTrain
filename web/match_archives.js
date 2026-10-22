@@ -4,7 +4,8 @@
   const $=id=>document.getElementById(id);
   const playback=()=>window.MahTrainPlayback;
   let listed=[],opened=null,selected=new Set(),frames=[],active=null;
-  let lastGrouping=null,refreshVersion=0;
+  let lastGrouping=null,refreshVersion=0,offset=0;
+  const PAGE_SIZE=50;
   const el=(tag,kind,txt)=>{
     const n=document.createElement(tag);
     if(kind)n.className=kind;
@@ -167,7 +168,7 @@
         " · "+match.win_count+"笔胡牌 · 0号正式净额 "+
         sign(match.settled_b0??match.win_b0)+
         "（胡牌 "+sign(match.win_b0)+"）"));
-      row.append(makeButton("查看公开复盘",()=>openMatch(match.archive_id)));
+      row.append(makeButton("查看本局复盘",()=>openMatch(match.archive_id)));
       root.append(row);
     }
     comparison();
@@ -176,25 +177,94 @@
     const version=++refreshVersion;
     try{
       $("match-archives-message").textContent="";
-      const response=await api("/api/match_archives?limit=50");
-      // Slow earlier replies must never overwrite a newer visit's chart.
+      const period=$("match-history-period").value;
+      const response=await api("/api/match_archives?limit="+PAGE_SIZE+
+        "&offset="+offset+"&period="+encodeURIComponent(period));
       if(version!==refreshVersion)return;
       listed=response.matches||[];
-      selected=new Set([...selected].filter(id=>
-        listed.some(x=>x.archive_id===id)));
+      selected=new Set([...selected].filter(id=>listed.some(x=>x.archive_id===id)));
+      const total=response.summary.games;
+      const start=total?offset+1:0;
+      const end=offset+listed.length;
+      $("match-history-period-note").textContent=
+        ({all:"全部历史",year:"近365天",month:"近30天",week:"近7天"}[period]||period)+
+        " · 当前区间"+total+"局 · 第"+start+"—"+end+"局";
+      $("match-archives-page-status").textContent=
+        "第"+(Math.floor(offset/PAGE_SIZE)+1)+"页 · "+start+"—"+end+
+        " / "+total+"局";
+      $("match-archives-prev").disabled=offset===0;
+      $("match-archives-next").disabled=!response.has_more;
       $("match-archives-summary").textContent=
-        "已保存 "+response.summary.games+" 局 · 0号平均正式净额 "+
+        "区间内已保存 "+total+" 局 · 0号平均正式净额 "+
         Number(response.summary.average_player0_settled_balance??
           response.summary.average_player0_win_balance).toFixed(1)+
         "（平均胡牌 "+Number(
           response.summary.average_player0_win_balance).toFixed(1)+"）"+
-        " · 累计 "+response.summary.paid_wins+"笔胡牌";
+        " · "+response.summary.paid_wins+"笔胡牌";
       renderList();
       renderScorecard(response.scorecard);
       window.MahTrainMatchStats?.render(response.scorecard,document);
       lastGrouping=response.scorecard?.groupings||null;
       renderGroupings();
     }catch(err){if(version===refreshVersion)fail(err)}
+  }
+  function handTiles(hand){
+    const row=el("div","match-review-open-hand");
+    for(const tile of hand){
+      if(!/^[mps][1-9]$/.test(tile))continue;
+      const img=el("img","match-review-open-tile");
+      img.src="/classic/img/"+tile+".gif";img.alt=tile;img.title=tile;
+      img.loading="lazy";row.append(img);
+    }
+    return row;
+  }
+  function renderCoaching(report){
+    const root=$("match-archives-coaching");
+    root.replaceChildren();
+    const review=report?.post_round_review;
+    if(!review||review.availability!=="complete_post_round"){
+      root.append(el("p","review-footnote",
+        "该档案创建时只保存公开牌面；当时没有采集四家暗手，无法事后计算真实逐巡最优切牌或符合率。新版完成牌局才会完整记录。"));
+      return;
+    }
+    const stats=review.player0;
+    root.append(el("h4","","本局切牌复盘 · 玩家0号"));
+    root.append(el("p","match-review-rate",
+      "最优切符合率："+(stats.rate===null?"无可评估出牌":
+        stats.rate.toFixed(2)+"%")+
+      " · 最优"+stats.optimal+"/"+stats.compared+"次"+
+      "（以每巡最低向听、其次最多有效张为准；同分切法都算最优）"));
+    root.append(el("p","review-footnote",
+      "下列前三名使用当巡出牌前本人的手牌及当时公开牌计算，不使用对手暗手或未来墙；它是牌效最优切，不是已验证最高最终得分的全局最优。"));
+    const detail=el("div","match-review-turn-list");
+    for(const item of review.decisions){
+      const article=el("details","match-review-turn");
+      const summary=el("summary","",
+        "第"+(item.step_index+1)+"步 · "+item.seat+"号切"+
+        item.played+" · "+(
+          item.optimal===null?"无法计算":
+          item.optimal?"最优切":"与最优切不同")+
+        (item.played_rank?" · 排名"+item.played_rank:""));
+      article.append(summary);
+      article.append(el("p","","出牌前真实手牌："));
+      article.append(handTiles(item.before_hand));
+      if(item.top_three.length){
+        const table=el("ol","match-review-topcuts");
+        for(const opt of item.top_three){
+          const row=el("li","",
+            "切 "+opt.discard+" · 向听"+opt.shanten+
+            " · 有效张"+opt.effective_tile_count+
+            (opt.optimal?" · 最优并列":"")+
+            (opt.discard===item.played?" · 实际出牌":""));
+          table.append(row);
+        }
+        article.append(table);
+      }else article.append(el("p","review-footnote",
+        "当前阶段无法安全评价最优切牌（可能是已和牌或尚未完成定缺）。"));
+      detail.append(article);
+    }
+    if(!review.decisions.length)detail.append(el("p","review-footnote","暂无已记录的出牌决策。"));
+    root.append(detail);
   }
   function renderArchiveBoard(frame){
     const root=$("match-archives-board");
@@ -212,9 +282,17 @@
         seat+"号"+(board.won[seat]?" · 已胡":"")+
         " · 暗手"+board.hand_counts[seat]+"张"));
       const backs=el("div","match-archive-back-count");
-      // Pure backs, not the saved values of concealed cards.
-      for(let i=0;i<board.hand_counts[seat];i++)
-        backs.append(el("span","match-archive-back",""));
+      // Live play NEVER exposes opponent concealed hands. A completed
+      // post-round archive can explicitly reveal this stage's server
+      // captured hands. Prior public-only records retain backs.
+      const snapshots=opened?.report?.post_round_review?.frames;
+      const hand=snapshots?.[frame.sequence-2]?.hands?.[seat];
+      if(Array.isArray(hand)){
+        backs.append(handTiles(hand));
+      }else{
+        for(let i=0;i<board.hand_counts[seat];i++)
+          backs.append(el("span","match-archive-back",""));
+      }
       cell.append(backs);
       cell.append(el("p","",
         "公开副露："+board.melds[seat].map(m=>
@@ -260,6 +338,7 @@
       $("match-archives-message").textContent="";
       const details=await api(uri(archiveId));
       const report=details.report;
+      renderCoaching(report);
       const start=playback().openingFrame(report.opening);
       const steps=playback().normalizeHistorySteps(
         report.steps||[],report.opening);
@@ -326,6 +405,17 @@
   function init(){
     $("match-history-groups-mode").addEventListener("change",renderGroupings);
     $("match-archives-refresh").addEventListener("click",refresh);
+    $("match-history-period").addEventListener("change",()=>{
+      offset=0;selected.clear();refresh();
+    });
+    $("match-archives-prev").addEventListener("click",()=>{
+      if(offset>=PAGE_SIZE){offset-=PAGE_SIZE;selected.clear();refresh();}
+    });
+    $("match-archives-next").addEventListener("click",()=>{
+      if(!$("match-archives-next").disabled){
+        offset+=PAGE_SIZE;selected.clear();refresh();
+      }
+    });
     $("match-archives-compare").addEventListener("click",comparison);
     for(const id of ["match-archives-seat","match-archives-action"]){
       $(id).addEventListener("change",()=>{active=null;renderSteps()});
