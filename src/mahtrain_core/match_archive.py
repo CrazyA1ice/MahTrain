@@ -425,6 +425,72 @@ def _group_rows(groups: dict, kind: str) -> list[dict]:
                                       x["fan_cap"]))
 
 
+def sanitize_private_review(value: dict | None) -> dict | None:
+    """Whitelist four-seat physical HAND histories, accessible only in
+    the terminal read-only archive, NEVER the in-progress public API.
+    Pre-M3.88 archives remain honestly public-only."""
+    if value is None:
+        return None
+    if not isinstance(value,dict):
+        raise ValueError("invalid terminal review")
+    def hands(raw):
+        if (type(raw) is not list or len(raw)!=4 or
+                any(type(h) is not list or len(h)>14 or
+                    any(_tile(t) is None for t in h) for h in raw)):
+            raise ValueError("invalid review hand snapshot")
+        return [list(h) for h in raw]
+    first=hands(value.get("opening"))
+    rows=value.get("steps")
+    if type(rows) is not list or len(rows)>_MAX_ARCHIVE_STEPS:
+        raise ValueError("invalid review step count")
+    clean=[]
+    for row in rows:
+        if not isinstance(row,dict):
+            raise ValueError("invalid terminal review step")
+        before=hands(row.get("hands_before"))
+        after=hands(row.get("hands_after"))
+        ev=sanitize_events(row.get("events") or [])
+        item={"hands_before":before,"hands_after":after,"events":ev}
+        cut=row.get("cut_review")
+        if cut is not None:
+            if type(cut) is not dict or cut.get("seat")!=0:
+                raise ValueError("invalid player cut review")
+            tile=_tile(cut.get("discard"))
+            if tile is None or tile not in before[0]:
+                raise ValueError("cut review tile not in prior hand")
+            top=cut.get("top3")
+            if type(top) is not list or len(top)>3:
+                raise ValueError("invalid top three alternatives")
+            choices=[]
+            for cand in top:
+                if (type(cand) is not dict or
+                        _tile(cand.get("tile")) not in before[0] or
+                        type(cand.get("shanten")) is not int or
+                        type(cand.get("effective_copies")) is not int or
+                        cand["effective_copies"]<0 or
+                        (cand.get("fan_weighted") is not None and
+                         type(cand["fan_weighted"]) is not int) or
+                        type(cand.get("reference_best")) is not bool):
+                    raise ValueError("invalid recorded candidate")
+                choices.append({
+                    "tile":cand["tile"],"shanten":cand["shanten"],
+                    "effective_copies":cand["effective_copies"],
+                    "fan_weighted":cand["fan_weighted"],
+                    "reference_best":cand["reference_best"]})
+            rank=cut.get("rank")
+            if rank is not None and (type(rank) is not int or rank<1 or rank>27):
+                raise ValueError("invalid cut rank")
+            if type(cut.get("optimal")) is not bool:
+                raise ValueError("invalid cut optimal flag")
+            item["cut_review"]={
+                "discard":tile,"rank":rank,"optimal":cut["optimal"],
+                "top3":choices}
+        clean.append(item)
+    return {"opening":first,"steps":clean,
+            "scope":"terminal_replay_only",
+            "ranking":"public_information_shanten_ukeire_fan_weighted"}
+
+
 class MatchArchive:
     def __init__(self, path: str | Path):
         self.path = Path(path)
@@ -460,7 +526,8 @@ class MatchArchive:
         return db
 
     def save_completed(self, public: dict, history: list[dict],
-                       initial_board: dict, ai_levels: list[str]) -> str:
+                       initial_board: dict, ai_levels: list[str],
+                       private_review: dict | None = None) -> str:
         if public.get("phase") not in _TERMINAL:
             raise ValueError("only completed matches can be archived")
         if (type(ai_levels) is not list or len(ai_levels) != 3 or
@@ -541,6 +608,10 @@ class MatchArchive:
                      if kong_included else
                      "历史兼容模式：杠钱仅为试验积分，不计入正式净额。"),
         }
+        terminal_review=sanitize_private_review(private_review)
+        if terminal_review is not None:
+            payload["terminal_review"]=terminal_review
+            payload["version"]=2
         archive_id = secrets.token_urlsafe(18)
         stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         with self._connect() as db:
