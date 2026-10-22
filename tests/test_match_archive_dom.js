@@ -29,11 +29,15 @@ const ids=[
   "match-stats-metrics","match-stats-cumulative","match-stats-outcomes",
   "match-history-groups-mode","match-history-groups-status",
   "match-history-groups-rows",
+  "match-history-period","match-history-period-note",
+  "match-archives-prev","match-archives-next",
+  "match-archives-page-status","match-archives-coaching",
 ];
 const dom=Object.fromEntries(ids.map(id=>[id,new Node()]));
 dom["match-archives-seat"].value="all";
 dom["match-archives-action"].value="all";
 dom["match-history-groups-mode"].value="ai";
+dom["match-history-period"].value="all";
 const board=(n,wall,won)=>({
   phase:won?"finished":"await_discard",turn:1,wall_count:wall,
   hand_counts:[13,13,10,13],
@@ -195,6 +199,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   dom["match-archives-action"].handlers.change();
   dom["match-archives-actions"].children[1].handlers.click();
   assert.ok(dom["match-archives-board"].children[0].textContent.includes("牌山53张"));
+  assert.ok(dom["match-archives-coaching"].children[0].textContent.includes("无法事后计算"));
   assert.ok(!JSON.stringify(dom).includes("never-show"));
   assert.ok(requests.every(url=>url.startsWith("/api/match_archives")));
   // M3.47: simulate two rapid visits to history. The SLOW response
