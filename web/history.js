@@ -4,7 +4,8 @@
   const $=id=>document.getElementById(id);
   let selectedId=null;
   let selectedDetail=null;
-  let busy=false;
+  let busy=false,historyOffset=0;
+  const PAGE_SIZE=40;
   const names={m:"万",s:"条",p:"筒"};
   const name=t=>t==="win"?"胡牌":(t.slice(1)+names[t[0]]);
   const percent=value=>(value*100).toFixed(1)+"%";
@@ -64,11 +65,51 @@
        "（相差 "+((summary.latest_five_average-summary.first_five_average)*100).toFixed(1)+
        " 个百分点）。仅比较已有训练，样本较小时波动可能很大。";
   }
+  function renderTrend(trend){
+    const root=$("history-trend");
+    if(!root)return;
+    root.replaceChildren();
+    if(!Array.isArray(trend)||!trend.length){
+      root.append(el("p","review-footnote","这个周期内还没有已完成训练。"));return;
+    }
+    const points=trend.map((v,i)=>[
+      40+(trend.length===1?.5:i/(trend.length-1))*640,
+      168-Math.max(0,Math.min(1,Number(v.accuracy)||0))*140,
+    ]);
+    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+    svg.setAttribute("viewBox","0 0 720 195");
+    svg.setAttribute("role","img");
+    svg.setAttribute("aria-label","当前周期"+trend.length+"局训练正确率完整走势");
+    const line=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+    line.setAttribute("fill","none");line.setAttribute("stroke","#278661");
+    line.setAttribute("stroke-width","3");
+    line.setAttribute("points",points.map(p=>p.join(",")).join(" "));
+    svg.append(line);root.append(svg);
+    root.append(el("small","review-footnote",
+      "当前周期完整"+trend.length+"局 · 首局"+
+      (100*Number(trend[0].accuracy)).toFixed(1)+"% → 末局"+
+      (100*Number(trend.at(-1).accuracy)).toFixed(1)+"%"));
+  }
   async function refresh(){
     if(busy)return;
     busy=true;
     try{
-      const res=await get("/api/history?limit=40");
+      const period=$("history-period")?.value||"all";
+      const url="/api/history?limit="+PAGE_SIZE+
+        (period==="all"&&historyOffset===0?"":(
+          "&period="+encodeURIComponent(period)+"&offset="+historyOffset));
+      const res=await get(url);
+      renderTrend(res.trend);
+      $("history-period-note").textContent=
+        ({all:"全部历史",year:"最近365天",month:"最近30天",week:"最近7天"}[period]
+          ||period)+" · 共"+res.summary.session_count+"局";
+      $("history-page-status").textContent=
+        "第"+(Math.floor(historyOffset/PAGE_SIZE)+1)+"页 · "+
+        (res.summary.session_count?historyOffset+1:0)+"—"+
+        (historyOffset+(res.sessions||[]).length)+
+        " / "+res.summary.session_count+"局";
+      $("history-prev").disabled=historyOffset===0;
+      $("history-next").disabled=!res.has_more;
       renderSummary(res.summary);
       const list=$("history-list");
       list.replaceChildren();
@@ -246,6 +287,15 @@
   }
   function init(){
     $("history-refresh").addEventListener("click",refresh);
+    $("history-period").addEventListener("change",()=>{
+      historyOffset=0;refresh();
+    });
+    $("history-prev").addEventListener("click",()=>{
+      if(historyOffset>=PAGE_SIZE){historyOffset-=PAGE_SIZE;refresh();}
+    });
+    $("history-next").addEventListener("click",()=>{
+      if(!$("history-next").disabled){historyOffset+=PAGE_SIZE;refresh();}
+    });
     refresh();
   }
   window.MahTrainHistory={init,refresh};
