@@ -75,7 +75,10 @@
     const container=el("section","match-decision-hint match-operation-advice");
     container.append(el("strong","","当前参考："+selected.label));
     container.append(el("p","",selected.reason));
-    const listing=el("div","match-operation-alternatives");
+    // Keep the fixed-size central board readable: complete comparison is
+    // expandable, rather than growing the decision overlay by default.
+    const listing=el("details","match-operation-alternatives");
+    listing.append(el("summary","","展开全部合法操作对比"));
     for(const option of hint.candidates||[]){
       listing.append(el("span","",option.label+
         (option.reference_best?"（推荐）":"")+
@@ -83,8 +86,8 @@
          " · 向听"+option.shanten+" · 有效张≤"+option.effective_copies+
          " · 番值代理"+option.fan_weighted)));
     }
+    listing.append(el("small","",hint.limitations));
     container.append(listing);
-    container.append(el("small","",hint.limitations));
     root.append(container);
   }
   function syncHomeMatchHint(){
