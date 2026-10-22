@@ -307,6 +307,17 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
                         "fan_weighted":x["fan_weighted_unknown_copies"],
                         "reference_best":x["reference_best"],
                     } for x in candidates[:3]],
+                    # An actual discard may rank below third. Preserve its
+                    # already-computed PUBLIC-KNOWLEDGE attributes in the
+                    # TERMINAL archive only; otherwise an honest delta
+                    # cannot be calculated from the top three alone.
+                    "played_candidate":({
+                        "tile":candidates[best]["discard"],
+                        "shanten":candidates[best]["shanten"],
+                        "effective_copies":candidates[best]["effective_tile_count_upper_bound"],
+                        "fan_weighted":candidates[best]["fan_weighted_unknown_copies"],
+                        "reference_best":candidates[best]["reference_best"],
+                    } if best is not None else None),
                 }
         trace.append(detail)
         if len(trace)>2048:del trace[:-2048]
