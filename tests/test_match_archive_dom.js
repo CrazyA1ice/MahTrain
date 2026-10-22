@@ -20,6 +20,7 @@ class Node{
 const ids=[
   "match-archives-refresh","match-archives-list","match-archives-summary",
   "match-archives-period","match-archives-review-summary",
+  "match-archives-cut-timeline",
   "match-archives-detail","match-archives-compare","match-archives-export",
   "match-archives-board","match-archives-seat","match-archives-action",
   "match-archives-message","match-archives-comparison",
@@ -257,6 +258,20 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.match(reviewText,/切m2/);
   assert.match(reviewText,/切p4/);
   assert.match(reviewText,/有效张上界/);
+  const decisionTimeline=dom["match-archives-cut-timeline"];
+  assert.equal(decisionTimeline.children.length,3);
+  assert.match(collect(decisionTimeline),/逐巡切牌对照/);
+  assert.match(collect(decisionTimeline),/符合最优 1 巡/);
+  assert.match(collect(decisionTimeline),/前三：m1 \/ m2 \/ p4/);
+  const jump=decisionTimeline.children[2].children[0];
+  assert.match(jump.textContent,/第1巡/);
+  dom["match-archives-action"].value="win";
+  dom["match-archives-action"].handlers.change();
+  jump.handlers.click();
+  assert.equal(dom["match-archives-action"].value,"all");
+  assert.match(collect(dom["match-archives-board"]),/第2步/);
+  assert.match(collect(dom["match-archives-board"]),/切m2/);
+
   // M3.88: one period control governs server-side leaderboard, chart,
   // history list and the grouping totals. Never substitute stale all-time
   // aggregates after the selector changes.
