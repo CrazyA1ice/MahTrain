@@ -512,6 +512,14 @@
       <section id="match-archives-panel" class="panel match-archives-panel">
         <div class="panel-title">
           <h3>四人血战 · 本地已完成对局档案</h3>
+          <label class="match-archive-period-label">统计周期
+            <select id="match-archives-period" aria-label="全部历史或最近一周、一月、一年">
+              <option value="all">全部历史</option>
+              <option value="week">最近一周</option>
+              <option value="month">最近一月（30天）</option>
+              <option value="year">最近一年（365天）</option>
+            </select>
+          </label>
           <button id="match-archives-refresh" type="button" class="review-control">刷新对局档案</button>
         </div>
         <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。胡牌、已结算杠钱与符合方案 A 的流局赔付均计入新对局正式净收益；历史旧局的试验杠钱不追溯计入。</p>
@@ -524,8 +532,8 @@
             <div id="match-stats-metrics" class="match-stats-metrics" aria-live="polite"></div>
             <div class="match-stats-charts">
               <section class="match-stats-chart-card">
-                <div class="match-stats-heading"><h5>累计正式积分走势</h5><span>最近最多 30 局 · 时间从左到右</span></div>
-                <div id="match-stats-cumulative" class="match-stats-cumulative" aria-label="近30局累计正式积分折线图"></div>
+                <div class="match-stats-heading"><h5>累计正式积分走势</h5><span>所选周期完整已存历史 · 时间从左到右</span></div>
+                <div id="match-stats-cumulative" class="match-stats-cumulative" aria-label="所选周期正式累计积分折线图"></div>
               </section>
               <section class="match-stats-chart-card">
                 <div class="match-stats-heading"><h5>单局正负收益分布</h5><span>全部可核验对局 · 不是胡牌率</span></div>
