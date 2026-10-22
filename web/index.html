@@ -138,11 +138,25 @@
         <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
         <section class="quiz-history-section">
           <div class="panel-title"><h3>单题成绩与难度建议</h3><small>不同模式独立统计 · 保存至本地SQLite</small></div>
+          <div class="match-history-period-tools">
+            <label>单题历史周期 <select id="quiz-history-period"><option value="all">全部历史</option>
+              <option value="year">最近一年（365天）</option>
+              <option value="month">最近一月（30天）</option>
+              <option value="week">最近一周（7天）</option></select></label>
+            <span id="quiz-history-period-note">全部已完成题目</span>
+          </div>
           <div id="quiz-history-stats" class="quiz-history-stats" aria-live="polite"></div>
+          <div id="quiz-history-trend" class="history-period-trend"
+            aria-label="当前周期全部单题答题正确率趋势"></div>
           <div id="quiz-recommendation" class="quiz-recommendation"></div>
           <div id="quiz-weaknesses" class="quiz-weaknesses" aria-live="polite"></div>
           <div class="panel-title"><h3>近期单题与错题本</h3><small>只记录提交评分的题目</small></div>
           <div id="quiz-attempt-list" class="quiz-attempt-list"></div>
+          <div class="match-archive-pages">
+            <button id="quiz-history-prev" type="button">上一页</button>
+            <span id="quiz-history-page-status"></span>
+            <button id="quiz-history-next" type="button">下一页</button>
+          </div>
           <div id="quiz-history-detail" class="quiz-history-detail" aria-live="polite"></div>
         </section>
       </section>
@@ -632,9 +646,23 @@
       <section id="history-panel" class="panel history-panel">
         <div class="panel-title"><h3>本地历史训练与错题本</h3><button id="history-refresh" type="button" class="review-control">刷新历史</button></div>
         <p class="review-footnote">已完成训练自动保存到本机 SQLite，重启服务后仍能查看旧成绩、逐轮复盘和错题重练。本地原型不含账号或云同步。</p>
+        <div class="match-history-period-tools">
+          <label>训练历史周期 <select id="history-period"><option value="all">全部历史</option>
+              <option value="year">最近一年（365天）</option>
+              <option value="month">最近一月（30天）</option>
+              <option value="week">最近一周（7天）</option></select></label>
+          <span id="history-period-note">全部已完成训练</span>
+        </div>
         <div id="history-summary" class="history-summary"></div>
+        <div id="history-trend" class="history-period-trend"
+          aria-label="当前周期全部训练正确率趋势"></div>
         <p id="history-progress" class="review-intro"></p>
         <div id="history-list" class="history-list" aria-live="polite"></div>
+        <div class="match-archive-pages">
+          <button id="history-prev" type="button">上一页</button>
+          <span id="history-page-status"></span>
+          <button id="history-next" type="button">下一页</button>
+        </div>
         <div id="history-detail" class="history-detail" aria-live="polite"></div>
       </section>
       <div id="prompt-layer" class="prompt-layer" hidden><div class="prompt-card" role="dialog" aria-modal="true" aria-labelledby="prompt-title"><div class="eyebrow" id="prompt-kicker">ACTION AVAILABLE</div><h2 id="prompt-title">操作提示</h2><p id="prompt-message"></p><div id="prompt-tiles" class="prompt-tiles"></div><div id="prompt-buttons" class="prompt-buttons"></div></div></div>
