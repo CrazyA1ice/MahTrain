@@ -57,7 +57,7 @@ class M399RepeatAndRobAuditTests(unittest.TestCase):
         self.assertEqual(view,before)
         self.assertNotIn("p4",str(c))
         self.assertNotIn("m1",str(c))
-        self.assertNotIn("tile",str(c))
+        self.assertNotIn("opponent_hands",str(c))
 
     def test_hu_opportunity_never_inflates_optional_kong_counts(self):
         seat,view=view_for_repeat()
