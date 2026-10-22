@@ -1,0 +1,26 @@
+name: M3.93 paired public-reference cut study
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_challenge_reference_paired.py"
+      - "src/mahtrain_core/ai_tournament.py"
+      - "src/mahtrain_core/classic_hint.py"
+      - "tests/test_m393_challenge_reference_paired.py"
+      - ".github/workflows/m393-paired-reference-cuts.yml"
+permissions:
+  contents: read
+jobs:
+  paired-cut-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real paired seed, audit zero-sum, no future-wall information
+        run: python -m unittest discover -s tests -p 'test_m393_challenge_reference_paired.py' -v
+      - name: Existing seeded AI decision and tournament safety
+        run: |
+          python -m unittest discover -s tests -p 'test_ai.py' -v
+          python -m unittest discover -s tests -p 'test_ai_tournament.py' -v
