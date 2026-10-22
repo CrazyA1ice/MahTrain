@@ -837,6 +837,14 @@ def _process(action: str, payload: dict) -> dict:
             _SESSIONS[token] = game
             return {"token": token, "state": game.public_state()}
         if action == "quiz_progress":
+            # Legacy calls retain their original interface; new history
+            # controls explicitly opt into period and offset queries.
+            if "period" in payload or "offset" in payload:
+                return {"progress": _HISTORY.quiz_progress(
+                    payload.get("mode"), payload.get("difficulty"),
+                    period=payload.get("period","all"),
+                    offset=payload.get("offset",0),
+                )}
             return {"progress": _HISTORY.quiz_progress(
                 payload.get("mode"), payload.get("difficulty")
             )}
@@ -1097,7 +1105,12 @@ class Handler(BaseHTTPRequestHandler):
                         result = _HISTORY.detail(query["archive_id"][0])
                     else:
                         limit = int(query.get("limit", ["30"])[0])
-                        result = _HISTORY.list_history(limit)
+                        if "period" in query or "offset" in query:
+                            result = _HISTORY.list_history(
+                                limit,period=query.get("period",["all"])[0],
+                                offset=int(query.get("offset",["0"])[0]))
+                        else:
+                            result = _HISTORY.list_history(limit)
             except (ValueError, TypeError) as exc:
                 self._json(400, {"error": str(exc)})
             else:
