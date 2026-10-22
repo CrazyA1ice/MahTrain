@@ -5,6 +5,8 @@
   const playback=()=>window.MahTrainPlayback;
   const cutQuality=()=>window.MahTrainCutQuality;
   let listed=[],opened=null,selected=new Set(),frames=[],active=null;
+  // The saved cut adviser scored PRE-discard cards, not the post-action board.
+  let handPhase="auto";
   let lastGrouping=null,refreshVersion=0;
   const el=(tag,kind,txt)=>{
     const n=document.createElement(tag);
@@ -216,6 +218,47 @@
        {hands_after:terminal.opening}:null);
     root.append(el("strong","","第"+frame.sequence+"步 · "+frame.label+
       " · 牌山"+board.wall_count+"张"));
+    // Preserve the true decision moment in a finished archive. The public
+    // board (river/melds/turn/remaining wall) is always the action's AFTER
+    // state, so never mislabel it as if it were a pre-action public board.
+    const validFourHands=hands=>Array.isArray(hands)&&hands.length===4&&
+      hands.every(hand=>Array.isArray(hand));
+    const beforeHands=validFourHands(snapshot?.hands_before)?
+      snapshot.hands_before:null;
+    const afterHands=validFourHands(snapshot?.hands_after)?
+      snapshot.hands_after:null;
+    const shownPhase=handPhase==="before"&&beforeHands?"before":
+      handPhase==="after"&&afterHands?"after":
+      snapshot?.cut_review&&beforeHands?"before":
+      afterHands?"after":beforeHands?"before":null;
+    const shownHands=shownPhase==="before"?beforeHands:afterHands;
+    if(beforeHands&&afterHands){
+      const controls=el("div","match-archive-hand-switch");
+      for(const phase of ["before","after"]){
+        const button=makeButton(phase==="before"?"动作前手牌":"动作后手牌",()=>{
+          handPhase=phase;
+          renderArchiveBoard(frame);
+        });
+        button.setAttribute("aria-pressed",String(shownPhase===phase));
+        if(phase===shownPhase)button.classList.add("is-selected");
+        controls.append(button);
+      }
+      root.append(controls);
+    }
+    if(shownHands){
+      root.append(el("p","review-footnote",
+        "当前显示四家"+(shownPhase==="before"?"动作前":"动作后")+
+        "真实手牌；下方的牌河、副露、已胡标记及牌山数量始终来自动作后公开快照。"+
+        (snapshot?.cut_review&&shownPhase==="before"?
+          "切牌前三推荐以这里的0号出牌前手牌和当时可见公开信息计算。":"")));
+    }else if(snapshot?.cut_review){
+      root.append(el("p","review-footnote",
+        "旧档案未保存本巡出牌前手牌，无法直接核对决策时刻；请勿将动作后牌面当作评分输入。"));
+    }
+    if(snapshot?.cut_review&&!beforeHands&&afterHands){
+      root.append(el("p","review-footnote",
+        "本档案只有动作后手牌，没有可供核对的出牌前快照；前三推荐来自当时另行保存的评分。"));
+    }
     if(!terminal){
       root.append(el("p","review-footnote",
         "旧档案只记录公开牌和牌背：当时各家暗手未保存，无法真实还原或计算逐巡最优切符合率。"));
@@ -256,16 +299,23 @@
     const groups=el("div","match-archive-four-seats");
     for(let seat=0;seat<4;seat++){
       const cell=el("div","match-archive-public-seat");
+      const actual=shownHands?.[seat];
       cell.append(el("strong","",
-        seat+"号"+(board.won[seat]?" · 已胡":"")+
-        " · 暗手"+board.hand_counts[seat]+"张"));
+        seat+"号"+(board.won[seat]?" · 已胡（动作后）":"")+
+        " · 暗手"+(actual?actual.length:board.hand_counts[seat])+"张"+
+        (shownPhase?"（动作"+(shownPhase==="before"?"前":"后")+"）":"")));
       const backs=el("div","match-archive-back-count");
-      const actual=snapshot?.hands_after?.[seat];
       if(Array.isArray(actual)){
         const suit={m:"万",p:"筒",s:"条"};
         for(const tile of actual){
-          backs.append(el("span","match-archive-revealed-tile",
-            tile.slice(1)+(suit[tile[0]]||tile[0])));
+          const tileView=el("span","match-archive-revealed-tile",
+            tile.slice(1)+(suit[tile[0]]||tile[0]));
+          if(seat===0&&shownPhase==="before"&&
+             snapshot?.cut_review?.discard===tile){
+            tileView.classList.add("match-archive-actual-cut");
+            tileView.setAttribute("title","本巡实际切出的牌型");
+          }
+          backs.append(tileView);
         }
         cell.append(el("small","", "终局复盘：当时真实手牌已公开"));
       }else{
@@ -301,7 +351,7 @@
     root.replaceChildren();
     for(const f of shown){
       const b=makeButton("第"+f.sequence+"步 · "+f.label,()=>{
-        active=f.sequence;renderSteps();
+        active=f.sequence;handPhase="auto";renderSteps();
       });
       if(f.sequence===active)b.classList.add("is-selected");
       root.append(b);
@@ -345,6 +395,7 @@
           $("match-archives-seat").value="all";
           $("match-archives-action").value="all";
           active=step;
+          handPhase="auto";
           renderSteps();
           $("match-archives-board").scrollIntoView?.({
             behavior:"smooth",block:"nearest"
@@ -370,7 +421,7 @@
         report.steps||[],report.opening);
       frames=[...(start?[start]:[]),...steps]
         .map((frame,index)=>({...frame,sequence:index+1}));
-      opened=details;active=null;
+      opened=details;active=null;handPhase="auto";
       $("match-archives-seat").value="all";
       $("match-archives-action").value="all";
       $("match-archives-detail").hidden=false;
@@ -468,7 +519,7 @@
     $("match-archives-refresh").addEventListener("click",refresh);
     $("match-archives-compare").addEventListener("click",comparison);
     for(const id of ["match-archives-seat","match-archives-action"]){
-      $(id).addEventListener("change",()=>{active=null;renderSteps()});
+      $(id).addEventListener("change",()=>{active=null;handPhase="auto";renderSteps()});
     }
     refresh();
   }
