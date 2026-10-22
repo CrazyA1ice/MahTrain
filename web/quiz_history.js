@@ -8,6 +8,8 @@
     pure_suit_waits:"清一色选听口",pure_suit_discard:"清一色何切"};
   const name=t=>t==="win"?"胡牌":window.MahTrainUI.tileName(t);
   let current=null,lastDetail=null,pending=null,busy=false,fetchSeq=0;
+  let quizOffset=0,lastQuizMode=null;
+  const PAGE_SIZE=20;
   function el(tag,css,s){
     const v=document.createElement(tag);
     if(css)v.className=css;
@@ -33,14 +35,56 @@
   async function refresh(){
     const myFetch=++fetchSeq;
     const mode=$("quiz-mode").value,difficulty=$("quiz-level").value;
+    if(lastQuizMode!==mode){lastQuizMode=mode;quizOffset=0;}
+    const period=$("quiz-history-period")?.value||"all";
     try{
-      const response=await call("quiz_progress",{mode,difficulty});
+      const response=await call("quiz_progress",{
+        mode,difficulty,period,offset:quizOffset,
+      });
       if(myFetch!==fetchSeq)return;
       current=response.progress;
       render(response.progress);
     }catch(err){if(myFetch===fetchSeq)error(err);}
   }
+  function renderQuizTrend(rows){
+    const root=$("quiz-history-trend");if(!root)return;
+    root.replaceChildren();
+    if(!Array.isArray(rows)||!rows.length){
+      root.append(el("p","review-footnote","当前周期没有已评分单题。"));return;
+    }
+    let hits=0;
+    const values=rows.map((r,i)=>{
+      hits+=r.correct?1:0;return hits/(i+1);
+    });
+    const coords=values.map((v,i)=>[
+      40+(values.length===1?.5:i/(values.length-1))*640,
+      170-v*140,
+    ]);
+    const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+    svg.setAttribute("viewBox","0 0 720 196");
+    svg.setAttribute("role","img");
+    svg.setAttribute("aria-label","当前周期完整"+rows.length+"题累计正确率变化");
+    const poly=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+    poly.setAttribute("fill","none");
+    poly.setAttribute("stroke","#278661");
+    poly.setAttribute("stroke-width","3");
+    poly.setAttribute("points",coords.map(x=>x.join(",")).join(" "));
+    svg.append(poly);root.append(svg);
+    root.append(el("small","review-footnote",
+      "已完成"+rows.length+"题 · 当前周期累计正确率"+
+      (100*values.at(-1)).toFixed(1)+"%"));
+  }
   function render(p){
+    $("quiz-history-period-note").textContent=
+      ({all:"全部历史",year:"最近365天",month:"最近30天",week:"最近7天"}[
+        p.period||"all"]||"当前周期")+" · "+(p.total_attempts||0)+"题";
+    $("quiz-history-page-status").textContent=
+      "第"+(Math.floor(quizOffset/PAGE_SIZE)+1)+"页 · "+
+      ((p.total_attempts||0)?quizOffset+1:0)+"—"+
+      (quizOffset+p.attempts.length)+" / "+(p.total_attempts||0)+"题";
+    $("quiz-history-prev").disabled=quizOffset===0;
+    $("quiz-history-next").disabled=!p.has_more;
+    renderQuizTrend(p.trend);
     const root=$("quiz-history-stats");
     root.replaceChildren();
     for(const difficulty of ["basic","intermediate","challenge"]){
@@ -232,6 +276,17 @@
     }catch(err){error(err);}
     finally{busy=false;}
   }
-  function init(){refresh();}
+  function init(){
+    $("quiz-history-period").addEventListener("change",()=>{
+      quizOffset=0;refresh();
+    });
+    $("quiz-history-prev").addEventListener("click",()=>{
+      if(quizOffset>=PAGE_SIZE){quizOffset-=PAGE_SIZE;refresh();}
+    });
+    $("quiz-history-next").addEventListener("click",()=>{
+      if(!$("quiz-history-next").disabled){quizOffset+=PAGE_SIZE;refresh();}
+    });
+    refresh();
+  }
   window.MahTrainQuizHistory={init,refresh};
 })();

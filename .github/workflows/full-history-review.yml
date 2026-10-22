@@ -1,0 +1,107 @@
+name: M3.88 full historical periods and completed-only open replay
+on:
+  push:
+    branches: [feat/m388-history-review-periods-scoreboard-fit]
+  pull_request:
+    paths:
+      - "src/mahtrain_core/match_archive.py"
+      - "src/mahtrain_core/post_round_review.py"
+      - "web_server.py"
+      - "web/index.html"
+      - "web/match_archives.js"
+      - "web/app.css"
+      - "frontend_2d/src/**"
+      - "tests/test_post_round_review.py"
+      - "tests/test_match_archive_dom.js"
+      - ".github/workflows/full-history-review.yml"
+permissions:
+  contents: write
+jobs:
+  complete-history:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: New completed-only replay, all-time periods and cutoff parity
+        run: |
+          python -m unittest discover -s tests -p 'test_post_round_review.py' -v
+          python -m unittest discover -s tests -p 'test_all_history_periods.py' -v
+      - name: Existing archive, server and partial live privacy regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_match_archive.py' -v
+          python -m unittest discover -s tests -p 'test_http_disconnect.py' -v
+          python -m unittest discover -s tests -p 'test_classic_hint.py' -v
+          python -m unittest discover -s tests -p 'test_history_store.py' -v
+          python -m unittest discover -s tests -p 'test_quiz_progress.py' -v
+      - name: Archived-score visualization DOM and period/date browser scripting
+        run: |
+          node --check web/history.js
+          node --check web/quiz_history.js
+          node --check web/match_archives.js
+          node tests/test_match_archive_dom.js
+          node tests/test_match_stats_dom.js
+  classic-center-board:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/m388-history-review-periods-scoreboard-fit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build classic 2D compiled UI
+        working-directory: frontend_2d
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm run build
+          node --test test/*.test.mjs
+      - name: Install real Chromium
+        working-directory: frontend_2d
+        run: npx playwright-core install --with-deps chromium
+      - name: Real browser fixed center and all directional kong regressions
+        run: |
+          python web_server.py >/tmp/m388-server.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/classic/game.html >/dev/null; then break; fi
+            sleep 1
+          done
+          node frontend_2d/test/browser-center-overflow.mjs
+          node frontend_2d/test/browser-fixed-table.mjs
+          node frontend_2d/test/browser-settlement.mjs
+          node frontend_2d/test/browser-turn-avatar.mjs
+          node frontend_2d/test/browser-kong-layout.mjs
+      - name: Rebuild tracked browser assets for direct local usage
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Multiple history/review commits can reach this feature branch
+          # while Chromium checks run. Rebuild from freshest remote HEAD.
+          git fetch origin feat/m388-history-review-periods-scoreboard-fit
+          git reset --hard origin/feat/m388-history-review-periods-scoreboard-fit
+          (cd frontend_2d && npm run build)
+          git add -A -f frontend_2d/dist/
+          if git diff --cached --quiet; then
+            echo "Build identical to tracked dist."
+          else
+            git commit -m "build(M3.88): constrain classic center scoreboard text inside black panel"
+            git push origin HEAD:feat/m388-history-review-periods-scoreboard-fit
+          fi
+      - name: Archive visual failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m388-center-replay-browser-log
+          path: /tmp/m388-server.log
+          retention-days: 10
+          if-no-files-found: ignore

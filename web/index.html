@@ -138,11 +138,25 @@
         <div id="quiz-feedback" class="quiz-feedback" aria-live="polite"></div>
         <section class="quiz-history-section">
           <div class="panel-title"><h3>单题成绩与难度建议</h3><small>不同模式独立统计 · 保存至本地SQLite</small></div>
+          <div class="match-history-period-tools">
+            <label>单题历史周期 <select id="quiz-history-period"><option value="all">全部历史</option>
+              <option value="year">最近一年（365天）</option>
+              <option value="month">最近一月（30天）</option>
+              <option value="week">最近一周（7天）</option></select></label>
+            <span id="quiz-history-period-note">全部已完成题目</span>
+          </div>
           <div id="quiz-history-stats" class="quiz-history-stats" aria-live="polite"></div>
+          <div id="quiz-history-trend" class="history-period-trend"
+            aria-label="当前周期全部单题答题正确率趋势"></div>
           <div id="quiz-recommendation" class="quiz-recommendation"></div>
           <div id="quiz-weaknesses" class="quiz-weaknesses" aria-live="polite"></div>
           <div class="panel-title"><h3>近期单题与错题本</h3><small>只记录提交评分的题目</small></div>
           <div id="quiz-attempt-list" class="quiz-attempt-list"></div>
+          <div class="match-archive-pages">
+            <button id="quiz-history-prev" type="button">上一页</button>
+            <span id="quiz-history-page-status"></span>
+            <button id="quiz-history-next" type="button">下一页</button>
+          </div>
           <div id="quiz-history-detail" class="quiz-history-detail" aria-live="polite"></div>
         </section>
       </section>
@@ -514,8 +528,17 @@
           <h3>四人血战 · 本地已完成对局档案</h3>
           <button id="match-archives-refresh" type="button" class="review-control">刷新对局档案</button>
         </div>
-        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；不保存暗手、牌墙顺序、随机种子或正在进行的对局。胡牌、已结算杠钱与符合方案 A 的流局赔付均计入新对局正式净收益；历史旧局的试验杠钱不追溯计入。</p>
+        <p class="review-footnote">仅已结束对局自动保存到本地 SQLite；新版终局档案仅在正式结束后保存四家逐步手牌与切牌评价；进行中的暗手、牌墙顺序和种子绝不公开。旧版档案缺失的暗牌不能倒推。胡牌、已结算杠钱与符合方案 A 的流局赔付均计入新对局正式净收益；历史旧局的试验杠钱不追溯计入。</p>
         <p id="match-archives-message" aria-live="polite"></p>
+        <div class="match-history-period-tools">
+          <label>历史统计周期 <select id="match-history-period" aria-label="历史统计周期">
+            <option value="all">全部历史</option>
+            <option value="year">最近一年（365天）</option>
+            <option value="month">最近一月（30天）</option>
+            <option value="week">最近一周（7天）</option>
+          </select></label>
+          <span id="match-history-period-note">全部已归档对局</span>
+        </div>
         <div id="match-archives-summary" class="match-archives-summary"></div>
         <section class="match-scorecard" aria-labelledby="match-scorecard-title">
           <h4 id="match-scorecard-title">多局正式积分总览 · 四家座位统计</h4>
@@ -524,24 +547,24 @@
             <div id="match-stats-metrics" class="match-stats-metrics" aria-live="polite"></div>
             <div class="match-stats-charts">
               <section class="match-stats-chart-card">
-                <div class="match-stats-heading"><h5>累计正式积分走势</h5><span>最近最多 30 局 · 时间从左到右</span></div>
-                <div id="match-stats-cumulative" class="match-stats-cumulative" aria-label="近30局累计正式积分折线图"></div>
+                <div class="match-stats-heading"><h5>累计正式积分走势</h5><span>当前周期全部已归档对局 · 时间从左到右</span></div>
+                <div id="match-stats-cumulative" class="match-stats-cumulative" aria-label="当前周期全部正式积分折线图"></div>
               </section>
               <section class="match-stats-chart-card">
                 <div class="match-stats-heading"><h5>单局正负收益分布</h5><span>全部可核验对局 · 不是胡牌率</span></div>
                 <div id="match-stats-outcomes" class="match-stats-outcomes"></div>
               </section>
             </div>
-            <p class="match-stats-footnote">正式净额＝胡牌积分＋本局已计价杠钱＋已正式入账的方案 A 流局赔付；旧版本试验杠钱不追溯计入。不同房间底分的数值不可直接代表牌技高低。折线起点是所显示首局当时的历史累计，并非截取区间从零开始。</p>
+            <p class="match-stats-footnote">正式净额＝胡牌积分＋本局已计价杠钱＋已正式入账的方案 A 流局赔付；旧版本试验杠钱不追溯计入。不同房间底分的数值不可直接代表牌技高低。每个所选周期独立从零累计，周期外数据不计入区间统计。</p>
           </div>
           <div id="match-scorecard-seats" class="match-scorecard-seats"></div>
           <div class="match-scorecard-trend-head">
-            <strong>0号玩家 · 近30局正式净额走势</strong>
+            <strong>0号玩家 · 当前周期正式净额走势</strong>
             <span>每行显示单局净额及截至该局的累计正式积分</span>
           </div>
           <div id="match-scorecard-trend" class="match-scorecard-trend"
-            aria-label="最近三十局的正式净额和累计得分"></div>
-          <p class="review-footnote">统计范围为本机所有可核验的已完成档案；历史缺失账本的记录会单独计数排除。1—3号仅代表座位，不代表固定的同一名 AI；正式积分不含试验杠钱。</p>
+            aria-label="当前周期全部已归档正式净额和累计得分"></div>
+          <p class="review-footnote">统计范围为本机所选周期内可核验的已完成档案；历史缺失账本的记录会单独计数排除。1—3号仅代表座位，不代表固定的同一名 AI；正式积分不含试验杠钱。</p>
         </section>
         <section class="match-history-groups" aria-labelledby="match-history-groups-title">
           <div class="match-history-groups-head">
@@ -558,6 +581,11 @@
           <p class="review-footnote">仅已核验的本机对局。不同房间系数、封顶番和 AI 组合不能直接用于推断算法强弱；平均“系数单位”只是去除底分倍率，非真实胜率或因果实验。</p>
         </section>
         <div id="match-archives-list" class="match-archives-list"></div>
+        <div class="match-archive-pages">
+          <button type="button" id="match-archives-prev">上一页</button>
+          <span id="match-archives-page-status" aria-live="polite">—</span>
+          <button type="button" id="match-archives-next">下一页</button>
+        </div>
         <div class="match-archives-compare-tools">
           <button id="match-archives-compare" type="button" disabled>对比所选两局</button>
           <span>在档案条目中勾选两局，比较胡牌与方案A流局组成的正式积分。</span>
@@ -566,11 +594,13 @@
         <section id="match-archives-detail" class="match-archives-detail" hidden>
           <div class="match-archives-detail-head">
             <strong id="match-archives-title">已保存对局</strong>
-            <a id="match-archives-export" href="#" download="mahtrain_match.json">导出完整公开复盘 JSON</a>
+            <a id="match-archives-export" href="#" download="mahtrain_match.json">导出终局复盘 JSON</a>
           </div>
           <p id="match-archives-detail-summary"></p>
           <div id="match-archives-balances" class="match-archives-balances"></div>
           <div id="match-archives-wins" class="match-archives-wins"></div>
+          <section id="match-archives-coaching" class="match-archives-coaching"
+            aria-label="本局最优切牌符合率和逐巡前三推荐"></section>
           <div class="match-archives-review-controls">
             <label>筛选玩家 <select id="match-archives-seat">
               <option value="all">全部玩家</option>
@@ -591,7 +621,7 @@
           <p id="match-archives-count"></p>
           <div id="match-archives-actions" class="match-archives-actions"></div>
           <div id="match-archives-board" class="match-archives-board"></div>
-          <p class="review-footnote">这里仅能查看公开局面，不会恢复对战或暴露任何历史暗手。浏览器刷新后可从 SQLite 重新打开已完成对局；本地档案没有账户登录或云同步。</p>
+          <p class="review-footnote">新版已结束对局可查看四家真实手牌与逐巡决策；旧版公开档案没有记录的暗手不可还原。浏览器刷新后可从 SQLite 重新打开已完成对局；本地档案没有账户登录或云同步。</p>
         </section>
       </section>
       <section id="four-player-demo" class="panel table-demo">
@@ -616,9 +646,23 @@
       <section id="history-panel" class="panel history-panel">
         <div class="panel-title"><h3>本地历史训练与错题本</h3><button id="history-refresh" type="button" class="review-control">刷新历史</button></div>
         <p class="review-footnote">已完成训练自动保存到本机 SQLite，重启服务后仍能查看旧成绩、逐轮复盘和错题重练。本地原型不含账号或云同步。</p>
+        <div class="match-history-period-tools">
+          <label>训练历史周期 <select id="history-period"><option value="all">全部历史</option>
+              <option value="year">最近一年（365天）</option>
+              <option value="month">最近一月（30天）</option>
+              <option value="week">最近一周（7天）</option></select></label>
+          <span id="history-period-note">全部已完成训练</span>
+        </div>
         <div id="history-summary" class="history-summary"></div>
+        <div id="history-trend" class="history-period-trend"
+          aria-label="当前周期全部训练正确率趋势"></div>
         <p id="history-progress" class="review-intro"></p>
         <div id="history-list" class="history-list" aria-live="polite"></div>
+        <div class="match-archive-pages">
+          <button id="history-prev" type="button">上一页</button>
+          <span id="history-page-status"></span>
+          <button id="history-next" type="button">下一页</button>
+        </div>
         <div id="history-detail" class="history-detail" aria-live="polite"></div>
       </section>
       <div id="prompt-layer" class="prompt-layer" hidden><div class="prompt-card" role="dialog" aria-modal="true" aria-labelledby="prompt-title"><div class="eyebrow" id="prompt-kicker">ACTION AVAILABLE</div><h2 id="prompt-title">操作提示</h2><p id="prompt-message"></p><div id="prompt-tiles" class="prompt-tiles"></div><div id="prompt-buttons" class="prompt-buttons"></div></div></div>
