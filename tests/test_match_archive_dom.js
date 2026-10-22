@@ -223,7 +223,7 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   // become visible ONLY here, and an actual human discard has a top-three
   // explanation plus series-level optimal-cut compliance.
   const terminalHands=[
-    ["m1","m2"],["p4","p5"],["s1","s2"],["m7","m8"]
+    ["m1","m2","p4","m9"],["p4","p5"],["s1","s2"],["m7","m8"]
   ];
   result.report.terminal_review={
     opening:terminalHands,
@@ -273,6 +273,42 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal(dom["match-archives-action"].value,"all");
   assert.match(collect(dom["match-archives-board"]),/第2步/);
   assert.match(collect(dom["match-archives-board"]),/切m2/);
+  assert.equal(dom["match-archives-stage-summary"].children.length,5,
+    "phase name, 3 stage cards and an honest limitations note");
+  // A newer completed archive records the ACTUAL choice even when ranked
+  // fourth. The first-three list ALONE cannot reconstruct its shanten.
+  result.report.terminal_review.steps[1].cut_review={
+    discard:"m9",rank:4,optimal:false,
+    top3:[
+      {tile:"m1",shanten:1,effective_copies:12,
+       fan_weighted:null,reference_best:true},
+      {tile:"m2",shanten:1,effective_copies:10,
+       fan_weighted:null,reference_best:false},
+      {tile:"p4",shanten:1,effective_copies:8,
+       fan_weighted:null,reference_best:false}
+    ],
+    played_candidate:{tile:"m9",shanten:2,effective_copies:14,
+      fan_weighted:null,reference_best:false},
+  };
+  rows=dom["match-archives-list"].children;
+  rows[0].children[2].handlers.click();
+  await settle();
+  assert.match(collect(dom["match-archives-review-summary"]),/50\\.0%/);
+  assert.match(collect(dom["match-archives-stage-summary"]),/退向听 1 巡/);
+  const detail=dom["match-archives-cut-timeline"];
+  assert.equal(detail.children[2].children.length,2,
+    "two separately navigable decisions in one archived round");
+  assert.match(detail.children[2].children[1].textContent,/退向听 1/);
+  detail.children[2].children[1].handlers.click();
+  assert.match(collect(dom["match-archives-board"]),/第3步/);
+  assert.match(collect(dom["match-archives-board"]),/实际切牌：向听2/);
+  assert.match(collect(dom["match-archives-board"]),/应优先保持更低向听数/);
+  // A pre-M3.90 record ranked fourth cannot infer its missing metrics.
+  delete result.report.terminal_review.steps[1].cut_review.played_candidate;
+  rows[0].children[2].handlers.click();
+  await settle();
+  assert.match(collect(dom["match-archives-cut-timeline"]),/无法计算差距/);
+  assert.match(collect(dom["match-archives-stage-summary"]),/历史指标缺失 1 巡/);
 
   // M3.88: one period control governs server-side leaderboard, chart,
   // history list and the grouping totals. Never substitute stale all-time
