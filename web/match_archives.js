@@ -3,6 +3,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const playback=()=>window.MahTrainPlayback;
+  const cutQuality=()=>window.MahTrainCutQuality;
   let listed=[],opened=null,selected=new Set(),frames=[],active=null;
   let lastGrouping=null,refreshVersion=0;
   const el=(tag,kind,txt)=>{
@@ -226,6 +227,20 @@
         (cut.optimal?"符合并列最优方案":("未符合最优方案"+
         (cut.rank?"（排序第"+cut.rank+"）":""))));
       root.append(head);
+      const comparison=cutQuality().inspect(cut);
+      const desc=el("p","match-archive-cut-diagnosis",
+        "与当巡最佳方案比较："+comparison.text);
+      desc.classList.add("match-archive-cut-"+comparison.kind);
+      root.append(desc);
+      if(comparison.measured){
+        const actual=cut.played_candidate||
+          cut.top3.find(x=>x.tile===cut.discard);
+        root.append(el("p","match-archive-cut-metrics",
+          "实际切牌：向听"+actual.shanten+
+          " · 有效张上界"+actual.effective_copies+
+          (actual.fan_weighted===null?"":" · 基础番值加权"+
+            actual.fan_weighted)));
+      }
       const three=el("div","match-archive-cut-top3");
       three.append(el("strong","","当前公开信息下，切牌参考前三名："));
       cut.top3.forEach((cand,i)=>{
@@ -318,9 +333,11 @@
     decisions.forEach(({step,cut},index)=>{
       if(cut.optimal)optimal++;
       const rank=cut.rank?(" · 排名"+cut.rank):"";
+      const qualityLabel=cutQuality().inspect(cut);
       const action=makeButton(
         "第"+(index+1)+"巡｜切"+cut.discard+
         "｜"+(cut.optimal?"符合最优":"可改进"+rank)+
+        "｜"+qualityLabel.text+
         "｜前三："+cut.top3.map(x=>x.tile).join(" / "),
         ()=>{
           // Point into the exact saved public-state frame; retain history's
@@ -420,6 +437,27 @@
       heading.append(el("p","",reviewed?
         "按每次出牌前己方手牌与当时公开信息，用向听数优先、有效进张与听牌番值加权排序；并列第一也视为符合。此项不是完全信息下的保证最优策略。":
         "本局缺少可验证的逐巡切牌数据，不能根据最终胜负推测最优切符合率。"));
+      const stages=$("match-archives-stage-summary");
+      if(stages){
+        stages.replaceChildren();
+        if(reviewed){
+          stages.append(el("strong","","整局切牌质量分段 · 按已记录切牌顺序均分"));
+          for(const part of cutQuality().thirds(cuts)){
+            const card=el("div","match-archive-stage-card");
+            card.append(el("strong","",part.name+
+              " · 符合最优 "+part.optimal+"/"+part.total));
+            card.append(el("span","",
+              "退向听 "+part.regressed+" 巡 · 同向听有效张损失 "+
+              part.ukeireLoss+" 巡 · 听牌番值权重落后 "+
+              part.weightedLoss+" 巡"));
+            if(part.unrated)card.append(el("small","",
+              "历史指标缺失 "+part.unrated+" 巡，不强行补算"));
+            stages.append(card);
+          }
+          stages.append(el("p","review-footnote",
+            "有效张与番值都是当时公开信息下的未知张数上界比较；不是胡牌概率、实际剩余墙牌或确定可得的分数。"));
+        }
+      }
       renderCutTimeline(report);
       renderSteps();
     }catch(err){fail(err)}

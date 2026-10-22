@@ -485,6 +485,30 @@ def sanitize_private_review(value: dict | None) -> dict | None:
             item["cut_review"]={
                 "discard":tile,"rank":rank,"optimal":cut["optimal"],
                 "top3":choices}
+            # M3.90: the player's actual cut can be below the third
+            # recommendation. Preserve its REAL contemporaneous metrics
+            # only in the terminal archive and never infer a missing row.
+            if "played_candidate" in cut:
+                chosen=cut["played_candidate"]
+                if chosen is not None:
+                    if (type(chosen) is not dict or
+                            chosen.get("tile") != tile or
+                            type(chosen.get("shanten")) is not int or
+                            type(chosen.get("effective_copies")) is not int or
+                            chosen["effective_copies"] < 0 or
+                            (chosen.get("fan_weighted") is not None and
+                             type(chosen["fan_weighted"]) is not int) or
+                            type(chosen.get("reference_best")) is not bool):
+                        raise ValueError("invalid played cut analysis")
+                    item["cut_review"]["played_candidate"]={
+                        "tile":tile,
+                        "shanten":chosen["shanten"],
+                        "effective_copies":chosen["effective_copies"],
+                        "fan_weighted":chosen["fan_weighted"],
+                        "reference_best":chosen["reference_best"],
+                    }
+                else:
+                    item["cut_review"]["played_candidate"]=None
         clean.append(item)
     return {"opening":first,"steps":clean,
             "scope":"terminal_replay_only",

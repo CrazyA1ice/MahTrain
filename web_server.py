@@ -88,6 +88,7 @@ _STATIC = {
     "/match_voice.js": ROOT / "web" / "match_voice.js",
     "/match_archives.js": ROOT / "web" / "match_archives.js",
     "/match_stats.js": ROOT / "web" / "match_stats.js",
+    "/match_cut_quality.js": ROOT / "web" / "match_cut_quality.js",
     "/navigation.js": ROOT / "web" / "navigation.js",
     "/ai_replay.js": ROOT / "web" / "ai_replay.js",
     "/ai_baseline.js": ROOT / "web" / "ai_baseline.js",
@@ -307,6 +308,17 @@ def _match_record(game: FourPlayerOpening, output: list[dict],
                         "fan_weighted":x["fan_weighted_unknown_copies"],
                         "reference_best":x["reference_best"],
                     } for x in candidates[:3]],
+                    # An actual discard may rank below third. Preserve its
+                    # already-computed PUBLIC-KNOWLEDGE attributes in the
+                    # TERMINAL archive only; otherwise an honest delta
+                    # cannot be calculated from the top three alone.
+                    "played_candidate":({
+                        "tile":candidates[best]["discard"],
+                        "shanten":candidates[best]["shanten"],
+                        "effective_copies":candidates[best]["effective_tile_count_upper_bound"],
+                        "fan_weighted":candidates[best]["fan_weighted_unknown_copies"],
+                        "reference_best":candidates[best]["reference_best"],
+                    } if best is not None else None),
                 }
         trace.append(detail)
         if len(trace)>2048:del trace[:-2048]

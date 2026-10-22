@@ -1,0 +1,42 @@
+name: M3.90 terminal cut quality comparisons and stage reports
+on:
+  push:
+    branches: [feat/m390-cut-quality-explanations]
+  pull_request:
+    paths:
+      - "web_server.py"
+      - "src/mahtrain_core/match_archive.py"
+      - "web/match_archives.js"
+      - "web/match_cut_quality.js"
+      - "web/index.html"
+      - "web/app.css"
+      - "tests/test_match_cut_quality.js"
+      - "tests/test_m390_cut_quality.py"
+      - "tests/test_match_archive_dom.js"
+      - ".github/workflows/m390-cut-quality.yml"
+permissions:
+  contents: read
+jobs:
+  validated-terminal-qualities:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: New official cut metric preservation and no hidden-hand data
+        run: python -m unittest discover -s tests -p 'test_m390_cut_quality.py' -v
+      - name: Current and legacy terminal archives, all history periods
+        run: |
+          python -m unittest discover -s tests -p 'test_m388_match_review.py' -v
+          python -m unittest discover -s tests -p 'test_match_archive.py' -v
+          python -m unittest discover -s tests -p 'test_classic_hint.py' -v
+      - name: Strategy-delta diagnostic and historical DOM click-through
+        run: |
+          node --test tests/test_match_cut_quality.js
+          node --test tests/test_match_archive_dom.js
+          node --test tests/test_match_stats_dom.js
