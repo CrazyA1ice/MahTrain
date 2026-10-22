@@ -24,3 +24,20 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_ai.py' -v
           python -m unittest discover -s tests -p 'test_ai_tournament.py' -v
+      - name: Pilot two independently seeded four-rotation paired cohorts
+        run: |
+          python examples/compare_challenge_reference_paired.py --start 8407 --seeds 2 --rotations 4 --output /tmp/m393-paired.json
+          python - <<'PY'
+          import json
+          d=json.load(open("/tmp/m393-paired.json",encoding="utf-8"))
+          assert d["independent_seeds"]==2 and d["paired_games"]==8
+          print("M3.93 paired pilot:",json.dumps({
+              "protocol":d["protocol"],"paired_games":d["paired_games"],
+              "seed_count":d["independent_seeds"],
+              "mean_net_delta":d["mean_delta_net_reference_minus_challenge"],
+              "wins_delta":d["total_win_event_delta"],
+              "deal_ins_delta":d["total_deal_in_event_delta"],
+              "decision_counts":d["decision_counts"],
+              "per_seed":d["per_seed"],
+          },ensure_ascii=False))
+          PY
