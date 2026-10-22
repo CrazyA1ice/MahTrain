@@ -123,8 +123,11 @@ def classic_operation_hint(view: Mapping[str, Any], seat: int) -> dict[str, Any]
             # a separate visible tile in the hypothetical outcome.
             exposed_public.remove(target)
             if "peng" in options:
+                # Real peng irrevocably cancels Tian Ting. Do not score
+                # a hypothetical after-peng wait as still earning its bonus.
                 after = _best_post_peng(
-                    hand, melds, missing, target, exposed_public, cap, tian)
+                    hand, melds, missing, target, exposed_public, cap,
+                    {"eligible": False} if tian.get("eligible") else tian)
                 rows.append(_summary(
                     "peng", "碰", after,
                     reason=("预计碰后优先切" + after["next_discard"] +
