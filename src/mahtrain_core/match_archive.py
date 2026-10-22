@@ -576,13 +576,12 @@ def sanitize_private_review(value: dict | None) -> dict | None:
                             "fan_weighted":weighted,
                             "reason":option["reason"],
                             "reference_best":option["reference_best"]})
-        if (actual["action"],actual["tile"]) not in seen or (
-            recommended["action"],recommended["tile"]) not in seen or
-            sum(bool(x["reference_best"]) for x in choices)!=1 or
-            not next(x for x in choices if
-                     (x["action"],x["tile"])==
-                     (recommended["action"],recommended["tile"])
-                     )["reference_best"]):
+        marked=[x for x in choices if x["reference_best"]]
+        if ((actual["action"],actual["tile"]) not in seen or
+            (recommended["action"],recommended["tile"]) not in seen or
+            len(marked)!=1 or
+            (marked[0]["action"],marked[0]["tile"]) !=
+            (recommended["action"],recommended["tile"])):
             raise ValueError("operation choice must match scored legal options")
         safe_actions.append({"seat":seat,"sequence":seq,
                              "actual":actual,"recommended":recommended,
