@@ -276,10 +276,12 @@
     const seat=$("match-archives-seat").value||"all";
     const kind=$("match-archives-action").value||"all";
     const matching=playback().filterReviewEntries(frames,seat,kind);
-    const shown=matching.slice(-200);
+    // A completed archive must permit tracing EVERY saved action, not
+    // silently hide the first turns when a blood-battle has over 200 steps.
+    // The server already bounds its archive at 2048 genuine public steps.
+    const shown=matching;
     const count=$("match-archives-count");
-    count.textContent="符合条件 "+matching.length+"步"+
-      (matching.length>shown.length?" · 仅列最后200条":"");
+    count.textContent="符合条件 "+matching.length+"步 · 全部可追溯";
     const root=$("match-archives-actions");
     root.replaceChildren();
     for(const f of shown){

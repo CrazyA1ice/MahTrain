@@ -199,6 +199,23 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
   assert.ok(dom["match-archives-board"].children[0].textContent.includes("牌山53张"));
   assert.ok(!JSON.stringify(dom).includes("never-show"));
   assert.ok(requests.every(url=>url.startsWith("/api/match_archives")));
+  // M3.89: a long genuine archived round must expose ALL saved public
+  // transitions, not silently drop every step before the last 200.
+  const originalSteps=result.report.steps;
+  result.report.steps=Array.from({length:225},(_,i)=>({
+    board:board(i+1,Math.max(0,54-Math.floor(i/5)),false),
+    events:[{type:"discard",seat:1,tile:"p6"}],
+  }));
+  rows=dom["match-archives-list"].children;
+  rows[0].children[2].handlers.click();
+  await settle();
+  assert.equal(dom["match-archives-actions"].children.length,226,
+    "one opening board plus every 225 true saved transitions");
+  assert.match(dom["match-archives-count"].textContent,/全部可追溯/);
+  assert.match(dom["match-archives-actions"].children[1].textContent,/第2步/);
+  dom["match-archives-actions"].children[1].handlers.click();
+  assert.match(dom["match-archives-board"].children[0].textContent,/第2步/);
+  result.report.steps=originalSteps;
   // M3.88 version-2 terminal archive: every seat's genuine archived tiles
   // become visible ONLY here, and an actual human discard has a top-three
   // explanation plus series-level optimal-cut compliance.
