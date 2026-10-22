@@ -1,4 +1,4 @@
-"""Public-knowledge-only, ON-DEMAND efficiency notes for seat-zero Mahjong UI.
+"""Public-knowledge-only cut ranking: live seat-zero and terminal seat-specific review.
 
 No opponent hands, hidden wall contents, RNG, or perfect-information EV.
 Counts reflect unknown physical copies from own hand/melds + published
@@ -15,14 +15,26 @@ _TURNS = frozenset(("dealer_discard", "await_discard"))
 
 
 def classic_hand_hint(view: Mapping) -> dict:
+    """Seat-zero-only live advice. The web endpoint MUST use this wrapper."""
     if view.get("seat") != 0:
         raise ValueError("牌效分析仅支持当前玩家的授权视图")
-    if view.get("phase") not in _TURNS or view.get("turn") != 0:
-        raise ValueError("仅在轮到自己出牌时可查看牌效")
+    return classic_archive_seat_hint(view, 0)
+
+
+def classic_archive_seat_hint(view: Mapping, seat: int) -> dict:
+    """Trusted server-side historic cut scoring, never exposed as live HTTP.
+
+    Caller must pass the AUTHORIZED private_view(seat) captured *before*
+    that seat's physical discard. Does not inspect any opponent private hand.
+    """
+    if type(seat) is not int or seat not in (0, 1, 2, 3) or view.get("seat") != seat:
+        raise ValueError("出牌评分只能读取该座位的授权视图")
+    if view.get("phase") not in _TURNS or view.get("turn") != seat:
+        raise ValueError("仅在轮到该座位出牌时可分析牌效")
     missing_suits = view.get("missing_suits")
     if not isinstance(missing_suits, list) or len(missing_suits) != 4:
         raise ValueError("必须先完成定缺")
-    missing = missing_suits[0]
+    missing = missing_suits[seat]
     if missing not in ("m", "p", "s"):
         raise ValueError("尚未完成定缺")
     hand = view["hand"]
