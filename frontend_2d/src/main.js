@@ -8,7 +8,7 @@ import {publicActions,recentWins,winTitle} from "./settlement.mjs";
 import {renderSettlement} from "./report.mjs";
 import {seatOutcome} from "./seat-status.mjs";
 import {claimDecision,ownKongChoices} from "./action-choice.mjs";
-import {renderClassicHint} from "./hint-view.mjs";
+import {renderClassicHint,renderClassicOperationHint} from "./hint-view.mjs";
 import {renderKongMeld} from "./kong-view.mjs";
 const CLS=["main","xiajia","duimian","shangjia"];
 const SUIT={m:"万",p:"筒",s:"条"};
@@ -18,6 +18,7 @@ const el=id=>document.getElementById(id);
 let token=null,state=null,pai=null,busy=false,timer=null,voice=null;
 let terminalScrollTimeout=null;
 let hintSource=null,hintReport=null,hintBusy=false;
+let operationSource=null,operationReport=null,operationRequested=null;
 const selected=new Set();
 function status(t){el("classic-status").textContent=t}
 function initializeVoice(){
@@ -76,6 +77,46 @@ function store(){try{
  if(token&&state)sessionStorage.setItem(SESSION_KEY,token);
  else sessionStorage.removeItem(SESSION_KEY);
 }catch{}}
+function clearOperationHint(){
+ operationSource=null;operationReport=null;operationRequested=null;
+ renderClassicOperationHint(el("classic-operation-hint-panel"),null);
+}
+function operationWindow(view){
+ if(!view||view.seat!==0||view.won?.[0])return false;
+ if(["claim_window","rob_kong_window"].includes(view.phase)){
+  const options=view.phase==="claim_window"?view.claim_options:view.rob_options;
+  const pending=view.phase==="claim_window"?view.pending_discard:view.pending_rob_kong;
+  return pending?.seat!==0&&!view.claim_submitted?.includes(0)&&
+   options?.some(x=>x!=="pass");
+ }
+ return TURN.has(view.phase)&&view.turn===0&&
+  (view.can_self_draw_win||view.kong_options?.length>0);
+}
+async function loadOperationHint(snapshot){
+ if(operationRequested===snapshot)return;
+ operationRequested=snapshot;
+ const currentToken=token;
+ try{
+  const response=await fetch("/api/action",{
+   method:"POST",headers:{"Content-Type":"application/json","X-MahTrain":"1"},
+   body:JSON.stringify({action:"match_operation_hint",
+                        match_token:currentToken}),
+  });
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error||"碰杠胡参考暂不可用");
+  if(snapshot!==state||currentToken!==token)return;
+  if(result.hint?.status!=="choose_operation")throw Error("操作建议格式异常");
+  operationSource=snapshot;operationReport=result.hint;
+  renderClassicOperationHint(el("classic-operation-hint-panel"),operationReport);
+  draw();
+ }catch(err){
+  if(snapshot===state)status("操作参考暂不可用："+err.message);
+ }
+}
+function currentOperationLabel(){
+ if(operationSource!==state||!operationReport)return null;
+ return operationReport.candidates?.find(x=>x.reference_best)?.label||null;
+}
 function clearHint(){
  hintSource=null;hintReport=null;
  renderClassicHint(el("classic-hint-panel"),null);
@@ -261,7 +302,8 @@ function draw(){
     return control;
    });
   }
-  center(decision?.title||"",buttons);
+  center((decision?.title||"")+
+   (currentOperationLabel()?" · 参考："+currentOperationLabel():""),buttons);
   status(decision?"请选择合法操作；也可以点「过」":"等待其他玩家响应");
  }else if(TURN.has(state.phase)&&state.turn===0){
   if(state.can_self_draw_win)buttons.push(btn("自摸胡",()=>run("win"),true,busy));
@@ -270,7 +312,8 @@ function draw(){
    button.title="可以不杠，直接点选手牌出牌";
    buttons.push(button);
   }
-  center(buttons.length?"可自摸或杠，也可直接出牌":"",buttons);
+  center((buttons.length?"可自摸或杠，也可直接出牌":"")+
+   (currentOperationLabel()?" · 参考："+currentOperationLabel():""),buttons);
   status("点击手牌选中、再点同一张打出；按 Esc 可取消选牌");
  }else if(DONE.has(state.phase)){
   const next=state.next_dealer;
@@ -288,6 +331,9 @@ function draw(){
  el("classic-hint-trigger").disabled=!available||hintBusy;
  renderWins();
  renderSettlement(el("classic-result-report"),state);
+ if(operationWindow(state)&&operationRequested!==state){
+  void loadOperationHint(state);
+ }
  resize();
 }
 function focusTile(index){
@@ -349,6 +395,7 @@ async function submit(cmd){
   // A change of turn/hand invalidates all reference counts, even if the
   // same tile values later recur. Do not show stale advice after a move.
   clearHint();
+  clearOperationHint();
   if(newRound){
    voice?.reset();
    if(terminalScrollTimeout!==null)clearTimeout(terminalScrollTimeout);
