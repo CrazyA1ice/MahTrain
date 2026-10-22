@@ -462,7 +462,8 @@ class MatchArchive:
 
     def save_completed(self, public: dict, history: list[dict],
                        initial_board: dict, ai_levels: list[str],
-                       sealed_review: list[dict] | None = None) -> str:
+                       sealed_review: list[dict] | None = None,
+                       sealed_opening_hands: list[list[str]] | None = None) -> str:
         if public.get("phase") not in _TERMINAL:
             raise ValueError("only completed matches can be archived")
         if (type(ai_levels) is not list or len(ai_levels) != 3 or
@@ -550,7 +551,8 @@ class MatchArchive:
             if len(sealed_review) != len(history):
                 raise ValueError("sealed completed history does not align with public steps")
             payload["post_round_review"] = completed_review(
-                sealed_review[-len(safe_steps):])
+                sealed_review[-len(safe_steps):],
+                opening_hands=sealed_opening_hands)
             payload["version"] = 2
             payload["privacy"] = "post_round_full_reveal"
         archive_id = secrets.token_urlsafe(18)
