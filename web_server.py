@@ -261,9 +261,51 @@ def _match_public_step(game: FourPlayerOpening, before_events: int,
 
 def _match_record(game: FourPlayerOpening, output: list[dict],
                   action) -> None:
+    # Keep exact four-seat hand views server-side ONLY. They are never put
+    # into live HTTP steps or public replay; archived after verified terminal.
+    prior=[list(hand) for hand in game._hands]
+    previous_view=(game.private_view(0) if game.turn == 0 and
+                   game.phase in ("await_discard","dealer_discard") else None)
     before = len(game._events)
     action()
     _match_public_step(game, before, output)
+    events=game._events[before:]
+    if events:
+        detail={"events": [
+                    {"type":event["type"],
+                     **({"seat":event["seat"]} if type(event.get("seat")) is int else {}),
+                     **({"tile":event["tile"]} if isinstance(event.get("tile"),str) else {})}
+                    for event in events],
+                "hands_before":prior,
+                "hands_after":[list(hand) for hand in game._hands]}
+        if previous_view is not None and any(
+                e.get("type")=="discard" and e.get("seat")==0 for e in events):
+            from mahtrain_core.classic_hint import classic_hand_hint
+            # This is the same seat-zero PUBLIC-KNOWLEDGE adviser available
+            # during the live turn, never an omniscient four-hand ranking.
+            report=classic_hand_hint(previous_view)
+            played=next(e["tile"] for e in events
+                        if e.get("type")=="discard" and e.get("seat")==0)
+            candidates=report.get("candidates") or []
+            best=next((i for i,x in enumerate(candidates)
+                       if x["discard"]==played),None)
+            detail["cut_review"]={
+                "seat":0,"discard":played,
+                "optimal":bool(candidates and candidates[0]["reference_best"]
+                               and best is not None and
+                               candidates[best]["reference_best"]),
+                "rank":best+1 if best is not None else None,
+                "top3":[{
+                    "tile":x["discard"],"shanten":x["shanten"],
+                    "effective_copies":x["effective_tile_count_upper_bound"],
+                    "fan_weighted":x["fan_weighted_unknown_copies"],
+                    "reference_best":x["reference_best"],
+                } for x in candidates[:3]],
+            }
+        trace=getattr(game,"_terminal_review_trace",None)
+        if trace is not None:
+            trace.append(detail)
+            if len(trace)>2048:del trace[:-2048]
 
 
 def _match_script_until_human(
@@ -644,6 +686,8 @@ def _process(action: str, payload: dict) -> dict:
                         _MATCH_SUCCESSORS.pop(previous,None)
             if predecessor is not None:
                 _MATCH_SUCCESSORS[old_token]=token
+            game._terminal_review_opening=[list(h) for h in game._hands]
+            game._terminal_review_trace=[]
             _MATCH_SESSIONS[token]=game
             _MATCH_AGENTS[token]=agents
             _MATCH_HISTORY[token]=[]
@@ -748,7 +792,11 @@ def _process(action: str, payload: dict) -> dict:
                 published=game.public_state()
                 archive_id=_MATCH_ARCHIVE.save_completed(
                     published,_MATCH_HISTORY[token],_MATCH_OPENING[token],
-                    [agents[n].level for n in (1,2,3)])
+                    [agents[n].level for n in (1,2,3)],
+                    private_review={
+                        "opening":game._terminal_review_opening,
+                        "steps":game._terminal_review_trace,
+                    })
                 _MATCH_ARCHIVE_IDS[token]=archive_id
             view["match_archive_id"]=_MATCH_ARCHIVE_IDS.get(token)
             return {"match_token":token,"match":view}
