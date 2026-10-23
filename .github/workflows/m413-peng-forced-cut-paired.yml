@@ -1,0 +1,95 @@
+name: M4.13 Peng forced-cut public risk paired official outcome
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_peng_forced_cut_risk_paired.py"
+      - "tests/test_m413_peng_forced_cut_risk_paired.py"
+      - "examples/audit_peng_forced_cut_risk_paired.py"
+      - ".github/workflows/m413-peng-forced-cut-paired.yml"
+permissions:
+  contents: read
+jobs:
+  authorized-risk-and-official-cash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: New Peng tests and M4.12/M4.11 independent strategy regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m413_peng_forced_cut_risk_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m412_independent_replication_gate.py' -v
+          python -m unittest discover -s tests -p 'test_m411_preclaim_risk_peng_paired.py' -v
+  real-paired-shuffles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 38
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 50000
+          - cohort: holdout
+            start: 51000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Eight official games per independent shuffle, exact score
+        run: |
+          python examples/audit_peng_forced_cut_risk_paired.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m413-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m413-"+cohort+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m413_equal_shanten_peng_forced_cut_public_threat_paired_v1"
+          assert x["cohort"]==cohort and x["seed_start"]==start
+          assert x["online_policy_modified"] is False
+          d=x["result"]
+          assert d["independent_shuffles"]==4
+          assert d["paired_seat_positions"]==16
+          assert d["complete_official_games"]==32
+          assert d["frozen_risk_gate"]==0.30
+          assert d["candidate_is_live"] is False
+          assert d["calibrated_ron_probability"] is None
+          assert d["confidence_interval"] is None
+          assert set(s["seed"] for s in d["per_seed"])==set(range(start,start+4))
+          assert sum(s["interventions"] for s in d["per_seed"])==d["candidate_policy_interventions"]
+          assert d["positive_seeds"]+d["negative_seeds"]+d["unchanged_seeds"]==4
+          score=d["component_deltas"]
+          assert score.get("official_net",0)==sum(score.get(k,0) for k in (
+              "win_points","kong_points","exhaustive_points"))
+          for pos in d["positions"]:
+              assert pos["seed"] in range(start,start+4)
+              assert pos["arms"]["baseline"]["counts"].get("actual_changes",0)==0
+              for arm in ("baseline","peng_guard"):
+                  official=pos["arms"][arm]["official"]
+                  assert official["official_net"]==sum(official[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+              if pos["actual_interventions"]==0:
+                  assert pos["identical_if_untouched"] is True
+                  assert all(v==0 for v in pos["official_deltas"].values())
+          text=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','opponent_hands','future_wall','full_wall','drawn_tile','_trace','_events'):
+              assert forbidden not in text
+          print("M4.13 VERIFIED REAL PENG STUDY",cohort,json.dumps({
+              "selected_peng":d["selected_peng_windows"],
+              "changes":d["candidate_policy_interventions"],
+              "official_net":score.get("official_net",0),
+              "mean":d["mean_four_seat_net_delta"],
+              "per_seed":d["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m413-${{ matrix.cohort }}-peng-guard-official-paired
+          path: /tmp/m413-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
