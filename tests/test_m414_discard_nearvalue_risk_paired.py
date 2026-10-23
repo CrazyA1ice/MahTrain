@@ -89,6 +89,8 @@ class M414NearvalueDiscardTests(unittest.TestCase):
         a=NearValueDefenseResearchAgent(seed=42,seat=seat,arm="baseline")
         b=NearValueDefenseResearchAgent(seed=42,seat=seat,
                                         arm="nearvalue_defense")
+        self.assertTrue(a._offline_reference_cut)
+        self.assertTrue(b._offline_reference_cut)
         ref=MahjongAgent("challenge",seed=42,seat=seat).discard(v)
         self.assertEqual(a.discard(v),ref)
         chosen=b.discard(v)
