@@ -112,7 +112,7 @@ def evaluate_block(
             "mean_four_seat_net_delta":net,
             "treated_seed_cluster":changes>0,
         })
-    if (dict(calculated) != {k:v for k,v in metrics.items() if v} or
+    if (any(calculated[k] != metrics[k] for k in METRICS) or
             trial.get("candidate_real_policy_changes") != total_changes
             or counts["risk_peng"].get("actual_changes",0)!=total_changes
             or counts["baseline"].get("actual_changes",0)!=0):
