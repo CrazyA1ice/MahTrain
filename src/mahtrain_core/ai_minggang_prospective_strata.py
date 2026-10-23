@@ -8,6 +8,7 @@ No probability calibration or online AI intervention is claimed.
 from __future__ import annotations
 
 from collections import Counter
+from math import isfinite
 from typing import Any, Mapping
 
 from .ai_action_extended_study import _fixed_lineup
@@ -23,8 +24,11 @@ RISK_BANDS = ("low", "mid", "high")
 
 
 def risk_band(value: float) -> str:
-    """Predeclared descriptive bins; these are NOT P(Ron) buckets."""
-    if type(value) not in (int, float) or not 0 <= value <= 1:
+    """Nonnegative unbounded aggregate threat bins, NOT P(Ron) buckets.
+
+    read_discard_threat SUMS up to three opponents. It can exceed 1.
+    """
+    if type(value) not in (int, float) or not isfinite(value) or value < 0:
         raise ValueError("invalid publicly observed risk index")
     return "low" if value < 0.25 else "mid" if value < 0.5 else "high"
 
