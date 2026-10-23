@@ -1,0 +1,86 @@
+name: M4.09 prospective Ming-Gang risk strata and actual Ron
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_prospective_strata.py"
+      - "tests/test_m409_minggang_prospective_strata.py"
+      - "examples/audit_minggang_prospective_strata.py"
+      - ".github/workflows/m409-prospective-minggang-strata.yml"
+permissions:
+  contents: read
+jobs:
+  preclaim-public-bins-and-authoritative-cash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Original challenge action, physical Kong, actual Ron and privacy regression
+        run: |
+          python -m unittest discover -s tests -p 'test_m409_minggang_prospective_strata.py' -v
+          python -m unittest discover -s tests -p 'test_m408_minggang_ledger_followthrough.py' -v
+          python -m unittest discover -s tests -p 'test_m407_public_minggang_risk_audit.py' -v
+  fixed-natural-independent-cohorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 32
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 42000
+          - cohort: holdout
+            start: 43000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Eight independent shuffles x four challenge seats, no agent treatment
+        run: |
+          python examples/audit_minggang_prospective_strata.py --cohort ${{ matrix.cohort }} --seeds 8 --output /tmp/m409-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          c=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m409-"+c+".json",encoding="utf-8") as f:
+              data=json.load(f)
+          assert data["protocol"]=="m409_public_preclaim_strata_vs_actual_minggang_ron_v1"
+          assert data["cohort"]==c and data["seed_start"]==start
+          assert data["online_policy_modified"] is False
+          out=data["results"]
+          assert out["independent_shuffle_seeds"]==8
+          assert out["four_seat_positions"]==32 and out["complete_games"]==32
+          assert {x["seed"] for x in out["per_seed"]}==set(range(start,start+8))
+          assert out["confidence_interval"] is None
+          assert out["calibrated_ron_probability"] is None
+          assert out["causal_treatment_effect"] is None
+          v=out["counts"]
+          assert v.get("dual_total",0)==sum(v.get(b+"_offer",0) for b in ("low","mid","high"))
+          assert v.get("awarded",0)==sum(v.get(b+"_awarded",0) for b in ("low","mid","high"))
+          assert v.get("actual_ron",0)==sum(v.get(b+"_actual_ron",0) for b in ("low","mid","high"))
+          for p in out["positions"]:
+              assert p["terminal_phase"] in ("finished","wall_exhausted")
+              a=p["official"]
+              assert a["official_net"]==sum(a[k] for k in ("win_points","kong_points","exhaustive_points"))
+          dump=json.dumps(data)
+          for forbidden in ('"hand"','"tile"','future_wall','opponent_hands','full_wall'):
+              assert forbidden not in dump
+          print("M4.09 INDEPENDENT NATURAL STRATA VERIFIED",c,json.dumps({
+              "seeds":out["independent_shuffle_seeds"],
+              "awarded":v.get("awarded",0),
+              "ron":v.get("actual_ron",0),
+              "bins":v,"per_seed":out["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - name: Archive aggregate-only independent evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: m409-${{ matrix.cohort }}-risk-strata
+          path: /tmp/m409-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
