@@ -93,6 +93,11 @@ class NearValueDefenseResearchAgent(MahjongAgent):
         if arm not in ARMS:
             raise ValueError("unknown offline research arm")
         super().__init__("challenge",seed=seed,seat=seat)
+        # The tournament pressure probe requires EXACT original challenge
+        # ranking. Our offline candidate deliberately tests a distinct cut;
+        # skip that baseline-only probe on BOTH arms, while retaining the
+        # standard legal-cut, full trace and official cash validations.
+        self._offline_reference_cut=True
         self.arm=arm
         self.counts:Counter[str]=Counter()
 
