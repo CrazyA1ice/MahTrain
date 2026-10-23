@@ -139,8 +139,10 @@ def paired_position(seed: int, rotation: int) -> dict[str, Any]:
                               offline_agent_overrides={seat: observer})
     official = _official_outcome(base, seat, lineup)
     shadow = _official_outcome(observed, seat, lineup)
-    if official != shadow or base["terminal_phase"] != observed["terminal_phase"]:
-        raise RuntimeError("risk observer changed the authoritative terminal result")
+    if (official != shadow or base["terminal_phase"] != observed["terminal_phase"] or
+            base["public_events"] != observed["public_events"] or
+            base["trace"] != observed["trace"]):
+        raise RuntimeError("risk observer changed a decision, trace or terminal result")
     return {"seed": seed, "rotation": rotation, "challenge_seat": seat,
             "baseline_official": official, "observer_official": shadow,
             "terminal_phase": observed["terminal_phase"],
