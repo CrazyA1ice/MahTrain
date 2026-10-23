@@ -1,0 +1,95 @@
+name: M4.05 dual optional call fastpath and independent paired research
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_dual_claim_fastpath_paired.py"
+      - "tests/test_m405_dual_claim_fastpath.py"
+      - "examples/compare_dual_claim_fastpath.py"
+      - ".github/workflows/m405-dual-fastpath.yml"
+permissions:
+  contents: read
+jobs:
+  dual-fastpath-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real physical dual offer, one candidate pass, all Hu and tian ting protections
+        run: |
+          python -m unittest discover -s tests -p 'test_m405_dual_claim_fastpath.py' -v
+          python -m unittest discover -s tests -p 'test_m404_joint_optional_action_slate.py' -v
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+  new-natural-paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 29
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 34000
+          - cohort: holdout
+            start: 35000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 8 independent seeds x four seats x challenge vs dual-only fastpath
+        run: |
+          python examples/compare_dual_claim_fastpath.py --development 34000 --holdout 35000 --seeds 8 --cohort ${{ matrix.cohort }} --output /tmp/m405-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          co=os.environ["COHORT"]; start=int(os.environ["START"])
+          d=json.load(open("/tmp/m405-"+co+".json",encoding="utf8"))
+          assert d["protocol"]=="m405_dual_option_public_fastpath_seed_cluster_paired_v1"
+          assert d["cohort"]==co and d["seed_start"]==start
+          assert d["online_challenge_modified"] is False
+          c=d["result"]
+          assert c["independent_shuffle_seeds"]==8
+          assert c["paired_four_seat_positions"]==32
+          assert c["complete_official_games"]==64
+          assert {r["seed"] for r in c["per_seed"]}==set(range(start,start+8))
+          ledger=c["official_component_deltas"]
+          assert ledger.get("official_net",0)==sum(ledger.get(k,0) for k in (
+              "win_points","kong_points","exhaustive_points"))
+          assert c["confidence_interval"] is None
+          assert c["positive_delta_seeds"]+c["negative_delta_seeds"]+c["unchanged_delta_seeds"]==8
+          for row in c["positions"]:
+              for arm in ("baseline","dual_fastpath"):
+                  t=row["arms"][arm]
+                  assert t["official"]["official_net"]==sum(t["official"][k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+                  cnt=t["counts"]
+                  assert cnt.get("joint_slate_evaluations",0)==cnt.get("dual_active_windows",0)
+                  assert cnt.get("actual_policy_changes",0)<=cnt.get("dual_action_disagreements",0)
+                  assert t["latency"]["extra_slate_evaluations"]==cnt.get("dual_active_windows",0)
+          raw=json.dumps(d,ensure_ascii=False)
+          for secret in ("opponent_hands","future_wall","full_wall","offer_signature","oracle_rob_hu"):
+              assert secret not in raw,secret
+          print("M4.05 VERIFIED SEED CLUSTER",co,json.dumps({
+              "independent_seeds":c["independent_shuffle_seeds"],
+              "complete_games":c["complete_official_games"],
+              "paired_positions":c["paired_four_seat_positions"],
+              "mean_official_net_delta":c["seed_average_official_net_delta"],
+              "positive_seeds":c["positive_delta_seeds"],
+              "negative_seeds":c["negative_delta_seeds"],
+              "component_deltas":c["official_component_deltas"],
+              "arm_counts":c["counts_by_arm"],
+              "latency":c["latency_descriptive_only"],
+              "per_seed":c["per_seed"],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - name: Archive full official results, dual offers and timing counters
+        uses: actions/upload-artifact@v4
+        with:
+          name: m405-${{ matrix.cohort }}-paired
+          path: /tmp/m405-${{ matrix.cohort }}.json
+          if-no-files-found: error
+          retention-days: 30
