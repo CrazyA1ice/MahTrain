@@ -51,9 +51,9 @@ def offered(*, risk: float, choice: str, voided: bool = False,
 
 class M409ProspectiveMingGangTests(unittest.TestCase):
     def test_predeclared_boundary_bins_are_not_ron_probability(self):
-        self.assertEqual([risk_band(v) for v in (0.0,.249,.25,.499,.5,1)],
-                         ["low","low","mid","mid","high","high"])
-        for v in (-.01,1.01,float("nan"),True,"0.2"):
+        self.assertEqual([risk_band(v) for v in (0.0,.249,.25,.499,.5,1,2.46)],
+                         ["low","low","mid","mid","high","high","high"])
+        for v in (-.01,float("inf"),float("nan"),True,"0.2"):
             with self.subTest(v=v), self.assertRaises(ValueError):
                 risk_band(v)
 
