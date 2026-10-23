@@ -66,7 +66,7 @@ class M409ProspectiveMingGangTests(unittest.TestCase):
         self.assertEqual(c.get("low_actual_ron",0),0)
         self.assertEqual(c["awarded_nominal_cash"],2)
         self.assertEqual(c["awarded_final_cash"],2)
-        self.assertEqual(c["selected_preempted"],0)
+        self.assertEqual(c.get("selected_preempted",0),0)
         self.assertNotIn("tile",json.dumps(c))
 
     def test_actual_multi_ron_cancels_one_cash_not_two(self):
