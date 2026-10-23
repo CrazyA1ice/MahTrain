@@ -1,0 +1,87 @@
+name: M4.04 joint optional claim slate and paired official settlement
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_joint_optional_action_slate.py"
+      - "tests/test_m404_joint_optional_action_slate.py"
+      - "examples/compare_joint_optional_action_slate.py"
+      - ".github/workflows/m404-joint-action-slate.yml"
+permissions:
+  contents: read
+jobs:
+  joint-slate-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compare genuine authorized legal candidates; Hu, tian ting and no secret access
+        run: |
+          python -m unittest discover -s tests -p 'test_m404_joint_optional_action_slate.py' -v
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+          python -m unittest discover -s tests -p 'test_m397_action_counterfactual.py' -v
+  paired-terminal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 29
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            first: 32000
+          - cohort: holdout
+            first: 33000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Four independent shuffle seeds times four seats times baseline/joint ranking
+        run: |
+          python examples/compare_joint_optional_action_slate.py --development 32000 --holdout 33000 --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m404-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          co=os.environ["COHORT"]
+          start=int(os.environ["FIRST"])
+          d=json.load(open("/tmp/m404-"+co+".json",encoding="utf8"))
+          assert d["protocol"]=="m404_joint_optional_claim_action_slate_paired_v1"
+          assert d["cohort"]==co and d["seed_start"]==start
+          assert d["live_policy_modified"] is False
+          x=d["results"]
+          assert x["independent_shuffle_seeds"]==4
+          assert x["four_seat_pairs"]==16
+          assert x["full_games"]==32
+          assert {r["seed"] for r in x["per_seed"]}==set(range(start,start+4))
+          deltas=x["sum_official_component_deltas"]
+          assert deltas["official_net"]==sum(deltas[k] for k in (
+              "win_points","kong_points","exhaustive_points"))
+          assert x["confidence_interval_95pct"] is None
+          for pair in x["positions"]:
+              for arm in ("baseline","joint_slate"):
+                  official=pair["arms"][arm]["official"]
+                  assert official["official_net"]==sum(official[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+                  assert pair["arms"][arm]["evaluation_elapsed_ms"]>=0
+          raw=json.dumps(d,ensure_ascii=False)
+          for secret in ("opponent_hands","future_wall","full_wall","offer_signature","_hands"):
+              assert secret not in raw,secret
+          print("M4.04 PAIRED VERIFIED",json.dumps({
+              "cohort":co,"net_delta":x["counterfactual_mean_seed_delta"],
+              "positive_seed_clusters":x["positive_delta_seeds"],
+              "negative_seed_clusters":x["negative_delta_seeds"],
+              "components":deltas,"counts":x["aggregate_counts"],
+              "per_seed":x["per_seed"],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          FIRST: ${{ matrix.first }}
+      - name: Save anonymized official full-game result by independent cohort
+        uses: actions/upload-artifact@v4
+        with:
+          name: m404-paired-${{ matrix.cohort }}
+          path: /tmp/m404-${{ matrix.cohort }}.json
+          if-no-files-found: error
+          retention-days: 30
