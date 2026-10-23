@@ -1,0 +1,107 @@
+name: M4.16 official exhaustive terminal classification and payment audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_exhaustive_terminal_cash_audit.py"
+      - "tests/test_m416_exhaustive_terminal_cash_audit.py"
+      - "examples/audit_exhaustive_terminal_cash.py"
+      - ".github/workflows/m416-exhaustive-terminal-cash.yml"
+      - "docs/MATCH_M416_EXHAUSTIVE_TERMINAL_CASH_V1.26.md"
+permissions:
+  contents: read
+
+jobs:
+  stage-and-authority-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Flower pig, maximal effective fan, one-shot da-jiao and old cut audits
+        run: |
+          python -m unittest discover -s tests -p 'test_m416_exhaustive_terminal_cash_audit.py' -v
+          python -m unittest discover -s tests -p 'test_m415_discard_first_divergence_ledger.py' -v
+
+  independent-shuffle-frozen-replays:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 52000
+            changes: 3
+            net: -700
+            exhaustive: -1000
+          - cohort: holdout
+            start: 53000
+            changes: 2
+            net: 0
+            exhaustive: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Re-run 4 frozen shuffles and all four challenge seats with both policies
+        run: |
+          python examples/audit_exhaustive_terminal_cash.py --cohort ${{ matrix.cohort }} --output /tmp/m416-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m416-"+cohort+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m416_authoritative_exhaustive_classes_da_jiao_postgame_v1"
+          assert x["cohort"]==cohort and x["seed_start"]==start
+          assert x["online_policy_modified"] is False
+          assert x["retrospective_not_independent_holdout"] is True
+          d=x["results"]
+          assert d["independent_shuffles"]==4
+          assert d["paired_seat_positions"]==16
+          assert d["complete_games"]==32
+          assert d["real_interventions"]==int(os.environ["CHANGES"])
+          assert d["official_deltas"]["official_net"]==int(os.environ["NET"])
+          assert d["official_deltas"]["exhaustive_points"]==int(os.environ["EXHAUSTIVE"])
+          assert d["official_deltas"]["exhaustive_points"]==sum(
+              d["stage_deltas"][k] for k in ("flower_pig","da_jiao"))
+          assert sum(x["real_interventions"] for x in d["per_seed"])==d["real_interventions"]
+          assert {p["seed"] for p in d["per_seed"]}==set(range(start,start+4))
+          assert len(d["changed_position_terminal_audits"])==d["changed_positions"]
+          for pos in d["changed_position_terminal_audits"]:
+              official=pos["official_deltas"]
+              assert official["official_net"]==sum(official[k] for k in (
+                  "win_points","kong_points","exhaustive_points"))
+              for arm in ("baseline","nearvalue_defense"):
+                  term=pos["arms"][arm]["terminal"]
+                  assert term["official_exhaustive_balance"]==sum(
+                      term[k] for k in ("flower_pig_balance","da_jiao_balance"))
+                  assert term["terminal_phase"] in ("finished","wall_exhausted")
+                  if term["terminal_phase"]=="finished":
+                      assert term["official_exhaustive_balance"]==0
+          raw=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','"future_wall"','"opponent_hands"',
+                            '"missing_suit"','"full_wall"','"_trace"','"public_events"'):
+              assert forbidden not in raw
+          print("M4.16 VERIFIED OFFICIAL FLOWER PIG & DA-JIAO",cohort,json.dumps({
+              "interventions":d["real_interventions"],
+              "official":d["official_deltas"],
+              "terminal_stages":d["stage_deltas"],
+              "per_seed":d["per_seed"],
+              "changed_positions":d["changed_position_terminal_audits"],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+          CHANGES: ${{ matrix.changes }}
+          NET: ${{ matrix.net }}
+          EXHAUSTIVE: ${{ matrix.exhaustive }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m416-${{ matrix.cohort }}-terminal-stage-cash
+          path: /tmp/m416-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
