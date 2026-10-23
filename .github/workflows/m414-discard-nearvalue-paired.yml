@@ -1,0 +1,98 @@
+name: M4.14 public near-value discard paired official study
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_discard_nearvalue_risk_paired.py"
+      - "tests/test_m414_discard_nearvalue_risk_paired.py"
+      - "examples/audit_discard_nearvalue_risk_paired.py"
+      - ".github/workflows/m414-discard-nearvalue-paired.yml"
+permissions:
+  contents: read
+jobs:
+  authorized-discard-rank-and-official-cash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: M4.14 ranked near-value, M4.13 Peng and M4.12 evidence regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m414_discard_nearvalue_risk_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m413_peng_forced_cut_risk_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m412_independent_replication_gate.py' -v
+  paired-natural-shuffle-blocks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 52000
+          - cohort: holdout
+            start: 53000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Four distinct challenge seats per unseen shuffle, matched full-game official money
+        run: |
+          python examples/audit_discard_nearvalue_risk_paired.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m414-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          name=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m414-"+name+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m414_frozen_public_risk_nearvalue_discard_paired_v1"
+          assert x["cohort"]==name and x["seed_start"]==start
+          assert x["online_policy_modified"] is False
+          d=x["result"]
+          assert d["independent_shuffle_seeds"]==4
+          assert d["paired_positions"]==16 and d["complete_games"]==32
+          assert d["frozen_reduction"]==0.08
+          assert d["frozen_value_retention"]==0.8
+          assert d["frozen_ukeire_retention"]==0.85
+          assert d["live_policy_modified"] is False
+          assert d["confidence_interval"] is None
+          assert d["calibrated_ron_probability"] is None
+          assert {p["seed"] for p in d["per_seed"]}==set(range(start,start+4))
+          assert sum(p["actual_interventions"] for p in d["per_seed"])==d["actual_discard_interventions"]
+          assert d["positive_seed_clusters"]+d["negative_seed_clusters"]+d["neutral_seed_clusters"]==4
+          q=d["official_component_deltas"]
+          assert q.get("official_net",0)==sum(q.get(k,0) for k in (
+              "win_points","kong_points","exhaustive_points"))
+          for p in d["positions"]:
+              assert p["seed"] in range(start,start+4)
+              assert p["arms"]["baseline"]["counts"].get("actual_changes",0)==0
+              for arm in ("baseline","nearvalue_defense"):
+                  o=p["arms"][arm]["official"]
+                  assert o["official_net"]==sum(o[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+              if p["actual_interventions"]==0:
+                  assert p["identical_if_untouched"] is True
+                  assert all(v==0 for v in p["paired_deltas"].values())
+          raw=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','"opponent_hands"','"future_wall"',
+                            '"full_wall"','"drawn_tile"','"_trace"','"_events"'):
+              assert forbidden not in raw
+          print("M4.14 PAIRED PUBLIC CUT VERIFIED",name,json.dumps({
+              "baseline_discards":d["total_baseline_discards"],
+              "multi_minimum":d["multiple_minimum_shanten_cuts"],
+              "changes":d["actual_discard_interventions"],
+              "changed_clusters":d["seeds_with_interventions"],
+              "official_delta":q.get("official_net",0),
+              "per_seed":d["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m414-${{ matrix.cohort }}-nearvalue-public-defensive-discard
+          path: /tmp/m414-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
