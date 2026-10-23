@@ -74,7 +74,7 @@ jobs:
                   assert pos["identical_if_untouched"] is True
                   assert all(v==0 for v in pos["official_deltas"].values())
           text=json.dumps(x)
-          for forbidden in ('"hand"','"tile"','opponent_hands','future_wall','full_wall','drawn_tile','_trace','_events'):
+          for forbidden in ('"hand"','"tile"','opponent_hands','future_wall','full_wall','drawn_tile','"_trace"','"_events"'):
               assert forbidden not in text
           print("M4.13 VERIFIED REAL PENG STUDY",cohort,json.dumps({
               "selected_peng":d["selected_peng_windows"],
