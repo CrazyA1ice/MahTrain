@@ -6,6 +6,7 @@ on:
       - "tests/test_m415_discard_first_divergence_ledger.py"
       - "examples/audit_discard_first_divergence_ledger.py"
       - ".github/workflows/m415-discard-first-divergence.yml"
+      - "docs/MATCH_M415_DISCARD_FIRST_DIVERGENCE_LEDGER_V1.25.md"
 permissions:
   contents: read
 jobs:
