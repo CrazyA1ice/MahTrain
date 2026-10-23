@@ -1,0 +1,102 @@
+name: M4.15 M4.14 first-divergence official score forensics
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_discard_first_divergence_ledger.py"
+      - "tests/test_m415_discard_first_divergence_ledger.py"
+      - "examples/audit_discard_first_divergence_ledger.py"
+      - ".github/workflows/m415-discard-first-divergence.yml"
+permissions:
+  contents: read
+jobs:
+  first-split-legal-shanten-and-private-safe-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: First actual original-vs-alternative cut and previous risk paired guards
+        run: |
+          python -m unittest discover -s tests -p 'test_m415_discard_first_divergence_ledger.py' -v
+          python -m unittest discover -s tests -p 'test_m414_discard_nearvalue_risk_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m413_peng_forced_cut_risk_paired.py' -v
+  recheck-real-previous-frozen-cohorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 52000
+            expected_changes: 3
+            expected_net: -700
+          - cohort: holdout
+            start: 53000
+            expected_changes: 2
+            expected_net: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Replay exact earlier 4 independent shuffles x four seats x two policies
+        run: |
+          python examples/audit_discard_first_divergence_ledger.py --cohort ${{ matrix.cohort }} --output /tmp/m415-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m415-"+cohort+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m415_frozen_m414_first_discard_divergence_cash_audit_v1"
+          assert x["cohort"]==cohort and x["seed_start"]==start
+          assert x["retrospective_not_independent_validation"] is True
+          assert x["online_policy_modified"] is False
+          d=x["result"]
+          assert d["independent_shuffle_seeds"]==4
+          assert d["paired_positions"]==16 and d["complete_games"]==32
+          assert d["actual_policy_changes"]==int(os.environ["CHANGES"])
+          assert d["official_deltas"]["official_net"]==int(os.environ["NET"])
+          assert sum(p["real_interventions"] for p in d["per_seed"])==d["actual_policy_changes"]
+          assert d["official_deltas"]["official_net"]==sum(
+              d["official_deltas"][k] for k in (
+                  "win_points","kong_points","exhaustive_points"))
+          assert set(p["seed"] for p in d["per_seed"])==set(range(start,start+4))
+          assert len(d["changed_position_diagnostics"])==d["changed_positions"]
+          assert d["local_causal_action_ev"] is None and d["p_ron"] is None
+          for row in d["changed_position_diagnostics"]:
+              split=row["first_divergence"]
+              assert split and split["exact_minimum_shanten"]>=0
+              assert split["own_discard_ordinal"]>=1
+              assert split["first_policy_change"]["public_risk_index_drop_milli"]>=80
+              assert split["first_policy_change"]["retained_fan_weighted_value_pct"]>=80
+              assert split["first_policy_change"]["retained_effective_copies_pct"]>=85
+              components=row["official_component_deltas"]
+              assert components["official_net"]==sum(
+                  components[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+          raw=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','"full_wall"','"future_wall"',
+                            '"opponent_hands"','"public_events"','"_trace"','"_events"'):
+              assert forbidden not in raw
+          print("M4.15 VERIFIED TRUE FIRST DIVERGENCE",cohort,json.dumps({
+              "interventions":d["actual_policy_changes"],
+              "positions_changed":d["changed_positions"],
+              "official":d["official_deltas"],
+              "per_seed":d["per_seed"],
+              "first_split_diagnostics":d["changed_position_diagnostics"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+          CHANGES: ${{ matrix.expected_changes }}
+          NET: ${{ matrix.expected_net }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m415-${{ matrix.cohort }}-ledger-first-divergence
+          path: /tmp/m415-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
