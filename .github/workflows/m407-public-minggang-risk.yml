@@ -1,0 +1,81 @@
+name: M4.07 public Ming-Gang pre-tail risk shadow audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_public_risk_audit.py"
+      - "tests/test_m407_public_minggang_risk_audit.py"
+      - "examples/audit_minggang_public_risk.py"
+      - ".github/workflows/m407-public-minggang-risk.yml"
+permissions:
+  contents: read
+jobs:
+  public-risk-legality-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real 108-tile physical dual window, protected Hu and public privacy
+        run: |
+          python -m unittest discover -s tests -p 'test_m407_public_minggang_risk_audit.py' -v
+          python -m unittest discover -s tests -p 'test_m406_minggang_credit_tail_guard.py' -v
+          python -m unittest discover -s tests -p 'test_m405_dual_claim_fastpath.py' -v
+  fixed-natural-shadow-pairs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 29
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 38000
+          - cohort: holdout
+            start: 39000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Four independent seeds x four seats x two identical official arms
+        run: |
+          python examples/audit_minggang_public_risk.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m407-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          name=os.environ["COHORT"];start=int(os.environ["START"])
+          j=json.load(open("/tmp/m407-"+name+".json",encoding="utf8"))
+          assert j["protocol"]=="m407_public_minggang_pre_tail_exit_risk_v1"
+          assert j["online_policy_modified"] is False
+          assert j["cohort"]==name and j["seed_start"]==start
+          r=j["results"]
+          assert r["independent_initial_shuffle_seeds"]==4
+          assert r["paired_seat_positions"]==16 and r["complete_games"]==32
+          assert r["policy_interventions"]==0
+          assert r["confidence_interval"] is None
+          assert {x["seed"] for x in r["per_seed"]}==set(range(start,start+4))
+          assert r["natural_dual_windows"]==r["risk_counters"].get("dual_windows",0)
+          for entry in r["positions"]:
+              assert entry["unchanged_official"] is True
+              assert entry["baseline_official"]==entry["observer_official"]
+              official=entry["baseline_official"]
+              assert official["official_net"]==sum(official[k] for k in (
+                  "win_points","kong_points","exhaustive_points"))
+          dumped=json.dumps(j,ensure_ascii=False)
+          for forbidden in ("opponent_hands","future_wall","full_wall","oracle_ron"):
+              assert forbidden not in dumped
+          print("M4.07 REAL OFFICIAL NATURAL SHADOW VERIFIED",name,
+                json.dumps({"windows":r["natural_dual_windows"],
+                            "per_seed":r["per_seed"],
+                            "risk_counters":r["risk_counters"]},ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - name: Publish anonymous real terminal evidence and public risk counts
+        uses: actions/upload-artifact@v4
+        with:
+          name: m407-${{ matrix.cohort }}-paired-risk
+          path: /tmp/m407-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
