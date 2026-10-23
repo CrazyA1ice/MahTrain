@@ -1,0 +1,118 @@
+name: M4.12 frozen-risk candidate independent-seed evidence gate
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_replication_gate.py"
+      - "tests/test_m412_independent_replication_gate.py"
+      - "examples/audit_minggang_independent_replication.py"
+      - ".github/workflows/m412-independent-risk-peng-replication.yml"
+permissions:
+  contents: read
+
+jobs:
+  reconcile-official-payoff-and-sampling-units:
+    runs-on: ubuntu-latest
+    timeout-minutes: 21
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: M4.12 evidence gates plus frozen candidate and private-state regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m412_independent_replication_gate.py' -v
+          python -m unittest discover -s tests -p 'test_m411_preclaim_risk_peng_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m410_minggang_actual_exit_risk.py' -v
+
+  new-independent-eight-seed-cohorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 48000
+          - cohort: holdout
+            start: 49000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Frozen public gate baseline vs candidate on eight unseen four-seat shuffles
+        run: |
+          python examples/audit_minggang_independent_replication.py --cohort ${{ matrix.cohort }} --seeds 8 --output /tmp/m412-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m412-"+cohort+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m412_frozen_m411_new_independent_seed_replication_gate_v1"
+          assert x["cohort"]==cohort and x["seed_start"]==start
+          assert x["candidate_only_offline"] is True
+          assert x["online_policy_modified"] is False
+          b=x["result"]
+          assert b["shuffle_seeds"]==8 and b["seed_start"]==start
+          assert b["complete_games"]==64 and b["paired_seat_positions"]==32
+          assert b["public_threat_gate"]==0.25
+          assert b["policy_deployable"] is False
+          assert b["confidence_interval"] is None
+          assert b["calibrated_ron_probability"] is None
+          assert b["study_is_causal_local_claim_value"] is False
+          assert {s["seed"] for s in b["per_seed"]}==set(range(start,start+8))
+          assert sum(s["actual_interventions"] for s in b["per_seed"])==b["actual_interventions"]
+          assert sum(s["treated_seed_cluster"] for s in b["per_seed"])==b["independent_seeds_with_interventions"]
+          c=b["official_component_deltas"]
+          assert c["official_net"]==c["win_points"]+c["kong_points"]+c["exhaustive_points"]
+          assert not any(k in b for k in ("positions","arms","public_events","trace"))
+          raw=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','opponent_hands','future_wall','drawn_tile','full_wall'):
+              assert forbidden not in raw
+          print("M4.12 FROZEN UNSEEN SEED COHORT VERIFIED",cohort,json.dumps({
+              "real_interventions":b["actual_interventions"],
+              "treated_seeds":b["independent_seeds_with_interventions"],
+              "net_delta":b["mean_four_seat_official_net_delta"],
+              "blocked":b["blockers"],"per_seed":b["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m412-${{ matrix.cohort }}-frozen-paired-seed-gate
+          path: /tmp/m412-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
+
+  aggregate-two-independent-evidence-blocks:
+    needs: [reconcile-official-payoff-and-sampling-units, new-independent-eight-seed-cohorts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m412-*-frozen-paired-seed-gate
+          merge-multiple: true
+          path: /tmp/m412
+      - name: Cross-block independence and explicitly no live policy promotion
+        run: |
+          python - <<'PY'
+          import json
+          with open('/tmp/m412/m412-development.json',encoding='utf8') as f:
+              dev=json.load(f)
+          with open('/tmp/m412/m412-holdout.json',encoding='utf8') as f:
+              hold=json.load(f)
+          a,b=dev['result'],hold['result']
+          assert a['seed_start']==48000 and b['seed_start']==49000
+          assert a['shuffle_seeds']==b['shuffle_seeds']==8
+          assert set(x['seed'] for x in a['per_seed']).isdisjoint(
+              x['seed'] for x in b['per_seed'])
+          assert a['complete_games']+b['complete_games']==128
+          more=(a['predeclared_more_research_gate_passed'] and
+                b['predeclared_more_research_gate_passed'])
+          assert not a['policy_deployable'] and not b['policy_deployable']
+          print('M4.12 CROSS-BLOCK COMPLETE; possible NEW research only:',more)
+          print('M4.12 LIVE CHALLENGE POLICY NOT MODIFIED OR PROMOTED')
+          PY
