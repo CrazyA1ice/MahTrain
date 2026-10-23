@@ -1,0 +1,95 @@
+name: M4.11 paired official Ming-Gang public-risk Peng research
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_preclaim_paired.py"
+      - "tests/test_m411_preclaim_risk_peng_paired.py"
+      - "examples/audit_minggang_preclaim_risk_peng.py"
+      - ".github/workflows/m411-preclaim-risk-peng-paired.yml"
+permissions:
+  contents: read
+jobs:
+  legitimate-action-and-no-oracle-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Legal Hu/Tian Ting, public gate, full official paired and legacy regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m411_preclaim_risk_peng_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m410_minggang_actual_exit_risk.py' -v
+          python -m unittest discover -s tests -p 'test_m409_minggang_prospective_strata.py' -v
+  four-seat-paired-natural-matches:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 46000
+          - cohort: holdout
+            start: 47000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fixed independent seeds, both policies, actual current official net
+        run: |
+          python examples/audit_minggang_preclaim_risk_peng.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m411-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          c=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m411-"+c+".json",encoding="utf8") as f:
+              root=json.load(f)
+          assert root["protocol"]=="m411_preclaim_public_risk_peng_paired_official_net_v1"
+          assert root["online_policy_modified"] is False
+          assert root["candidate_only_offline"] is True
+          assert root["cohort"]==c and root["seed_start"]==start
+          d=root["results"]
+          assert d["independent_shuffle_seeds"]==4
+          assert d["paired_seat_positions"]==16 and d["complete_games"]==32
+          assert d["public_threat_gate"]==0.25
+          assert {x["seed"] for x in d["per_seed"]}==set(range(start,start+4))
+          assert d["confidence_interval"] is None
+          assert d["risk_is_probability"] is False
+          assert d["positive_delta_seeds"]+d["negative_delta_seeds"]+d["unchanged_delta_seeds"]==4
+          metrics=d["official_component_deltas"]
+          assert metrics.get("official_net",0)==sum(metrics.get(k,0) for k in (
+              "win_points","kong_points","exhaustive_points"))
+          for item in d["positions"]:
+              assert item["seed"] in range(start,start+4)
+              assert item["arms"]["baseline"]["counts"].get("actual_changes",0)==0
+              for arm in ("baseline","risk_peng"):
+                  official=item["arms"][arm]["official"]
+                  assert official["official_net"]==sum(official[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+              if item["actual_interventions"]==0:
+                  assert item["same_state_when_unchanged"] is True
+                  assert all(v==0 for v in item["paired_deltas"].values())
+          raw=json.dumps(root)
+          for forbidden in ('"hand"','"tile"','future_wall','opponent_hands','drawn_tile','full_wall'):
+              assert forbidden not in raw
+          print("M4.11 PAIRED OFFICIAL VERIFIED",c,json.dumps({
+              "seeds":d["independent_shuffle_seeds"],
+              "games":d["complete_games"],
+              "actual_changes":d["candidate_real_policy_changes"],
+              "mean_delta":d["seed_mean_official_net_delta"],
+              "components":metrics,
+              "per_seed":d["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - name: Preserve strictly anonymous complete paired outcomes
+        uses: actions/upload-artifact@v4
+        with:
+          name: m411-${{ matrix.cohort }}-paired-official-cash
+          path: /tmp/m411-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
