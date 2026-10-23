@@ -1,0 +1,87 @@
+name: M4.10 authorized actual post-tail exit threat audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_actual_exit_risk.py"
+      - "tests/test_m410_minggang_actual_exit_risk.py"
+      - "examples/audit_minggang_actual_exit_risk.py"
+      - ".github/workflows/m410-actual-posttail-minggang-exit.yml"
+permissions:
+  contents: read
+jobs:
+  posttail-authorized-cut-and-official-ron-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real tail draw, baseline unchanged, post-tail Ron authority
+        run: |
+          python -m unittest discover -s tests -p 'test_m410_minggang_actual_exit_risk.py' -v
+          python -m unittest discover -s tests -p 'test_m409_minggang_prospective_strata.py' -v
+          python -m unittest discover -s tests -p 'test_m408_minggang_ledger_followthrough.py' -v
+  independent-real-minggang-exits:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 44000
+          - cohort: holdout
+            start: 45000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 8 truly new independent initial shuffles x four challenge seats
+        run: |
+          python examples/audit_minggang_actual_exit_risk.py --cohort ${{ matrix.cohort }} --seeds 8 --output /tmp/m410-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          c=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m410-"+c+".json",encoding="utf8") as f:
+              doc=json.load(f)
+          assert doc["protocol"]=="m410_actual_supplement_exit_cut_public_risk_v1"
+          assert doc["cohort"]==c and doc["seed_start"]==start
+          assert doc["online_policy_modified"] is False
+          x=doc["results"]
+          assert x["independent_shuffle_seeds"]==8
+          assert x["complete_games"]==32 and x["four_seat_positions"]==32
+          assert {r["seed"] for r in x["per_seed"]}==set(range(start,start+8))
+          pre=x["pre_tail_counts"];post=x["post_tail_counts"]
+          assert post.get("real_exits",0)+post.get("awarded_without_exit",0)==pre.get("awarded",0)
+          assert post.get("ron",0)==pre.get("actual_ron",0)
+          assert post.get("ron_winners",0)==pre.get("actual_ron_winners",0)
+          assert post.get("real_exits",0)==sum(post.get("post_"+b+"_exits",0)
+                                               for b in ("low","mid","high"))
+          assert post.get("real_exits",0)==sum(post.get(x,0) for x in (
+              "upshift","downshift","same_band"))
+          assert x["calibrated_ron_probability"] is None and x["uncertainty_interval"] is None
+          for p in x["positions"]:
+              a=p["official"]
+              assert a["official_net"]==a["win_points"]+a["kong_points"]+a["exhaustive_points"]
+          raw=json.dumps(doc)
+          for forbidden in ('"tile"','"hand"','future_wall','opponent_hands','drawn_tile','full_wall'):
+              assert forbidden not in raw
+          print("M4.10 FULL NATURAL VERIFIED",c,json.dumps({
+              "pre":pre,"post":post,
+              "seeds_with_real_exits":x["seeds_with_actual_exit"],
+              "seeds_with_ron":x["seeds_with_actual_ron"],
+              "per_seed":x["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - name: Archive nonsecret per-seed research audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: m410-${{ matrix.cohort }}-actual-posttail-risk
+          path: /tmp/m410-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
