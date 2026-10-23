@@ -1,0 +1,85 @@
+name: M4.08 authoritative Ming-Gang refund and Ron follow-through
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_ledger_followthrough.py"
+      - "tests/test_m408_minggang_ledger_followthrough.py"
+      - "examples/audit_minggang_ledger_followthrough.py"
+      - ".github/workflows/m408-minggang-ledger-followthrough.yml"
+permissions:
+  contents: read
+jobs:
+  physical-cash-and-hu-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Kong payment and cancellation, protected Hu, no-oracle
+        run: |
+          python -m unittest discover -s tests -p 'test_m408_minggang_ledger_followthrough.py' -v
+          python -m unittest discover -s tests -p 'test_m407_public_minggang_risk_audit.py' -v
+          python -m unittest discover -s tests -p 'test_kong_and_exhaustive_review.py' -v
+  independent-natural-official-ledger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 27
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 40000
+          - cohort: holdout
+            start: 41000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real 108-tile matches, authoritative cash events and terminal Hu
+        run: |
+          python examples/audit_minggang_ledger_followthrough.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m408-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"];start=int(os.environ["SEED_START"])
+          record=json.load(open("/tmp/m408-"+cohort+".json",encoding="utf8"))
+          assert record["protocol"]=="m408_actual_minggang_authoritative_ledger_followthrough_v1"
+          assert record["cohort"]==cohort and record["seed_start"]==start
+          assert record["online_policy_modified"] is False
+          x=record["results"]
+          assert x["independent_initial_shuffle_seeds"]==4
+          assert x["four_seat_positions"]==16 and x["complete_games"]==16
+          assert {p["seed"] for p in x["per_seed"]}==set(range(start,start+4))
+          assert x["confidence_interval"] is None
+          assert x["total_dual_windows"]==x["counts"]["windows"].get("dual_windows",0)
+          assert x["actual_all_seat_minggang"]==x["counts"]["ledger"].get("table_minggang_realized",0)
+          for p in x["positions"]:
+              assert p["terminal_phase"] in ("finished","wall_exhausted")
+              a=p["official"]
+              assert a["official_net"]==sum(a[k] for k in (
+                  "win_points","kong_points","exhaustive_points"))
+              ledger=p["ledger"]
+              assert ledger.get("own_minggang_posted",0)+ledger.get("own_minggang_voided",0)==ledger.get("own_minggang_realized",0)
+              assert ledger.get("own_minggang_exit_ron",0)==ledger.get("own_minggang_voided",0)
+          dump=json.dumps(record,ensure_ascii=False)
+          for forbidden in ('"hand"','"tile"','opponent_hands','future_wall','full_wall','oracle_ron'):
+              assert forbidden not in dump
+          print("M4.08 REAL AUTHORITATIVE LEDGER VERIFIED",cohort,json.dumps({
+              "seeds":x["independent_initial_shuffle_seeds"],
+              "actual_kongs":x["actual_all_seat_minggang"],
+              "dual_windows":x["total_dual_windows"],
+              "counts":x["counts"],"per_seed":x["per_seed"],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          SEED_START: ${{ matrix.start }}
+      - name: Preserve audited aggregate-only natural JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: m408-${{ matrix.cohort }}-terminal-ledger
+          path: /tmp/m408-${{ matrix.cohort }}.json
+          if-no-files-found: error
+          retention-days: 30
