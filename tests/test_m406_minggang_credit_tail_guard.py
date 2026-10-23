@@ -41,7 +41,8 @@ class M406MingGangCreditTailGuard(unittest.TestCase):
         before=copy.deepcopy(view)
         original=optional_claim_slate(view)
         data=authorized_public_minggang_evidence(view,original)
-        self.assertEqual(data["payment_if_posted"],2)
+        # Real staged fixture deliberately has NO priced kong base.
+        self.assertIsNone(data["payment_if_posted"])
         self.assertEqual(data["payment_payer_count"],1)
         self.assertTrue(data["payment_is_reversible_on_kong_discard_ron"])
         self.assertTrue(data["tail_draw_exists"])
@@ -72,7 +73,7 @@ class M406MingGangCreditTailGuard(unittest.TestCase):
             v,"ming_gang",slate_pass_best())
         self.assertEqual(choice,"ming_gang")
         self.assertEqual(reason,"retain_official_minggang")
-        self.assertEqual(evidence["payment_if_posted"],2)
+        self.assertIsNone(evidence["payment_if_posted"])
         self.assertIsNone(evidence["expected_official_net_from_kong"])
 
     def test_allowed_peng_only_for_strict_shanten_improvement(self):
@@ -91,6 +92,7 @@ class M406MingGangCreditTailGuard(unittest.TestCase):
         self.assertEqual(action,"pass")
         self.assertEqual(reason,"no_strict_profitable_minggang_proof")
         s[2]["shanten"]=0
+        v["kong_ledger"]["base"]=1  # priced official ming-gang explicitly
         action,reason,_=cash_preserving_optional_choice(v,"pass",s)
         self.assertEqual(action,"ming_gang")
         self.assertEqual(reason,"strict_shanten_and_priced_minggang")
