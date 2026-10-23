@@ -1,0 +1,93 @@
+name: M4.06 minggang cash reversal and tail draw guard
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_minggang_credit_tail_guard.py"
+      - "tests/test_m406_minggang_credit_tail_guard.py"
+      - "examples/compare_minggang_credit_tail_guard.py"
+      - ".github/workflows/m406-minggang-credit-tail.yml"
+permissions:
+  contents: read
+jobs:
+  official-money-and-tail-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 17
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Physical 108 tile, official refundable ledger, protected Hu/Tian Ting and no-oracle tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m406_minggang_credit_tail_guard.py' -v
+          python -m unittest discover -s tests -p 'test_m405_dual_claim_fastpath.py' -v
+          python -m unittest discover -s tests -p 'test_kong_and_exhaustive_review.py' -v
+  actual-terminal-pair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 29
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 36000
+          - cohort: holdout
+            start: 37000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: New eight independent initial shuffle seeds x four seats x baseline/cash-guard
+        run: |
+          python examples/compare_minggang_credit_tail_guard.py --cohort ${{ matrix.cohort }} --development 36000 --holdout 37000 --seeds 8 --output /tmp/m406-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          co=os.environ["COHORT"];start=int(os.environ["SEED_START"])
+          j=json.load(open("/tmp/m406-"+co+".json",encoding="utf8"))
+          assert j["protocol"]=="m406_minggang_reversible_payment_tail_draw_guard_v1"
+          assert j["online_policy_modified"] is False
+          assert j["cohort"]==co and j["seed_start"]==start
+          result=j["results"]
+          assert result["independent_initial_shuffle_seeds"]==8
+          assert result["complete_games"]==64
+          assert result["paired_seat_positions"]==32
+          assert {x["seed"] for x in result["per_seed"]}==set(range(start,start+8))
+          m=result["components"]
+          assert m.get("official_net",0)==sum(m.get(k,0) for k in (
+              "win_points","kong_points","exhaustive_points"))
+          assert result["confidence_interval"] is None
+          assert result["positive_seed_clusters"]+result["negative_seed_clusters"]+result["unchanged_seed_clusters"]==8
+          for row in result["positions"]:
+              for arm in ("baseline","credit_tail_guard"):
+                  x=row["arms"][arm]
+                  ledger=x["official"]
+                  assert ledger["official_net"]==sum(ledger[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+                  counters=x["counts"]
+                  assert counters.get("joint_slate_evaluations",0)==counters.get("dual_legal_windows",0)
+                  assert counters.get("actual_changes",0)<=counters.get("proposed_differences",0)
+                  assert x["latency"]["actual_slate_evaluations"]==counters.get("dual_legal_windows",0)
+          serialized=json.dumps(j,ensure_ascii=False)
+          for secret in ("opponent_hands","future_wall","full_wall","offer_signature","oracle_rob_hu"):
+              assert secret not in serialized
+          print("M4.06 PAIRED REAL RULES VERIFIED",co,json.dumps({
+              "mean_delta":result["average_official_net_delta"],
+              "positive_seed_clusters":result["positive_seed_clusters"],
+              "negative_seed_clusters":result["negative_seed_clusters"],
+              "official_components":result["components"],
+              "counts":result["counts_by_arm"],
+              "latency":result["latency_by_arm"],
+              "per_seed":result["per_seed"],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          SEED_START: ${{ matrix.start }}
+      - name: Archive anonymized signed official net and guarded action decisions
+        uses: actions/upload-artifact@v4
+        with:
+          name: m406-${{ matrix.cohort }}-paired
+          path: /tmp/m406-${{ matrix.cohort }}.json
+          if-no-files-found: error
+          retention-days: 30
