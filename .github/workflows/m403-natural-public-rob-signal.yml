@@ -1,0 +1,135 @@
+name: M4.03 independent public bu-gang rob risk validation
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_public_rob_seed_validation.py"
+      - "tests/test_m403_public_rob_seed_validation.py"
+      - "examples/validate_public_rob_seed_cohorts.py"
+      - ".github/workflows/m403-natural-public-rob-signal.yml"
+permissions:
+  contents: read
+
+jobs:
+  no-peek-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real rule-engine and public-only evidence-gate regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m403_public_rob_seed_validation.py' -v
+          python -m unittest discover -s tests -p 'test_m402_all_seat_bugang.py' -v
+          python -m unittest discover -s tests -p 'test_m401_physical_rob_scenarios.py' -v
+
+  natural-cohort:
+    runs-on: ubuntu-latest
+    timeout-minutes: 29
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            first: 30000
+          - cohort: holdout
+            first: 31000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fixed 12 independent seeds, four rotations, all four player seats
+        run: |
+          python examples/validate_public_rob_seed_cohorts.py --development 30000 --holdout 31000 --seeds 12 --cohort ${{ matrix.cohort }} --output /tmp/m403-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          co=os.environ['COHORT']
+          start=int(os.environ['START'])
+          j=json.load(open('/tmp/m403-'+co+'.json',encoding='utf8'))
+          assert j['protocol']=='m403_independent_all_seat_public_rob_signal_holdout_v1'
+          assert j['cohort']==co and j['seed_start']==start and j['seed_count']==12
+          assert j['live_policy_modified'] is False
+          c=j['raw']
+          s=j['seed_cluster_summary']
+          assert s['independent_initial_shuffle_seeds']==12
+          assert s['complete_games']==48 and s['correlated_seat_positions']==192
+          assert {x['seed'] for x in s['per_seed']}==set(range(start,start+12))
+          assert s['counts'].get('distinct_first',0)==sum(
+              band.get('first_distinct',0) for band in s['public_band_counts'].values())
+          assert s['counts'].get('first_positive',0)==sum(
+              band.get('label_positive',0) for band in s['public_band_counts'].values())
+          assert s['calibrated_rob_probability'] is None
+          for row in c['positions']:
+              assert sum(row['official_net_by_seat'])==0
+              assert len(row['seat_level'])==4
+              for x in row['actual_bugang_decisions']:
+                  assert x['actual_rob_winners']<=x['potential_robbers']
+          raw=json.dumps(j,ensure_ascii=False)
+          for secret in ('opponent_hands','future_wall','_hands','offer_signature'):
+              assert secret not in raw
+          print('M4.03 COHORT AUDITED',co,json.dumps({
+              'total':s['counts'],
+              'seed_support':s['seed_support'],
+              'public_band_counts':s['public_band_counts'],
+              'frozen_warning_cross_counts':s['frozen_warning_cross_counts'],
+              'status':s['validation_status'],
+              'per_seed':s['per_seed'],
+          },ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.first }}
+      - name: Archive verified raw and seed-cluster summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: m403-natural-${{ matrix.cohort }}
+          path: /tmp/m403-${{ matrix.cohort }}.json
+          if-no-files-found: error
+          retention-days: 30
+
+  independent-holdout-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs:
+      - no-peek-regressions
+      - natural-cohort
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m403-natural-*
+          merge-multiple: true
+          path: /tmp/m403-collected
+      - name: Join preregistered, disjoint 12-plus-12 seed clusters
+        run: |
+          python examples/validate_public_rob_seed_cohorts.py --development 30000 --holdout 31000 --seeds 12 --development-file /tmp/m403-collected/m403-development.json --holdout-file /tmp/m403-collected/m403-holdout.json --output /tmp/m403-joint-report.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/m403-joint-report.json',encoding='utf8'))
+          assert d['protocol']=='m403_independent_all_seat_public_rob_signal_holdout_v1'
+          assert d['seed_sets_disjoint'] and not d['live_policy_modified']
+          assert d['calibrated_rob_probability'] is None
+          assert d['dev']['independent_initial_shuffle_seeds']==12
+          assert d['holdout']['independent_initial_shuffle_seeds']==12
+          assert {r['seed'] for r in d['dev']['per_seed']}.isdisjoint(
+                 {r['seed'] for r in d['holdout']['per_seed']})
+          print('M4.03 FINAL INDEPENDENT HOLDOUT',json.dumps({
+              'conclusion':d['cross_cohort_decision'],
+              'development':d['dev']['counts'],
+              'holdout':d['holdout']['counts'],
+              'development_support':d['dev']['seed_support'],
+              'holdout_support':d['holdout']['seed_support'],
+          },ensure_ascii=False))
+          PY
+      - name: Save independent held-out risk-evidence audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: m403-independent-holdout-report
+          path: /tmp/m403-joint-report.json
+          if-no-files-found: error
+          retention-days: 30
