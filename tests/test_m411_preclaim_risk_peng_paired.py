@@ -68,7 +68,11 @@ class M411PreclaimPairedTests(unittest.TestCase):
             rob["phase"]="rob_kong_window"
             rob["rob_options"]=["pass","hu"]
             self.assertEqual(proposed_claim(rob,"hu"),("hu","mandatory_hu"))
-            self.assertEqual(proposed_claim(rob,"pass")[0],"pass")
+            with self.assertRaises(RuntimeError):
+                proposed_claim(rob,"pass")
+            rob_pass=copy.deepcopy(rob)
+            rob_pass["rob_options"]=["pass"]
+            self.assertEqual(proposed_claim(rob_pass,"pass")[0],"pass")
         _,_,single=offer_peng()
         self.assertEqual(proposed_claim(single,"peng")[0],"peng")
 
