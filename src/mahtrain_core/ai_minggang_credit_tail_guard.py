@@ -14,7 +14,6 @@ from time import perf_counter_ns
 from typing import Any, Mapping
 
 from .ai import MahjongAgent, visible_tiles
-from .ai_challenge_action_counterfactual import _public_label
 from .ai_challenge_call_kong_ablation import _official_outcome
 from .ai_action_extended_study import _fixed_lineup
 from .ai_dual_claim_fastpath_paired import _dual_optional_options
@@ -57,6 +56,11 @@ def authorized_public_minggang_evidence(
         raise ValueError("invalid public ming-gang payer/source identity")
     known=Counter(visible_tiles(view))
     known.update(view["hand"])
+    # visible_tiles deliberately excludes OWN exposed groups because its
+    # callers' effective_draws also receive own_melds. For this distinct
+    # physical-unknown calculation we MUST count those already known tiles.
+    for group in view["own_melds"]:
+        known[group["tile"]]+=3 if group["type"]=="peng" else 4
     unknown=0
     for tile in TILES:
         rest=4-known[tile]
