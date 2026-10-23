@@ -193,6 +193,8 @@ class JointSlateResearchAgent(MahjongAgent):
 def preferred_from_slate(slate:list[dict[str,Any]])->str:
     if any(x.get("mandatory_win") for x in slate):
         return "hu"
+    if len(slate)==1 and slate[0]["action"]=="pass":
+        return "pass"
     legal=[x for x in slate if x["admissible"]]
     if not legal:
         raise RuntimeError("slate excluded mandatory pass")
