@@ -200,7 +200,9 @@ def evaluate_case(case_id: int) -> dict[str, Any]:
         "delayed_guarded_action": _choice(guarded_action),
         "delayed_unguarded_action": _choice(ablated_action),
         "guard_disagreement": guarded_action != ablated_action,
-        "cash_rule_altered_policy_action": paid_action != guarded_action,
+        # Not a causal cash-only contrast: the subsequent real turn also
+        # changes own drawn tile and others' public discards.
+        "paid_vs_delayed_action_changed": paid_action != guarded_action,
         "other_kong_options": sum(
             x["type"] != "bu_gang" for x in late_view["kong_options"]
         ),
@@ -248,7 +250,7 @@ def audit_and_combine(payloads: Mapping[str, Any]) -> dict[str, Any]:
                     row.get("delayed_event_status") != "not_payable" or
                     row.get("delayed_kong_money") != 0 or
                     type(row.get("guard_disagreement")) is not bool or
-                    type(row.get("cash_rule_altered_policy_action")) is not bool or
+                    type(row.get("paid_vs_delayed_action_changed")) is not bool or
                     type(row.get("other_kong_options")) is not int or
                     row["other_kong_options"] < 0 or
                     any(row.get(key) not in ("pass", "bu_gang", "an_gang")
@@ -270,8 +272,8 @@ def audit_and_combine(payloads: Mapping[str, Any]) -> dict[str, Any]:
         counts["delayed_unguarded_bugang_choices"] += (
             row["delayed_unguarded_action"] == "bu_gang")
         counts["guard_disagreements"] += row["guard_disagreement"]
-        counts["cash_rule_action_differences"] += (
-            row["cash_rule_altered_policy_action"])
+        counts["paid_vs_delayed_action_differences"] += (
+            row["paid_vs_delayed_action_changed"])
         counts["competing_other_kong_choices"] += (
             row["other_kong_options"] > 0)
     return {
