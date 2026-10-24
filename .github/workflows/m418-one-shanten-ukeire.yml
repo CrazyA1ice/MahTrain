@@ -1,0 +1,103 @@
+name: M4.18 one-shanten useful-copy public paired official study
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_one_shanten_ukeire_paired.py"
+      - "tests/test_m418_one_shanten_ukeire_paired.py"
+      - "examples/audit_one_shanten_ukeire_paired.py"
+      - ".github/workflows/m418-one-shanten-ukeire.yml"
+      - "docs/MATCH_M418_ONE_SHANTEN_UKEIRE_PAIRED_V1.28.md"
+permissions:
+  contents: read
+
+jobs:
+  authorized-one-shanten-guards-and-official-cash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 26
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: M4.18 new tests and M4.17 fan-boundary regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m418_one_shanten_ukeire_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m417_latewall_da_jiao_fan_paired.py' -v
+
+  two-new-natural-four-seat-seed-cohorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 56000
+          - cohort: holdout
+            start: 57000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Four seat-rotations x original and frozen challenger per seed
+        run: |
+          python examples/audit_one_shanten_ukeire_paired.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m418-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import os,json
+          name=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m418-"+name+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m418_frozen_one_shanten_effective_copies_offline_paired_v1"
+          assert x["cohort"]==name and x["seed_start"]==start
+          assert x["online_ai_modified"] is False and x["candidate_only_offline"] is True
+          d=x["result"]
+          assert d["independent_shuffle_seeds"]==4
+          assert d["paired_seat_positions"]==16 and d["complete_official_games"]==32
+          assert d["frozen_min_absolute_copy_gain"]==2
+          assert d["frozen_min_relative_copy_multiplier"]==1.10
+          assert d["frozen_min_weighted_value_retention"]==.90
+          assert d["frozen_max_public_risk_increase"]==.12
+          assert d["frozen_min_public_wall_remaining"]==9
+          assert d["online_ai_modified"] is False
+          assert d["calibrated_p_tenpai"] is None
+          assert d["local_causal_action_value"] is None
+          assert d["confidence_interval"] is None
+          assert {p["seed"] for p in d["per_seed"]}==set(range(start,start+4))
+          assert sum(p["real_interventions"] for p in d["per_seed"])==d["actual_discard_interventions"]
+          assert d["positive_seed_clusters"]+d["negative_seed_clusters"]+d["neutral_seed_clusters"]==4
+          assert d["baseline_one_shanten_multi"]<=d["baseline_one_shanten_ranked"]<=d["baseline_total_cuts"]
+          delta=d["official_component_deltas"]
+          assert delta["official_net"]==sum(delta[k] for k in (
+              "win_points","kong_points","exhaustive_points"))
+          for p in d["positions"]:
+              assert p["seed"] in range(start,start+4)
+              assert p["arms"]["baseline"]["counts"].get("actual_changes",0)==0
+              for arm in ("baseline","one_shanten_ukeire"):
+                  o=p["arms"][arm]["official"]
+                  assert o["official_net"]==sum(o[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+              if p["actual_interventions"]==0:
+                  assert p["identical_if_untouched"] is True
+                  assert all(v==0 for v in p["official_deltas"].values())
+          raw=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','"opponent_hands"',
+                            '"future_wall"','"drawn_tile"','"_trace"','"_events"'):
+              assert forbidden not in raw
+          print("M4.18 VERIFIED REAL MIN-ONE-SHANTEN PAIRS",name,json.dumps({
+              "one_shanten_windows":d["baseline_one_shanten_ranked"],
+              "eligible_multi":d["baseline_one_shanten_multi"],
+              "changes":d["actual_discard_interventions"],
+              "treated_seeds":d["independent_seeds_with_interventions"],
+              "official":delta,"per_seed":d["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m418-${{ matrix.cohort }}-one-shanten-ukeire-paired
+          path: /tmp/m418-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
