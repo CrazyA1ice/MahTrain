@@ -202,14 +202,12 @@ class M420BoundedPublicSearchTests(unittest.TestCase):
                 "mahtrain_core.ai_bounded_public_lookahead_paired.projected_branch_score",
                 side_effect=lambda _,cut:branch(140 if cut=="m2" else 100)
             ):
-            for _ in range(4):
+            for index in range(4):
                 a._last_discard_scores=ranked()
                 b._last_discard_scores=ranked()
                 self.assertEqual(a.discard(v),"m1")
                 outcome=b.discard(v)
-                if b.counts["actual_changes"]<=2 and b.counts[
-                        "research_windows"]==b.counts["actual_changes"]:
-                    self.assertEqual(outcome,"m2")
+                self.assertEqual(outcome,"m2" if index<2 else "m1")
         self.assertEqual(a.safe_counts().get("actual_changes",0),0)
         self.assertEqual(b.safe_counts()["actual_changes"],2)
         self.assertEqual(b.safe_counts()["budget_skips"],2)
