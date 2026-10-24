@@ -34,6 +34,9 @@ jobs:
           python -m unittest discover -s tests -p 'test_four_player_claims.py' -v
           python -m unittest discover -s tests -p 'test_four_player_settlement.py' -v
           python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: Reproduce old historical research under frozen pre-M4.23 rule
+        run: |
+          python -m unittest discover -s tests -p 'test_m421_bounded_first_split_tenpai_audit.py' -v
       - name: Check browser script and board regression
         run: |
           node --check web/match.js
