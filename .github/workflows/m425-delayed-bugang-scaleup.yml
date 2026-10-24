@@ -1,0 +1,112 @@
+name: M4.25 fresh-seed delayed-bugang scale-up
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_delayed_bugang_scaleup.py"
+      - "examples/audit_delayed_bugang_scaleup.py"
+      - "tests/test_m425_delayed_bugang_scaleup.py"
+      - "docs/MATCH_M425_DELAYED_BUGANG_SCALEUP_V1.35.md"
+      - ".github/workflows/m425-delayed-bugang-scaleup.yml"
+permissions:
+  contents: read
+jobs:
+  strict-audit-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: M4.25 cohort integrity and score validator tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m425_delayed_bugang_scaleup.py' -v
+          python -m unittest discover -s tests -p 'test_m424_delayed_bugang_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+  real-shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: strict-audit-unit
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["development_a", "development_b", "holdout_a", "holdout_b"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: New physical 108-tile independent seed trials
+        run: |
+          python examples/audit_delayed_bugang_scaleup.py \
+            --shard "${{ matrix.shard }}" \
+            --out "m425-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m425-${{ matrix.shard }}
+          path: m425-${{ matrix.shard }}.json
+          if-no-files-found: error
+  audited-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: real-shard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m425-*
+          path: m425-results
+          merge-multiple: true
+      - name: Reject missing/repeated samples and reconcile official score
+        run: |
+          python examples/audit_delayed_bugang_scaleup.py \
+            --combine --input-dir m425-results \
+            --out m425-audited-summary.json
+      - name: Summarize independent development and holdout clusters
+        run: |
+          python - <<'PY'
+          import json, os
+          r=json.load(open("m425-audited-summary.json",encoding="utf8"))
+          assert r["official_ruleset"]=="current_m423"
+          assert r["total_independent_shuffle_seeds"]==16
+          assert r["total_complete_games"]==128
+          lines=["## M4.25 full-game independent paired audit",""]
+          for name in ("development","holdout"):
+              g=r[name]
+              assert g["independent_shuffle_seeds"]==8
+              assert g["complete_games"]==64
+              d=g["current_guard_minus_old_guard"]
+              assert abs(d["official_net"] - (
+                  d["win_points"]+d["kong_points"]+
+                  d["exhaustive_points"]))<1e-4
+              lines.append(
+                  f"- {name}: independent shuffled seeds = 8; "
+                  f"complete games = 64; guarded minus old guard net = "
+                  f"{d['official_net']}; win = {d['win_points']}; "
+                  f"kong = {d['kong_points']}; exhaustive = "
+                  f"{d['exhaustive_points']}; changed decisions = "
+                  f"{g['observed_old_guard_interventions']}; "
+                  f"positive / negative / tied shuffle clusters = "
+                  f"{g['positive_clusters']} / {g['negative_clusters']} / "
+                  f"{g['zero_clusters']}."
+              )
+          lines.append("")
+          lines.append("**Exploratory only: no live threshold promotion; "
+                       "seat rotations are not independent samples.**")
+          s="\n".join(lines)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m425-audited-new-ruleset-summary
+          path: m425-audited-summary.json
+          if-no-files-found: error
