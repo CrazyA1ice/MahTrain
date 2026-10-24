@@ -199,7 +199,10 @@ def classic_operation_hint(view: Mapping[str, Any], seat: int) -> dict[str, Any]
             rows.append(_summary(
                 kind, ("暗杠" if kind == "an_gang" else "补杠") + " " + tile,
                 outcome, tile=tile,
-                reason=("杠后尚未摸尾牌；补杠可能被抢杠。"
+                reason=(("杠后尚未摸尾牌；可能被抢杠；"
+                         + ("当巡摸到第四张，成功补杠可收杠钱。"
+                            if view.get("drawn_tile") == tile
+                            else "非当巡摸到的第四张，延迟补杠不收杠钱，根番照常。"))
                         if kind == "bu_gang" else "杠后从尾部补摸未知牌。")))
         chosen = None if winning else _challenge_kong(view)
         selected = (

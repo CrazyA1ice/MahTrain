@@ -1351,12 +1351,19 @@
           kongActions.setAttribute("role","group");
           kongActions.setAttribute("aria-label","本回合可执行的杠牌操作");
           for(const kong of state.kong_options){
+            const lateBu=kong.type==="bu_gang" &&
+              state.drawn_tile!==kong.tile;
+            const cashHint=lateBu?"（延迟补杠 · 不收杠钱）":
+              kong.type==="bu_gang"?"（当巡补杠 · 可收杠钱）":"";
             kongActions.append(button(
-              actionNames[kong.type]+" "+tileName(kong.tile),
+              actionNames[kong.type]+" "+tileName(kong.tile)+cashHint,
               "match-reaction-button match-reaction--ming_gang",
               ()=>{
+                const extra=kong.type!=="bu_gang"?"":lateBu?
+                  "延迟补杠不收杠钱，但正常计根番。":
+                  "本巡摸到第四张，补杠成功可按房间规则收杠钱。";
                 if(confirm("确认"+actionNames[kong.type]+tileName(kong.tile)+
-                    "？合法杠后从牌墙尾部补牌。")){
+                    "？合法杠后从牌墙尾部补牌。"+extra)){
                   decision.hidden=true;
                   action("match_kong",{kind:kong.type,tile:kong.tile});
                 }
@@ -1499,6 +1506,7 @@
         for(const item of kongLedger.events){
           const kind={ming_gang:"明杠",an_gang:"暗杠",bu_gang:"补杠"}[item.type];
           const stateLabel={posted:"已模拟入账",unpriced:"未计价",
+            not_payable:"延迟补杠不收杠钱",
             voided:"已作废并冲销"}[item.status];
           k.append(el("p","review-footnote",
             "第"+item.id+"笔 · "+item.seat+"号"+kind+

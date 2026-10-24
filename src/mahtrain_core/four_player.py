@@ -29,10 +29,16 @@ class FourPlayerOpening:
     def __init__(self, seed: int, *, room_coefficient: int = 100,
                  fan_cap: int = 3, kong_base: int | None = None,
                  self_draw_mode: str = "legacy",
-                 dealer_override: int | None = None) -> None:
+                 dealer_override: int | None = None,
+                 legacy_bugang_cash: bool = False) -> None:
         if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
             raise ValueError("seed must be an integer from 0 to 2^64 - 1")
         self.ledger = WinLedger(room_coefficient, fan_cap, self_draw_mode)
+        if type(legacy_bugang_cash) is not bool:
+            raise ValueError("legacy kong cash flag must be boolean")
+        # Default/current human games use draw-turn-only cash. Historical
+        # research can freeze the pre-M4.23 paid-on-any-turn ruleset.
+        self._legacy_bugang_cash = legacy_bugang_cash
         self.kong_ledger = KongLedger(kong_base)
         rng = random.Random(seed)
         deck = [tile for tile in TILES for _ in range(4)]
@@ -456,13 +462,15 @@ class FourPlayerOpening:
         self._events.append({"type": "all_pass", "next_turn": self.turn})
 
     def _pending_kong_price(self, seat: int, kind: str,
-                            source: int | None = None) -> None:
+                            source: int | None = None, *,
+                            cash_eligible: bool = True) -> None:
         # A priced kong is posted immediately; a kong-discard win reverses
         # this exact event rather than charging both kong and bonus.
         payers=([source] if kind=="ming_gang"
                 else [s for s in range(4) if s!=seat and not self._won[s]])
         event_id=self.kong_ledger.declare(
-            kind=kind,winner=seat,payers=payers,source=source)
+            kind=kind,winner=seat,payers=payers,source=source,
+            cash_eligible=cash_eligible)
         self._kong_reference[seat]=event_id
         self._settlement_pending=self.kong_ledger.public_state()["events"]
 
@@ -504,6 +512,13 @@ class FourPlayerOpening:
             raise ValueError("illegal concealed or supplement kong")
         if self._effective(seat)!=14:
             raise RuntimeError("kong requires 14 effective tiles")
+        # Cash for a supplement kong is earned ONLY when its fourth tile
+        # was drawn on this very turn. A previously retained fourth copy may
+        # still be added later (and still scores its normal root), but cannot
+        # be paid. Capture this before clearing the private draw marker;
+        # rob-kong resolution is asynchronous and must not recompute it.
+        cash_eligible = (kind != "bu_gang" or self._legacy_bugang_cash
+                         or self._drawn_tiles[seat] == tile)
         self._drawn_tiles[seat] = None
         if kind=="an_gang":
             for _ in range(4):
@@ -514,10 +529,12 @@ class FourPlayerOpening:
             self._supplement(seat)
         else:
             # Robbing the added fourth tile MUST be resolved before upgrade.
-            self._pending_kong = {"seat":seat,"tile":tile}
+            self._pending_kong = {"seat":seat,"tile":tile,
+                                  "cash_eligible":cash_eligible}
             self._responses.clear()
             self.phase = "rob_kong_window"
-            self._events.append({"type":"bu_gang_declared","seat":seat,"tile":tile})
+            self._events.append({"type":"bu_gang_declared","seat":seat,
+                                 "tile":tile,"cash_eligible":cash_eligible})
         self._assert_physical_tiles()
 
     def rob_options(self, seat: int) -> list[str]:
@@ -580,8 +597,11 @@ class FourPlayerOpening:
                         if m["tile"]==tile and m["type"]=="peng")
             meld["type"]="bu_gang"
             self._events.append({"type":"bu_gang",
-                                 "seat":source,"tile":tile})
-            self._pending_kong_price(source,"bu_gang")
+                                 "seat":source,"tile":tile,
+                                 "cash_eligible":self._pending_kong["cash_eligible"]})
+            self._pending_kong_price(
+                source,"bu_gang",
+                cash_eligible=self._pending_kong["cash_eligible"])
             self._pending_kong=None
             self._responses.clear()
             self._supplement(source)
@@ -727,6 +747,7 @@ class FourPlayerOpening:
         ) if can_self_win else None)
         view.update({
             "self_draw_preview":quote,
+            "legacy_bugang_cash_rule":self._legacy_bugang_cash,
             "seat":seat,
             "hand":sort_hand(self._hands[seat]),
             "own_melds":[dict(m) for m in self._melds[seat]],

@@ -271,7 +271,8 @@ def simulate_match(seed: int, rotation: int = 0,
                    lineup: list[str] | None = None,
                    offline_observer: Callable[[FourPlayerOpening], None] | None = None,
                    offline_agent_overrides: dict[int, Any] | None = None,
-                   offline_kong_base: int | None = None
+                   offline_kong_base: int | None = None,
+                   offline_ruleset: str = "frozen_pre_m423"
                    ) -> dict[str, Any]:
     if type(seed) is not int or not 0 <= seed < 2**32:
         raise ValueError("seed must be an unsigned 32-bit integer")
@@ -291,7 +292,16 @@ def simulate_match(seed: int, rotation: int = 0,
     if offline_kong_base is not None and (type(offline_kong_base) is not int
                                           or offline_kong_base < 0):
         raise ValueError("offline kong base must be a nonnegative integer")
-    game=FourPlayerOpening(seed, kong_base=offline_kong_base)
+    # All historical M3/M4 experiment seed results were generated with
+    # old any-turn bu-gang money. Do not silently rewrite their frozen
+    # official ledgers when changing the live rule. New independent
+    # studies must explicitly request the current M4.23 ruleset.
+    if offline_ruleset not in ("frozen_pre_m423", "current_m423"):
+        raise ValueError("unsupported offline rule profile")
+    game=FourPlayerOpening(
+        seed, kong_base=offline_kong_base,
+        legacy_bugang_cash=(offline_ruleset=="frozen_pre_m423"),
+    )
     agents={
         seat:(ShapeBaselineAgent(seed=seed,seat=seat)
               if assignment[seat]=="baseline" else

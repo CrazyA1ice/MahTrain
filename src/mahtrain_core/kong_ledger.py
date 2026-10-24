@@ -25,9 +25,12 @@ class KongLedger:
             raise ValueError("invalid seat")
 
     def declare(self, *, kind: str, winner: int,
-                payers: list[int], source: int | None = None) -> int:
+                payers: list[int], source: int | None = None,
+                cash_eligible: bool = True) -> int:
         if kind not in ("ming_gang", "an_gang", "bu_gang"):
             raise ValueError("unknown kong type")
+        if type(cash_eligible) is not bool or (not cash_eligible and kind != "bu_gang"):
+            raise ValueError("only delayed supplement kong can be cash-ineligible")
         self._seat(winner)
         if source is not None:
             self._seat(source)
@@ -42,16 +45,20 @@ class KongLedger:
         ):
             raise ValueError("invalid kong payer set")
         factor = 1 if kind == "bu_gang" else 2
-        amount = factor * self.base if self.base is not None else None
+        amount = (0 if not cash_eligible else
+                  factor * self.base if self.base is not None else None)
         event_id = len(self._events) + 1
         self._events.append({
             "id": event_id, "type": kind, "seat": winner, "source": source,
             "payers": list(payers), "amount_per_payer": amount,
-            "status": "posted" if amount is not None else "unpriced",
-            "reason": ("simulation_using_explicit_kong_base"
+            "status": ("not_payable" if not cash_eligible else
+                       "posted" if amount is not None else "unpriced"),
+            "reason": ("delayed_bu_gang_no_cash" if not cash_eligible else
+                       "simulation_using_explicit_kong_base"
                        if amount is not None else "kong_base_not_confirmed"),
+            "cash_eligible": cash_eligible,
         })
-        if amount is not None:
+        if amount is not None and amount > 0:
             for payer in payers:
                 self._post(event_id, payer, winner, amount, "charge")
         return event_id
