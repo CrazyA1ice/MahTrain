@@ -1,0 +1,91 @@
+name: M4.22 public complete-branch coverage retrospective
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_bounded_full_coverage_audit.py"
+      - "tests/test_m422_full_coverage_audit.py"
+      - "examples/audit_bounded_full_coverage.py"
+      - "docs/MATCH_M422_FULL_BRANCH_COVERAGE_V1.32.md"
+      - ".github/workflows/m422-full-branch-coverage.yml"
+permissions:
+  contents: read
+
+jobs:
+  frozen-proxy-and-privacy-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify complete versus truncated public branch identities
+        run: |
+          python -m unittest discover -s tests -p 'test_m422_full_coverage_audit.py' -v
+          python -m unittest discover -s tests -p 'test_m421_bounded_first_split_tenpai_audit.py' -v
+          python -m unittest discover -s tests -p 'test_m420_bounded_public_lookahead.py' -v
+
+  complete-historical-true-change-replays:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            seed: 60001
+          - cohort: holdout
+            seed: 61000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Replay and audit all public draw types at the actual first change
+        run: |
+          python examples/audit_bounded_full_coverage.py --cohort "${{ matrix.cohort }}" --output "/tmp/m422-${{ matrix.cohort }}.json"
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"]
+          seed=int(os.environ["SEED"])
+          with open("/tmp/m422-"+cohort+".json",encoding="utf-8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m422_m420_actual_cut_all_public_effective_draw_type_coverage_v1"
+          assert x["historical_selected_after_m421"] is True
+          assert x["retrospective_not_independent_validation"] is True
+          assert x["online_ai_modified"] is False
+          assert len(x["positions"])==1
+          row=x["positions"][0]
+          assert row["cohort"]==cohort and row["seed"]==seed
+          assert row["rotation"]==1 and row["actual_changes"]==1
+          assert len(row["coverage"])==1
+          assert row["official_component_deltas"]==dict.fromkeys(
+              ("official_net","win_points","kong_points","exhaustive_points"),0)
+          c=row["coverage"][0]
+          assert c["original_truncated_ratio"]>=1.12
+          for arm in ("baseline","candidate"):
+              p=c[arm]
+              assert p["complete_proxy"]>=p["truncated_proxy"]>=0
+              assert p["omitted_proxy"]>=0
+              assert p["all_effective_draw_types"]>=p["scanned_draw_types"]
+              assert p["scanned_draw_types"]<=6
+              assert p["all_effective_copies"]>=p["scanned_copies"]>0
+              assert p["omitted_draw_types"]==(
+                  p["all_effective_draw_types"]-p["scanned_draw_types"])
+          raw=json.dumps(x)
+          for forbidden in ('"tile"','"hand"','"future_wall"',
+                            '"_trace"','"public_events"','"drawn_tile"',
+                            '"original_cut"','"revised_cut"'):
+              assert forbidden not in raw
+          print("VERIFIED M4.22 true change public complete-branch coverage",
+                json.dumps({"cohort":cohort,"coverage":c},ensure_ascii=False))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          SEED: ${{ matrix.seed }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m422-${{ matrix.cohort }}-complete-branch-audit
+          path: /tmp/m422-${{ matrix.cohort }}.json
+          if-no-files-found: error
+          retention-days: 30
