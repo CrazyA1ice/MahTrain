@@ -1,0 +1,104 @@
+name: M4.26 constructed delayed-bugang decision and ledger coverage
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_delayed_bugang_targeted.py"
+      - "examples/audit_delayed_bugang_targeted.py"
+      - "tests/test_m426_bugang_targeted.py"
+      - "docs/MATCH_M426_BUGANG_TARGETED_COVERAGE_V1.36.md"
+      - ".github/workflows/m426-bugang-targeted.yml"
+permissions:
+  contents: read
+jobs:
+  constructed-cash-and-policy-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: M4.26 authoritative constructed physical game tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m426_bugang_targeted.py' -v
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+  constructed-shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: constructed-cash-and-policy-unit
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["set_a", "set_b", "set_c", "set_d"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Real engine physical paid vs delayed checkpoint construction and action audit
+        run: |
+          python examples/audit_delayed_bugang_targeted.py \
+            --shard "${{ matrix.shard }}" \
+            --out "m426-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m426-${{ matrix.shard }}
+          path: m426-${{ matrix.shard }}.json
+          if-no-files-found: error
+  verified-coverage-summary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: constructed-shard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m426-*
+          path: m426-results
+          merge-multiple: true
+      - name: Reject any missing case, cash error, or illegal decision label
+        run: |
+          python examples/audit_delayed_bugang_targeted.py \
+            --combine --input-dir m426-results \
+            --out m426-coverage-summary.json
+      - name: Write truthful coverage metrics (never win-rate claims)
+        run: |
+          python - <<'PY'
+          import json,os
+          a=json.load(open("m426-coverage-summary.json",encoding="utf8"))
+          assert a["total_constructed_checkpoints"]==24
+          assert a["independent_natural_shuffle_seeds"]==0
+          assert a["complete_natural_games"]==0
+          counts=a["measured_counts"]
+          summary=[
+            "## M4.26 constructed paid / delayed bu-gang coverage",
+            "- **24 constructed physically legal decision checkpoints** "
+              "(not natural frequency, not game EV).",
+            f"- Old-guard vs current-guard different choices: "
+              f"**{counts['guard_disagreements']} / 24**.",
+            f"- Current-draw paid bu-gang choices: "
+              f"**{counts['paid_bugang_choices']} / 24**.",
+            f"- Delayed cashless bu-gang choices under current guard: "
+              f"**{counts['delayed_guarded_bugang_choices']} / 24**.",
+            "- Every case verified true 108-tile state, genuine turn transition, "
+              "rob window, tail supplement, +60 paid / 0 delayed kong cash.",
+            "- **No independent natural games, no calibrated win probability, "
+              "no expected-score improvement claim.**",
+          ]
+          s="\n".join(summary)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m426-verified-constructed-summary
+          path: m426-coverage-summary.json
+          if-no-files-found: error
