@@ -29,10 +29,16 @@ class FourPlayerOpening:
     def __init__(self, seed: int, *, room_coefficient: int = 100,
                  fan_cap: int = 3, kong_base: int | None = None,
                  self_draw_mode: str = "legacy",
-                 dealer_override: int | None = None) -> None:
+                 dealer_override: int | None = None,
+                 legacy_bugang_cash: bool = False) -> None:
         if type(seed) is not int or not 0 <= seed <= 2**64 - 1:
             raise ValueError("seed must be an integer from 0 to 2^64 - 1")
         self.ledger = WinLedger(room_coefficient, fan_cap, self_draw_mode)
+        if type(legacy_bugang_cash) is not bool:
+            raise ValueError("legacy kong cash flag must be boolean")
+        # Default/current human games use draw-turn-only cash. Historical
+        # research can freeze the pre-M4.23 paid-on-any-turn ruleset.
+        self._legacy_bugang_cash = legacy_bugang_cash
         self.kong_ledger = KongLedger(kong_base)
         rng = random.Random(seed)
         deck = [tile for tile in TILES for _ in range(4)]
@@ -511,7 +517,8 @@ class FourPlayerOpening:
         # still be added later (and still scores its normal root), but cannot
         # be paid. Capture this before clearing the private draw marker;
         # rob-kong resolution is asynchronous and must not recompute it.
-        cash_eligible = kind != "bu_gang" or self._drawn_tiles[seat] == tile
+        cash_eligible = (kind != "bu_gang" or self._legacy_bugang_cash
+                         or self._drawn_tiles[seat] == tile)
         self._drawn_tiles[seat] = None
         if kind=="an_gang":
             for _ in range(4):
@@ -740,6 +747,7 @@ class FourPlayerOpening:
         ) if can_self_win else None)
         view.update({
             "self_draw_preview":quote,
+            "legacy_bugang_cash_rule":self._legacy_bugang_cash,
             "seat":seat,
             "hand":sort_hand(self._hands[seat]),
             "own_melds":[dict(m) for m in self._melds[seat]],
