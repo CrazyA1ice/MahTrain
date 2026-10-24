@@ -1,0 +1,114 @@
+name: M4.19 original challenge one-shanten Pareto frontier audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_one_shanten_pareto_audit.py"
+      - "tests/test_m419_one_shanten_pareto_audit.py"
+      - "examples/audit_one_shanten_pareto.py"
+      - ".github/workflows/m419-one-shanten-pareto.yml"
+      - "docs/MATCH_M419_ONE_SHANTEN_PARETO_FRONTIER_V1.29.md"
+permissions:
+  contents: read
+
+jobs:
+  strict-objective-and-authorized-rank-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Pure Pareto semantics and M4.18 regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_m419_one_shanten_pareto_audit.py' -v
+          python -m unittest discover -s tests -p 'test_m418_one_shanten_ukeire_paired.py' -v
+
+  authentic-unaltered-challenge-full-game-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - block: historical-development
+            start: 56000
+            expected_cuts: 182
+            expected_multi: 40
+          - block: historical-holdout
+            start: 57000
+            expected_cuts: 169
+            expected_multi: 42
+          - block: fresh-development
+            start: 58000
+            expected_cuts: -1
+            expected_multi: -1
+          - block: fresh-holdout
+            start: 59000
+            expected_cuts: -1
+            expected_multi: -1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Eight public-information-independent baseline four-seat clusters
+        run: |
+          python examples/audit_one_shanten_pareto.py --block ${{ matrix.block }} --seeds 4 --output /tmp/m419-${{ matrix.block }}.json
+          python - <<'PY'
+          import json,os
+          name=os.environ["BLOCK"];start=int(os.environ["START"])
+          with open("/tmp/m419-"+name+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m419_one_shanten_public_pareto_frontier_observational_v1"
+          assert x["block"]==name and x["seed_start"]==start
+          assert x["observational_only"] is True
+          assert x["online_ai_modified"] is False
+          r=x["result"]
+          assert r["independent_shuffle_seeds"]==4
+          assert r["audited_real_games"]==16
+          assert r["candidate_actions_changed"]==0
+          assert r["any_policy_alternative_executed"] is False
+          assert r["causal_improvement_estimate"] is None
+          assert r["probability_of_ron"] is None
+          assert r["baseline_one_shanten_multiple_cut_windows"]==(
+              r["selected_dominated_windows"]+r["selected_nondominated_windows"])
+          assert r["baseline_one_shanten_multiple_cut_windows"]<=r["baseline_total_cuts"]
+          assert sum(p["selected_dominated_windows"] for p in r["per_seed"])==r["selected_dominated_windows"]
+          assert sum(p["one_shanten_multiple_cut_windows"] for p in r["per_seed"])==r["baseline_one_shanten_multiple_cut_windows"]
+          assert {p["seed"] for p in r["per_seed"]}==set(range(start,start+4))
+          expected=int(os.environ["EXPECTED_CUTS"])
+          known=int(os.environ["EXPECTED_MULTI"])
+          if expected>=0:
+              assert r["baseline_total_cuts"]==expected
+          if known>=0:
+              assert r["baseline_one_shanten_multiple_cut_windows"]==known
+          if r["baseline_one_shanten_multiple_cut_windows"]:
+              assert r["dominated_window_fraction"] is not None
+              assert 0<=r["dominated_window_fraction"]<=1
+              assert 1<=r["mean_frontier_options_per_window"]
+          raw=json.dumps(x)
+          for prohibited in ('"hand"','"tile"','"future_wall"','"opponent_hands"',
+                             '"drawn_tile"','"full_wall"','"public_events"',
+                             '"_trace"','"_events"'):
+              assert prohibited not in raw
+          print("M4.19 VERIFIED NATURAL PUBLIC PARETO AUDIT",name,json.dumps({
+              "cut_windows":r["baseline_one_shanten_multiple_cut_windows"],
+              "dominated":r["selected_dominated_windows"],
+              "nondominated":r["selected_nondominated_windows"],
+              "fraction":r["dominated_window_fraction"],
+              "max_margins":r["largest_observed_dominator_margins"],
+              "per_seed":r["per_seed"],
+          }))
+          PY
+        env:
+          BLOCK: ${{ matrix.block }}
+          START: ${{ matrix.start }}
+          EXPECTED_CUTS: ${{ matrix.expected_cuts }}
+          EXPECTED_MULTI: ${{ matrix.expected_multi }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m419-${{ matrix.block }}-public-pareto
+          path: /tmp/m419-${{ matrix.block }}.json
+          retention-days: 30
+          if-no-files-found: error
