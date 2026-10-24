@@ -1,0 +1,98 @@
+name: M4.20 bounded public two-transition lookahead paired
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_bounded_public_lookahead_paired.py"
+      - "tests/test_m420_bounded_public_lookahead.py"
+      - "examples/audit_bounded_public_lookahead_paired.py"
+      - ".github/workflows/m420-bounded-public-lookahead.yml"
+      - "docs/MATCH_M420_BOUNDED_PUBLIC_LOOKAHEAD_V1.30.md"
+permissions:
+  contents: read
+
+jobs:
+  public-information-fan-and-branch-budget-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Frozen budget, original challenge action, scores, 108-tile legality and M4.19 Pareto
+        run: |
+          python -m unittest discover -s tests -p 'test_m420_bounded_public_lookahead.py' -v
+          python -m unittest discover -s tests -p 'test_m419_one_shanten_pareto_audit.py' -v
+
+  real-paired-official-net-new-independent-shuffles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 60000
+          - cohort: holdout
+            start: 61000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Four seat rotations x baseline and bounded candidate x independent natural shuffles
+        run: |
+          python examples/audit_bounded_public_lookahead_paired.py --cohort ${{ matrix.cohort }} --seeds 3 --output /tmp/m420-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          block=os.environ["BLOCK"];seed=int(os.environ["START"])
+          with open("/tmp/m420-"+block+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m420_frozen_public_bounded_two_transition_lookahead_v1"
+          assert x["cohort"]==block and x["seed_start"]==seed
+          assert x["online_ai_modified"] is False
+          r=x["result"]
+          assert r["independent_shuffles"]==3
+          assert r["complete_official_games"]==24
+          assert r["online_ai_modified"] is False
+          assert r["local_causal_ev"] is None and r["p_ron"] is None and r["p_tenpai"] is None
+          assert {p["seed"] for p in r["per_seed"]}==set(range(seed,seed+3))
+          assert sum(p["actual_interventions"] for p in r["per_seed"])==r["candidate_action_changes"]
+          assert sum(p["actual_interventions"]>0 for p in r["per_seed"])==r["affected_seed_clusters"]
+          assert r["official_component_deltas"]["official_net"]==sum(
+              r["official_component_deltas"][k] for k in
+              ("win_points","kong_points","exhaustive_points"))
+          for pos in r["positions"]:
+              a=pos["arms"]
+              assert a["baseline"]["counts"].get("actual_changes",0)==0
+              for arm in ("baseline","bounded_two_transition"):
+                  counts=a[arm]["counts"]
+                  official=a[arm]["official"]
+                  assert counts.get("research_windows",0)<=2
+                  assert counts.get("first_cuts_checked",0)<=4
+                  assert counts.get("draw_branches",0)<=24
+                  assert official["official_net"]==sum(official[k] for k in
+                      ("win_points","kong_points","exhaustive_points"))
+                  assert counts["lookahead_elapsed_ms_total"]>=0
+              if not pos["actual_interventions"]:
+                  assert not any(pos["official_deltas"].values())
+          raw=json.dumps(x)
+          for protected in ('"hand"','"tile"','"opponent_hands"','"future_wall"',
+                            '"drawn_tile"','"_trace"','"_events"'):
+              assert protected not in raw
+          print("M4.20 VERIFIED NATURAL BOUNDED PAIRED CASH",block,json.dumps({
+              "changes":r["candidate_action_changes"],
+              "affected_seeds":r["affected_seed_clusters"],
+              "official":r["official_component_deltas"],
+              "per_seed":r["per_seed"],
+          }))
+          PY
+        env:
+          BLOCK: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m420-${{ matrix.cohort }}-bounded-public-lookahead
+          path: /tmp/m420-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
