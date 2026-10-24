@@ -32,7 +32,7 @@ M4.23 [PR #123](https://github.com/CrazyA1ice/MahTrain/pull/123) 已合并 `main
 1. **若无实际替代动作**，必须据实记载覆盖不足，不能声称变强。
 2. 如果有实际替代动作，需核对官方 Hu、杠钱、流局分量及点炮事件；平均净分正负只是初步探索。
 3. 不得因看到开发组结果而调整候选门槛再使用预留组。任何进一步策略调整都需真正全新独立种子。
-4. 本轮研究仅添加离线观察、预定样本与测试，**不改动在线挑战级**。
+4. 本轮研究仅添加离线观察、预定样本与测试，**仅修复下述候选变量引用错误，不额外调整未验证的碰杠收益阈值**。
 
 ## 代码与运行
 
@@ -40,6 +40,7 @@ M4.23 [PR #123](https://github.com/CrazyA1ice/MahTrain/pull/123) 已合并 `main
 - `tests/test_m424_delayed_bugang_paired.py`：本巡/延迟机会判断、策略臂唯一变化、AI合法动作、公共信息边界、离线新规则强制性、样本隔离、账本聚合验证。
 - `examples/audit_delayed_bugang_current_cash.py`：可复现 CLI，JSON 不包含任何玩家手牌、私密未来墙或可重建的轨迹。
 - `.github/workflows/m424-delayed-bugang-paired.yml`：Python3.11/3.13单元+独立开发/留出真实32局配对赛，按独立种子检查全部官方净积分分量。
+- `src/mahtrain_core/ai.py`：修复线上守门误用上一段基线循环遗留牌名的问题，严格使用本次合法杠候选牌名。
 - 原有 `rules-tests.yml` 全仓测试依旧作为合并门槛。
 
 ```bash
@@ -48,4 +49,8 @@ python examples/audit_delayed_bugang_current_cash.py --group development --seeds
 python examples/audit_delayed_bugang_current_cash.py --group holdout --seeds 2 --output /tmp/m424-holdout.json
 ```
 
-**结论状态**：本文件在创建分支时是事前冻结的协议。实际观测次数、官方分账和两组四座位配对结果应从 GitHub Actions 的真实输出填写；没有完成真实试验前，不宣布新的 AI 胜率或决策效果。
+## 额外找到的真实线上守门错误（修复是本轮代码变更）
+
+在 `_challenge_kong` 中，对“暂不杠”基线合法弃牌的枚举循环使用过变量 `tile`，接下来判断延迟补杠时错误地继续比较这个基线循环留下来的牌，而不是正在评价的 `choice['tile']`。当一巡摸牌正好等于最后一项基线弃牌时，错误认为当前补杠是“当巡刚摸到”，使不应享有杠钱的延迟补杠绕过保守门槛；多个杠选项时也可能复用旧 `kind` 误判。新增 `candidate_tile`/`candidate_kind` 逐候选绑定，只在其对应的分支使用；原75%等阈值、实际规则引擎及历史冻结离线策略不改。专项单元测试用真实跨巡补杠场景复现该错误并要求改正；修复后再运行整个本轮真实配对实验。
+
+**结论状态**：本文件在创建分支时是事前冻结的协议，只有修复已经暴露的候选错误与对应验证作为明确的修订事项。实际观测次数、官方分账和两组四座位配对结果应从 GitHub Actions 的真实输出填写；没有完成真实试验前，不宣布新的 AI 胜率或决策效果。
