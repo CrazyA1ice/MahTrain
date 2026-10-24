@@ -488,6 +488,7 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
         # for equal-shanten delayed bu-gang. A current-draw paid bu-gang
         # keeps the established 75% protection policy.
         if (kind == "bu_gang" and before is not None
+                and not view.get("legacy_bugang_cash_rule", False)
                 and "drawn_tile" in view and view["drawn_tile"] != tile
                 and stage == least
                 and (outlook["ukeire"] < before["ukeire"]
