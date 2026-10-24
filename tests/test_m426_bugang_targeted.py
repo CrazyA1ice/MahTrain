@@ -108,7 +108,7 @@ class TargetedBuGangCoverageTests(unittest.TestCase):
                     "delayed_guarded_action":"pass",
                     "delayed_unguarded_action":"pass",
                     "guard_disagreement":False,
-                    "cash_rule_altered_policy_action":False,
+                    "paid_vs_delayed_action_changed":False,
                     "other_kong_options":0,
                 } for i in ids]}
         good=audit_and_combine(originals)
