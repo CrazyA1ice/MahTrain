@@ -66,7 +66,9 @@ def suggest_one_shanten_ukeire(
         for name in ("effective_tile_count","expected_fan_weighted_copies",
                      "table_threat_index"):
             val=r.get(name)
-            if type(val) not in (int,float) or not isfinite(val) or val<0:
+            if (type(val) not in (int,float) or
+                    not isfinite(val) or val<0 or
+                    (name=="effective_tile_count" and type(val) is not int)):
                 raise RuntimeError("invalid public effect/value/risk")
     baseline=ranked[0]
     chosen=[
