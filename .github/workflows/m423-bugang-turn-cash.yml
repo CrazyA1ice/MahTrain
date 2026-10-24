@@ -1,0 +1,41 @@
+name: M4.23 current-draw supplement-kong cash and challenge AI
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/four_player.py"
+      - "src/mahtrain_core/kong_ledger.py"
+      - "src/mahtrain_core/ai.py"
+      - "src/mahtrain_core/classic_operation_hint.py"
+      - "web/match.js"
+      - "tests/test_m423_bugang_draw_turn_cash.py"
+      - "docs/MATCH_M423_BUGANG_DRAW_TURN_CASH_V1.33.md"
+      - ".github/workflows/m423-bugang-turn-cash.yml"
+permissions:
+  contents: read
+jobs:
+  legal-kong-and-no-cash-after-turn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: New actual-draw and AI tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+      - name: Kong, scoring and AI previous regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_kong_and_exhaustive_review.py' -v
+          python -m unittest discover -s tests -p 'test_four_player_claims.py' -v
+          python -m unittest discover -s tests -p 'test_four_player_settlement.py' -v
+          python -m unittest discover -s tests -p 'test_ai_calls.py' -v
+      - name: Check browser script and board regression
+        run: |
+          node --check web/match.js
+          node tests/test_match_board_dom.js
+          node tests/test_match_playback.js
