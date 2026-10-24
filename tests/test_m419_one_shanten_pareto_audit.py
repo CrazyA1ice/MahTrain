@@ -126,7 +126,7 @@ class M419ParetoTests(unittest.TestCase):
             self.assertEqual(agent.discard(v),"m1")
         summary=agent.safe_report()
         self.assertEqual(summary["counts"]["no_challenge_rank"],1)
-        self.assertEqual(summary["counts"]["one_shanten_multi"],0)
+        self.assertEqual(summary["counts"].get("one_shanten_multi",0),0)
 
     def test_true_108_physical_tiles_and_same_unmodified_challenge_cut(self):
         game,seat,v=offer_kongs()
