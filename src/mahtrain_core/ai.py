@@ -464,6 +464,10 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
 
     candidates = []
     for stage, after, extra, choice in prepared:
+        # Always bind the CURRENT candidate: the baseline loop above reused
+        # 'tile' for a legal normal discard. Comparing that stale tile to
+        # drawn_tile silently misclassified some delayed cashless bu-gangs.
+        candidate_tile, candidate_kind = choice["tile"], choice["type"]
         outlook = _call_outlook(
             after, extra, missing, public, cap, tian,
             minimum_ukeire=(
@@ -487,9 +491,10 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
         # over the best normal discard, without harming the other metric,
         # for equal-shanten delayed bu-gang. A current-draw paid bu-gang
         # keeps the established 75% protection policy.
-        if (kind == "bu_gang" and before is not None
+        if (candidate_kind == "bu_gang" and before is not None
                 and not view.get("legacy_bugang_cash_rule", False)
-                and "drawn_tile" in view and view["drawn_tile"] != tile
+                and "drawn_tile" in view
+                and view["drawn_tile"] != candidate_tile
                 and stage == least
                 and (outlook["ukeire"] < before["ukeire"]
                      or outlook["value"] < before["value"]
@@ -499,10 +504,9 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
         # Same ranking and deterministic tie breaks as M3.79. A strictly
         # better stage than baseline is always accepted, but every viable
         # candidate still gets its real fan-weighted value for ordering.
-        tile, kind = choice["tile"], choice["type"]
         candidates.append((
             (-outlook["shanten"], outlook["value"], outlook["ukeire"],
-             int(kind == "an_gang"), -TILE_INDEX[tile]),
+             int(candidate_kind == "an_gang"), -TILE_INDEX[candidate_tile]),
             dict(choice),
         ))
     return max(candidates, key=lambda entry: entry[0])[1] if candidates else None

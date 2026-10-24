@@ -1,0 +1,77 @@
+name: M4.24 independent delayed-bugang guard paired games
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai.py"
+      - "src/mahtrain_core/ai_delayed_bugang_paired.py"
+      - "examples/audit_delayed_bugang_current_cash.py"
+      - "tests/test_m424_delayed_bugang_paired.py"
+      - "docs/MATCH_M424_DELAYED_BUGANG_PROSPECTIVE_V1.34.md"
+      - ".github/workflows/m424-delayed-bugang-paired.yml"
+permissions:
+  contents: read
+jobs:
+  new-ruleset-unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: New guard policy and current rule tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m424_delayed_bugang_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+  paired-current-ruleset-whole-games:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        cohort: ["development", "holdout"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prespecified real 108-tile four-seat paired games
+        run: |
+          python examples/audit_delayed_bugang_current_cash.py \
+            --group ${{ matrix.cohort }} --seeds 2 \
+            --output /tmp/m424-${{ matrix.cohort }}-aggregate.json
+      - name: Audit independent shuffle and official ledger invariants
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          group=os.environ["GROUP"]
+          path=f"/tmp/m424-{group}-aggregate.json"
+          data=json.load(open(path,encoding="utf8"))
+          r=data["result"]
+          assert data["new_cash_rule"]=="current_m423"
+          assert r["independent_shuffle_seeds"]==2
+          assert r["paired_positions"]==8
+          assert r["complete_games"]==16
+          assert sorted(x["seed"] for x in r["per_seed"]) == (
+              [64000,64001] if group=="development" else [65000,65001])
+          for position in r["positions"]:
+              assert set(position["arms"])=={"current_guard","old_guard_ablation"}
+              for arm in position["arms"].values():
+                  s=arm["score"]
+                  assert s["official_net"]==(
+                      s["win_points"]+s["kong_points"]+s["exhaustive_points"])
+                  assert arm["terminal_phase"] in {"finished","wall_exhausted"}
+          print("Actual whole-game paired ledger and seed invariants: PASS")
+          PY
+        env:
+          GROUP: ${{ matrix.cohort }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m424-${{ matrix.cohort }}-public-aggregate
+          path: /tmp/m424-${{ matrix.cohort }}-aggregate.json
+          if-no-files-found: error
