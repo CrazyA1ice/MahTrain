@@ -142,6 +142,24 @@ class M423BugangCashTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             k.void(idx, reason="kong_discard_ron")
 
+    def test_historical_research_rules_still_price_old_delayed_kong(self):
+        g = ready_to_draw_fourth()
+        # A frozen historical OFFLINE experiment needs the pre-M4.23
+        # policy for reproducibility. Live games never set this flag.
+        g._legacy_bugang_cash = True
+        g = reach_next_turn_holding_fourth(g)
+        self.assertTrue(g.private_view(0)["legacy_bugang_cash_rule"])
+        g.declare_kong(0, "bu_gang", "m9")
+        resolve_rob_as_pass(g)
+        st = g.public_state()["kong_ledger"]
+        self.assertEqual(st["events"][0]["status"], "posted")
+        self.assertEqual(st["balances"], [60, -20, -20, -20])
+        self.assertTrue(st["zero_sum"])
+
+    def test_legacy_mode_must_be_explicit_boolean(self):
+        with self.assertRaises(ValueError):
+            FourPlayerOpening(42, legacy_bugang_cash=1)
+
     def test_delayed_unpriced_kong_still_expressly_nonpayable(self):
         k = KongLedger()
         k.declare(kind="bu_gang", winner=0, payers=[1,2,3],
