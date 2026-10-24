@@ -1,0 +1,111 @@
+name: M4.17 late-wall official da-jiao fan paired study
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_latewall_da_jiao_fan_paired.py"
+      - "tests/test_m417_latewall_da_jiao_fan_paired.py"
+      - "examples/audit_latewall_da_jiao_fan_paired.py"
+      - ".github/workflows/m417-latewall-da-jiao-fan.yml"
+      - "docs/MATCH_M417_LATEWALL_DA_JIAO_FAN_PAIRED_V1.27.md"
+permissions:
+  contents: read
+
+jobs:
+  legal-min-shanten-and-terminal-fan-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: New M4.17 public-wall and official-max-fan decision and M4.16 settlement tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m417_latewall_da_jiao_fan_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m416_exhaustive_terminal_cash_audit.py' -v
+  preregistered-fresh-official-paired-shuffles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 54000
+          - cohort: holdout
+            start: 55000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Original challenge versus max-fan late-wall research over four rotations
+        run: |
+          python examples/audit_latewall_da_jiao_fan_paired.py --cohort ${{ matrix.cohort }} --seeds 4 --output /tmp/m417-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          cohort=os.environ["COHORT"];start=int(os.environ["START"])
+          with open("/tmp/m417-"+cohort+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m417_frozen_late_wall_max_fan_tenpai_paired_v1"
+          assert x["cohort"]==cohort and x["seed_start"]==start
+          assert x["online_policy_modified"] is False
+          assert x["candidate_only_offline"] is True
+          r=x["result"]
+          assert r["independent_shuffles"]==4
+          assert r["paired_seats"]==16 and r["complete_official_games"]==32
+          assert r["frozen_wall_count_cutoff"]==32
+          assert r["frozen_min_max_fan_gain"]==1
+          assert r["frozen_copies_retention"]==.60
+          assert r["frozen_wait_types_retention"]==.50
+          assert r["frozen_fan_weighted_retention"]==.65
+          assert r["frozen_max_public_risk_increase"]==.15
+          assert r["online_ai_changed"] is False
+          assert r["calibrated_local_action_ev"] is None
+          assert r["ron_probability"] is None
+          assert r["confidence_interval"] is None
+          assert {p["seed"] for p in r["per_seed"]}==set(range(start,start+4))
+          assert sum(p["real_interventions"] for p in r["per_seed"])==r["actual_interventions"]
+          assert sum(p["real_interventions"]>0 for p in r["per_seed"])==r["seed_clusters_with_interventions"]
+          assert r["positive_seed_clusters"]+r["negative_seed_clusters"]+r["neutral_seed_clusters"]==4
+          assert r["actual_interventions"]<=r["baseline_late_cuts"] or (
+              r["actual_interventions"]<=sum(
+                  p["arms"]["late_wall_fan"]["counts"].get("late_wall_cuts",0)
+                  for p in r["positions"]))
+          official=r["official_component_deltas"]
+          assert official["official_net"]==sum(official[k] for k in (
+              "win_points","kong_points","exhaustive_points"))
+          for pos in r["positions"]:
+              assert pos["seed"] in range(start,start+4)
+              assert pos["arms"]["baseline"]["counts"].get("actual_changes",0)==0
+              for arm in ("baseline","late_wall_fan"):
+                  record=pos["arms"][arm]["official"]
+                  assert record["official_net"]==sum(record[k] for k in (
+                      "win_points","kong_points","exhaustive_points"))
+              if pos["actual_interventions"]==0:
+                  assert pos["identical_if_untouched"] is True
+                  assert all(v==0 for v in pos["official_deltas"].values())
+          raw=json.dumps(x)
+          for forbidden in ('"hand"','"tile"','"future_wall"','"full_wall"',
+                            '"opponent_hands"','"drawn_tile"','"_trace"','"_events"'):
+              assert forbidden not in raw
+          print("M4.17 VERIFIED FROZEN NEW SHUFFLE",cohort,json.dumps({
+              "total_cuts":r["baseline_cuts"],
+              "late_cuts":r["baseline_late_cuts"],
+              "tenpai_cuts":r["baseline_tenpai_cuts"],
+              "actual_changes":r["actual_interventions"],
+              "treated_seeds":r["seed_clusters_with_interventions"],
+              "net_delta":r["mean_four_seat_net_delta"],
+              "official_component_deltas":official,
+              "per_seed":r["per_seed"],
+          }))
+          PY
+        env:
+          COHORT: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m417-${{ matrix.cohort }}-latewall-ready-fan-paired
+          path: /tmp/m417-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
