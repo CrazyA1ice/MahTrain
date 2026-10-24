@@ -1,0 +1,117 @@
+name: M4.21 actual first bounded cut divergence and observed tenpai audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_bounded_first_split_tenpai_audit.py"
+      - "tests/test_m421_bounded_first_split_tenpai_audit.py"
+      - "examples/audit_bounded_first_split_tenpai.py"
+      - ".github/workflows/m421-first-split-tenpai.yml"
+      - "docs/MATCH_M421_BOUNDED_FIRST_SPLIT_TENPAI_V1.31.md"
+permissions:
+  contents: read
+
+jobs:
+  source-identity-observation-and-official-cash-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Tests for actual split and censoring plus M4.20 legal bounded branches
+        run: |
+          python -m unittest discover -s tests -p 'test_m421_bounded_first_split_tenpai_audit.py' -v
+          python -m unittest discover -s tests -p 'test_m420_bounded_public_lookahead.py' -v
+
+  authentic-m420-changed-game-forensic-replays:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cohort: development
+            start: 60000
+            changes: 1
+          - cohort: holdout
+            start: 61000
+            changes: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Full 108-tile official matched-game first action and later tenpai
+        run: |
+          python examples/audit_bounded_first_split_tenpai.py --cohort ${{ matrix.cohort }} --output /tmp/m421-${{ matrix.cohort }}.json
+          python - <<'PY'
+          import json,os
+          block=os.environ["BLOCK"];start=int(os.environ["START"])
+          with open("/tmp/m421-"+block+".json",encoding="utf8") as f:
+              x=json.load(f)
+          assert x["protocol"]=="m421_m420_original_first_true_split_to_observed_tenpai_ledger_v1"
+          assert x["cohort"]==block and x["seed_start"]==start
+          assert x["retrospective_not_independent_validation"] is True
+          assert x["online_ai_modified"] is False
+          r=x["result"]
+          assert r["independent_historical_shuffles"]==3
+          assert r["complete_paired_games"]==24
+          assert r["total_actual_changes"]==int(os.environ["CHANGES"])
+          assert r["changed_seat_positions"]==1
+          assert r["unchanged_position_count"]==11
+          assert {p["seed"] for p in r["per_seed"]}==set(range(start,start+3))
+          assert sum(p["actual_changes"] for p in r["per_seed"])==1
+          assert r["retrospective_not_new_validation"] is True
+          assert r["online_ai_modified"] is False
+          official=r["official_component_deltas"]
+          assert all(official[k]==0 for k in ("official_net","win_points",
+                                              "kong_points","exhaustive_points"))
+          stages=r["flower_pig_and_da_jiao_deltas"]
+          assert sum(stages.values())==official["exhaustive_points"]
+          assert len(r["changed_position_forensics"])==1
+          record=r["changed_position_forensics"][0]
+          first=record["first_split"]
+          assert first["event_ordinal"]>0 and first["own_discard_ordinal"]>0
+          assert first["exact_minimum_shanten"]==1
+          obs=first["first_policy_change"]
+          assert obs["projected_ratio"]>=1.12
+          assert obs["own_discard_ordinal"]==first["own_discard_ordinal"]
+          assert obs["baseline_draw_types_scanned"]<=6
+          assert obs["candidate_draw_types_scanned"]<=6
+          for arm in ("baseline","bounded_two_transition"):
+              t=first["observed_tenpai_after_split"][arm]
+              assert t["censored"] is (not t["observed_zero_shanten"])
+              assert t["own_later_discards_total"]>=0
+              if t["observed_zero_shanten"]:
+                  assert t["own_later_discards_until_tenpai"]>=1
+                  assert t["events_after_split"]>=1
+              else:
+                  assert t["own_later_discards_until_tenpai"] is None
+                  assert t["events_after_split"] is None
+              o=record["arms"][arm]["official"]
+              assert o["official_net"]==sum(o[k] for k in
+                  ("win_points","kong_points","exhaustive_points"))
+          raw=json.dumps(x)
+          for prohibited in ('"tile"','"hand"','"opponent_hands"',
+                             '"future_wall"','"drawn_tile"','"public_events"',
+                             '"_trace"','"_events"','"original_cut"','"revised_cut"'):
+              assert prohibited not in raw
+          print("M4.21 VERIFIED REAL FIRST CUT TO OBSERVED TENPAI",block,json.dumps({
+              "actual_changes":r["total_actual_changes"],
+              "first_split":first,
+              "official":official,
+              "terminal_stages":stages,
+              "per_seed":r["per_seed"],
+          },ensure_ascii=False))
+          PY
+        env:
+          BLOCK: ${{ matrix.cohort }}
+          START: ${{ matrix.start }}
+          CHANGES: ${{ matrix.changes }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m421-${{ matrix.cohort }}-first-split-tenpai-cash
+          path: /tmp/m421-${{ matrix.cohort }}.json
+          retention-days: 30
+          if-no-files-found: error
