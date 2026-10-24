@@ -482,6 +482,19 @@ def _challenge_kong(view: Mapping[str, Any]) -> dict[str, str] | None:
                 and not _outlook_better_than_baseline(
                     outlook, before, fraction=0.75)):
             continue
+        # An earlier retained fourth copy remains eligible for bu-gang
+        # but earns no kong money. Require a strict efficiency improvement
+        # over the best normal discard, without harming the other metric,
+        # for equal-shanten delayed bu-gang. A current-draw paid bu-gang
+        # keeps the established 75% protection policy.
+        if (kind == "bu_gang" and before is not None
+                and "drawn_tile" in view and view["drawn_tile"] != tile
+                and stage == least
+                and (outlook["ukeire"] < before["ukeire"]
+                     or outlook["value"] < before["value"]
+                     or (outlook["ukeire"] == before["ukeire"]
+                         and outlook["value"] == before["value"]))):
+            continue
         # Same ranking and deterministic tie breaks as M3.79. A strictly
         # better stage than baseline is always accepted, but every viable
         # candidate still gets its real fan-weighted value for ordering.
