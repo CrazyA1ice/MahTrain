@@ -2,6 +2,7 @@ name: M4.24 independent delayed-bugang guard paired games
 on:
   pull_request:
     paths:
+      - "src/mahtrain_core/ai.py"
       - "src/mahtrain_core/ai_delayed_bugang_paired.py"
       - "examples/audit_delayed_bugang_current_cash.py"
       - "tests/test_m424_delayed_bugang_paired.py"
