@@ -50,6 +50,10 @@ if __name__=="__main__":
             "baseline_late_cuts":result["baseline_late_cuts"],
             "baseline_tenpai_cuts":result["baseline_tenpai_cuts"],
             "actual_interventions":result["actual_interventions"],
+            "baseline_no_change_reasons":{
+                k:v for k,v in result["counts_by_arm"]["baseline"].items()
+                if k.startswith("reason_")
+            },
             "treated_seed_clusters":result["seed_clusters_with_interventions"],
             "positive_seeds":result["positive_seed_clusters"],
             "negative_seeds":result["negative_seed_clusters"],
