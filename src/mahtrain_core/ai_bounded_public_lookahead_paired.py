@@ -178,7 +178,7 @@ def frozen_lookahead_decision(
     counts["second_cuts"]=first["second_cuts_checked"]+other["second_cuts_checked"]
     if (first["proxy"]<=0 or other["proxy"]<=0):
         return original,"zero_projected_wait_value",counts
-    if (other["proxy"]>=first["proxy"]*MIN_PROJECTED_SCORE_GAIN and
+    if (other["proxy"]+1e-8>=first["proxy"]*MIN_PROJECTED_SCORE_GAIN and
             other["proxy"]>first["proxy"]):
         return alternative["discard"],"better_bounded_next_wait_proxy",counts
     return original,"no_bounded_next_wait_gain",counts
