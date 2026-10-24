@@ -180,6 +180,10 @@ class M423BugangCashTests(unittest.TestCase):
     def test_challenge_refuses_cashless_equal_stage_unimproved_bugang(self):
         g = ready_to_draw_fourth()
         view = g.private_view(0)
+        # Isolate the priced vs cashless decision: this fixture also has
+        # an incidental legal m1 an-gang, which must not be mistaken
+        # for a changed bu-gang decision.
+        view["kong_options"] = [{"type": "bu_gang", "tile": "m9"}]
         before = deepcopy(view)
         def outlook(hand, melds, missing, public, cap, tian, **kwargs):
             if any(m["type"]=="bu_gang" for m in melds):
