@@ -127,6 +127,30 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
             self.result["seat_rotated_seed_cluster_mean_delta_points"],
         )
 
+    def test_m438_read_only_accounting_over_actual_paid_games(self):
+        # M4.36 setUpClass executed FIVE real four-seat complete games,
+        # not mocked accounting rows; audit them without rerunning the engine.
+        from mahtrain_core.ai_shadow_loss_audit import audit_saved_shadow_results
+        destination=self.root/"M438_genuine_ledger_accounting"
+        with patch("mahtrain_core.ai_shadow_headtohead.evaluate_one_seed",
+                   side_effect=AssertionError("analysis must never replay")):
+            safe=audit_saved_shadow_results(
+                evaluation_dir=self.output,report_dir=destination,
+            )
+        self.assertEqual(safe["original_shuffle_seed_clusters"],1)
+        self.assertEqual(safe["total_complete_authoritative_games"],5)
+        self.assertEqual(safe["correlated_rotated_seat_comparisons"],4)
+        self.assertEqual(
+            safe["paired_mean_official_net_delta_points"],
+            self.result["seat_rotated_seed_cluster_mean_delta_points"],
+        )
+        self.assertAlmostEqual(
+            sum(safe["paid_net_delta_accounting_by_component_points"].values()),
+            safe["paired_mean_official_net_delta_points"],
+            places=4,
+        )
+        self.assertTrue(safe["no_action_level_causal_attribution"])
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
