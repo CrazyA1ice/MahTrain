@@ -196,6 +196,21 @@ class ResumableFourSeatBenchmarkTests(unittest.TestCase):
         self.assertEqual(_get_json(_cluster_path(self.output,0))["protocol"],
                          SHARD_PROTOCOL)
 
+    def test_deny_legacy_report_without_m437_manifest_marker(self):
+        self._run()
+        manifest=self.output/"PRIVATE_frozen_benchmark_plan.json"
+        raw=_get_json(manifest)
+        self.assertEqual(raw.pop("resumable_shards_protocol"),SHARD_PROTOCOL)
+        manifest.write_text(json.dumps(raw),encoding="utf8")
+        with self.assertRaisesRegex(ValueError,"plan differs"):
+            self._run(resume=True)
+
+    def test_completed_report_missing_a_seed_shard_is_corruption(self):
+        self._run()
+        _cluster_path(self.output,1).unlink()
+        with self.assertRaisesRegex(ValueError,"complete seed shards missing"):
+            self._run(resume=True)
+
     def test_resume_rejects_absent_plan_and_seed_overlap(self):
         with self.assertRaisesRegex(ValueError,"existing M4.37"):
             self._run(resume=True)
