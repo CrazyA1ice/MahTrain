@@ -9,6 +9,7 @@ train on the held-out outcomes, or export it. Not a population causal EV.
 from __future__ import annotations
 
 from collections import defaultdict
+from hashlib import sha256
 from copy import deepcopy
 from pathlib import Path
 from random import Random
@@ -444,8 +445,8 @@ def run_matched_pong_branch_trial(
     if (type(seed_start) is not int or type(seeds) is not int or
             type(resume) is not bool or
             not 0<=seed_start<2**32 or seed_start+seeds>2**32 or
-            not 1<=seeds<=MAX_EVAL_SEEDS):
-        raise ValueError("invalid independent first-checkpoint rollout seed plan")
+            seeds!=SEED_COUNT):
+        raise ValueError("M4.47 requires the frozen eight-shuffle exploratory seed plan")
     train=_private_location(Path(training_dir))
     prior=_private_location(Path(prior_m446_dir))
     output=_private_location(Path(out_dir))
@@ -470,6 +471,7 @@ def run_matched_pong_branch_trial(
         "private_independent_shuffle_count":seeds,
         "model_sha256_provenance_only":model["model_sha256"],
         "worlds":list(WORLDS),
+        "frozen_m447_protocol_source_sha256":sha256(Path(__file__).read_bytes()).hexdigest(),
         "max_first_checkpoints_per_shuffle":CHECKPOINTS_PER_SHUFFLE,
         "no_new_policy_or_refit":True,
     }
