@@ -17,6 +17,7 @@ from mahtrain_core.ai_pong_actor_strata import (
     SEED_COUNT, PROTOCOL, safe_actor_strata, one_actor_stratified_shuffle,
     validate_case,
 )
+from mahtrain_core.ai_pong_pass_replication import SUMMARY as OLD_M448_SUMMARY
 from mahtrain_core.ai_pong_actor_strata_run import (
     SUMMARY, _shard, _check_previous, run_actor_strata,
 )
@@ -106,7 +107,7 @@ class M449ActorStratificationTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
     def test_reject_tampered_old_safe_report_and_paid_shard(self):
-        original=self.old.out/SUMMARY
+        original=self.old.out/OLD_M448_SUMMARY
         old=_get_json(original)
         altered=dict(old)
         altered["mean_forced_peng_minus_pass_official_net_points"]=1234
