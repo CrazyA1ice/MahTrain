@@ -104,8 +104,13 @@ class M434LocalBatchTests(unittest.TestCase):
         safe=json.dumps(summary)
         for secret in ("private_shuffle_seed","actor_observation",
                        "PRIVATE_actor_train","89823","89824",
-                       "_hands","_wall","private_view"):
+                       "private_view"):
             self.assertNotIn(secret,safe)
+        # Exact private state keys, not fragments of legitimate aggregate
+        # fields such as two_wall_mixed_or_tied_points.
+        for forbidden_key in ("_hands","_wall","opponent_hands",
+                              "future_wall"):
+            self.assertNotIn(forbidden_key,summary)
         self.assertEqual(
             summary["paired_world_delta_count"],
             summary["natural_legal_decision_points"],
