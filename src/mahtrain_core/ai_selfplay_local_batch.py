@@ -329,7 +329,7 @@ def _atomic_stream_outputs(
         "online_policy_promoted":False,
         "proof_of_increased_ai_strength":False,
         "uncertainty_estimate_valid_for_population":False,
-        "private_shuffle_seed_exported":False,
+        "private_seed_ids_exported":False,
         "independence_unit":"original_natural_shuffle_seed",
     }
     try:
