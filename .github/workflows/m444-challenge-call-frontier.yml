@@ -1,0 +1,34 @@
+name: M4.44 authentic Challenge legal claim kong hu opportunity census
+on:
+  pull_request:
+    paths:
+      - 'src/mahtrain_core/ai_challenge_call_frontier.py'
+      - 'examples/run_challenge_call_frontier_probe.py'
+      - 'tests/test_m444_challenge_call_frontier.py'
+      - 'tests/test_m436_frozen_shadow_four_seat.py'
+      - '.github/workflows/m444-challenge-call-frontier.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/mahtrain_core/ai_challenge_call_frontier.py'
+permissions:
+  contents: read
+jobs:
+  own-view-legal-claim-frontier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: Legal claims, kong opportunities, historical seed isolation and private data guards
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m444_challenge_call_frontier.py' -v
+      - name: Compile changed modules
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_challenge_call_frontier.py examples/run_challenge_call_frontier_probe.py
+      - name: Document CLI
+        run: python examples/run_challenge_call_frontier_probe.py --help
