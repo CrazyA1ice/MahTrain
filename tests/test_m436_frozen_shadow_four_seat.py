@@ -206,6 +206,55 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
         self.assertTrue(geometry["no_new_matches"])
         self.assertTrue(geometry["raw_frozen_weights_hidden"])
 
+    def test_m441_real_nine_paid_games_guarded_and_unguarded(self):
+        # This plays NINE truly complete rule-engine Mahjong matches with
+        # one original shuffle and all seat rotations, not a fake ledger.
+        from mahtrain_core.ai_shadow_guarded_trial import (
+            _path as trial_path, run_guarded_trial,
+        )
+        from mahtrain_core.ai_shadow_action_diagnostics import (
+            PROTOCOL as M439_PROTOCOL,
+        )
+        prior=self.root/"M439_prior_plan_for_M441"
+        prior.mkdir()
+        prior.joinpath("PRIVATE_actor_diagnostic_plan.json").write_text(
+            json.dumps({
+                "protocol":M439_PROTOCOL,
+                "private_source_training_directory":str(self.training),
+                "private_source_m437_directory":str(self.output),
+                "private_frozen_model_sha256":self.provenance["model_sha256"],
+                "online_policy_changed":False,
+                "private_eval_seed_start":90034,
+                "private_eval_seed_count":1,
+            }),encoding="utf8")
+        target=self.root/"M441_genuine_nine_game_trial"
+        result=run_guarded_trial(
+            training_dir=self.training,
+            prior_m437_dir=self.output,
+            prior_m439_dir=prior,
+            seed_start=90047,seeds=1,out_dir=target,
+        )
+        self.assertEqual(result["actual_complete_paid_games"],9)
+        self.assertEqual(result["challenge_baseline_games"],1)
+        self.assertEqual(result["unguarded_four_seat_games"],4)
+        self.assertEqual(result["guarded_four_seat_games"],4)
+        self.assertTrue(result["online_challenge_ai_unchanged"])
+        private=_get_json(trial_path(target,0))["private_case"]
+        self.assertEqual(private["complete_authoritative_games"],9)
+        for seat in private["seat_rotation_results"]:
+            for policy in ("unguarded","guarded"):
+                entry=seat["policies"][policy]
+                self.assertEqual(entry["official_net_delta"],
+                                 sum(entry["paid_component_delta"].values()))
+        with patch("mahtrain_core.ai_shadow_guarded_trial._one_original_shuffle",
+                   side_effect=AssertionError("genuine paid games cannot replay")):
+            repeat=run_guarded_trial(
+                training_dir=self.training,prior_m437_dir=self.output,
+                prior_m439_dir=prior,seed_start=90047,seeds=1,
+                out_dir=target,resume=True,
+            )
+        self.assertEqual(repeat["completed_seed_shards_reused_on_resume"],1)
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
