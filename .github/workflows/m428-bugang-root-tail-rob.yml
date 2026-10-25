@@ -1,0 +1,106 @@
+name: M4.28 conditional root, tail and hidden rob-risk envelope
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_delayed_bugang_risk_envelope.py"
+      - "examples/audit_delayed_bugang_risk_envelope.py"
+      - "tests/test_m428_bugang_risk_envelope.py"
+      - "docs/MATCH_M428_BUGANG_ROOT_TAIL_RISK_V1.38.md"
+      - ".github/workflows/m428-bugang-root-tail-rob.yml"
+permissions:
+  contents: read
+jobs:
+  exact-rules-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Physical 108-tile, lawful robbed/cashless tail and cap regression
+        run: |
+          python -m unittest discover -s tests -p 'test_m428_bugang_risk_envelope.py' -v
+          python -m unittest discover -s tests -p 'test_m426_bugang_targeted.py' -v
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+  scenario-shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: exact-rules-stress
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["set_a", "set_b", "set_c", "set_d"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Paired indistinguishable-actor hidden worlds and authoritative robbed/cashless branches
+        run: |
+          python examples/audit_delayed_bugang_risk_envelope.py \
+            --shard "${{ matrix.shard }}" --out "m428-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m428-${{ matrix.shard }}
+          path: m428-${{ matrix.shard }}.json
+          if-no-files-found: error
+  audited-risk-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: scenario-shard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m428-*
+          merge-multiple: true
+          path: m428-results
+      - name: Strictly reconcile all 24 registered cap/tail/rob outcomes
+        run: |
+          python examples/audit_delayed_bugang_risk_envelope.py \
+            --combine --input-dir m428-results \
+            --out m428-audited-boundary-report.json
+      - name: Publish no-exaggeration audit
+        run: |
+          python - <<'PY'
+          import json,os
+          x=json.load(open("m428-audited-boundary-report.json",encoding="utf8"))
+          assert x["constructed_checkpoints"]==24
+          assert x["legally_robbed_hidden_world_count"]==24
+          assert x["independent_natural_games"]==0
+          assert x["official_EV_estimate"] is None
+          assert x["rob_probability"] is None
+          assert x["online_policy_changed"] is False
+          s="\n".join([
+              "## M4.28 legal root/tail/rob uncertainty envelope",
+              "- 24 preregistered constructed checkpoints, all 108 physical tiles conserved.",
+              f"- Conditional **hypothetical completed-hand** root multiplier "
+                f"gains under official cap: {x['conditional_root_multiplier_gain_counts']}.",
+              f"- Legal rob-kong counterfactual hidden worlds with "
+                f"**identical actor private view**: "
+                f"{x['legally_robbed_hidden_world_count']} / 24.",
+              "- Actual attempted delayed upgrade: no kong money in either world.",
+              "- Robbed alternative: official win payment posts, fourth tile is "
+                "robbed, kong/tail supplement are cancelled.",
+              "- Non-robbed alternative: legal kong completes, supplement "
+                "tail is drawn, kong cash remains zero.",
+              "- **Rob probability unknown; tail proxy is not a calibrated "
+                "probability; no realized EV comparison or live AI tuning.**",
+          ])+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m428-verified-conditional-root-tail-rob-report
+          path: m428-audited-boundary-report.json
+          if-no-files-found: error
