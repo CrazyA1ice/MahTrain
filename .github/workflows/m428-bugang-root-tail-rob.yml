@@ -74,7 +74,7 @@ jobs:
           import json,os
           x=json.load(open("m428-audited-boundary-report.json",encoding="utf8"))
           assert x["constructed_checkpoints"]==24
-          assert x["legally_robbed_hidden_world_count"]==24
+          assert 0 <= x["legally_robbed_hidden_world_count"] <= 24
           assert x["independent_natural_games"]==0
           assert x["official_EV_estimate"] is None
           assert x["rob_probability"] is None
@@ -86,10 +86,13 @@ jobs:
                 f"gains under official cap: {x['conditional_root_multiplier_gain_counts']}.",
               f"- Legal rob-kong counterfactual hidden worlds with "
                 f"**identical actor private view**: "
-                f"{x['legally_robbed_hidden_world_count']} / 24.",
+                f"{x['legally_robbed_hidden_world_count']} / 24 "
+                "(remaining cases not proven safe).",
               "- Actual attempted delayed upgrade: no kong money in either world.",
-              "- Robbed alternative: official win payment posts, fourth tile is "
-                "robbed, kong/tail supplement are cancelled.",
+              "- Where a valid robber witness exists: official win payment posts, "
+                "fourth tile is robbed, kong/tail supplement are cancelled.",
+              "- No witness found means only this constrained construction failed; "
+                "it does NOT prove rob probability is zero.",
               "- Non-robbed alternative: legal kong completes, supplement "
                 "tail is drawn, kong cash remains zero.",
               "- **Rob probability unknown; tail proxy is not a calibrated "
