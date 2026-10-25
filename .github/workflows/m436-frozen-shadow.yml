@@ -1,0 +1,116 @@
+name: M4.36 frozen shadow AI versus real four-seat Challenge opponents
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_shadow_headtohead.py"
+      - "examples/run_local_shadow_headtohead.py"
+      - "tests/test_m436_frozen_shadow_four_seat.py"
+      - "docs/MATCH_M436_FROZEN_SHADOW_FOUR_SEAT_V1.46.md"
+      - ".github/workflows/m436-frozen-shadow.yml"
+permissions:
+  contents: read
+jobs:
+  genuine-five-game-paired-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Real four-seat closed loops and official zero-sum payouts
+        run: |
+          python -W error::SyntaxWarning -m unittest discover \
+            -s tests -p 'test_m436_frozen_shadow_four_seat.py' -v
+  frozen-model-end-to-end:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: genuine-five-game-paired-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Produce genuine local train + old holdout paid games
+        run: |
+          python examples/run_local_selfplay_batch.py \
+            --seed-start 89823 --train-seeds 1 --holdout-seeds 1 \
+            --max-checkpoints 1 --workers 1 \
+            --out-dir data/selfplay/m436-ci-train
+      - name: Freeze M4.35 all-action model without touching evaluation seeds
+        run: |
+          python examples/run_local_uncertainty_analysis.py \
+            --out-dir data/selfplay/m436-ci-train
+      - name: Run frozen four-seat REAL head-to-head on completely NEW shuffle
+        run: |
+          python examples/run_local_shadow_headtohead.py \
+            --train-dir data/selfplay/m436-ci-train \
+            --seed-start 90023 --seeds 1 \
+            --out-dir data/selfplay/m436-ci-eval
+      - name: Verify paired real terminal games, seat balance and private isolation
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib,sys
+          sys.path.insert(0,"src")
+          from mahtrain_core.ai_shadow_headtohead import load_frozen_local_model
+          from mahtrain_core.ai_selfplay_local_batch import _get_json
+          train=pathlib.Path("data/selfplay/m436-ci-train")
+          out=pathlib.Path("data/selfplay/m436-ci-eval")
+          w,p=load_frozen_local_model(train)
+          summary=_get_json(out/"safe_four_seat_shadow_summary.json")
+          assert summary["actual_real_complete_games"]==5
+          assert summary["independent_initial_shuffle_seed_clusters"]==1
+          assert summary["baseline_games"]==1
+          assert summary["experimental_shadow_games"]==4
+          assert len(summary["per_seat_conditional_net_delta_means"])==4
+          assert summary["official_score_ledger_reconciled"] is True
+          assert summary["evaluation_shuffles_disjoint_from_train_and_original_holdout"] is True
+          assert summary["trained_on_only_original_training_split"] is True
+          assert summary["no_change_to_online_ai"] is True
+          assert summary["no_generalization_or_strength_proven"] is True
+          with gzip.open(out/"PRIVATE_four_seat_paired_matches.jsonl.gz","rt",encoding="utf8") as fp:
+              detail=[json.loads(line) for line in fp]
+          assert len(detail)==1
+          assert detail[0]["private_evaluation_shuffle_seed"]==90023
+          assert [x["seat"] for x in detail[0]["seat_rotation_results"]]==[0,1,2,3]
+          for row in detail[0]["seat_rotation_results"]:
+              assert row["delta_shadow_minus_challenge"]==(
+                  row["real_win_delta"]+row["real_kong_delta"]+
+                  row["real_exhaustive_delta"]
+              )
+          safe=(out/"safe_four_seat_shadow_summary.json").read_text(encoding="utf8")
+          for term in ("90023","89823","89824","private_evaluation_shuffle_seed","_hands","future_wall"):
+              assert term not in safe,term
+          print("M4.36 PASS: real 5 complete paid games; four experimental seat rotations; frozen train only; private eval shuffles redacted")
+          PY
+      - name: Publish ONLY aggregate safe real-match summary
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          s=json.loads(Path("data/selfplay/m436-ci-eval/safe_four_seat_shadow_summary.json").read_text(encoding="utf8"))
+          lines=[
+              "## M4.36 real original Challenge versus frozen SHADOW action model",
+              f"- Fully paid TRUE complete games: {s['actual_real_complete_games']}",
+              f"- Independent untouched shuffle seed clusters: {s['independent_initial_shuffle_seed_clusters']}",
+              f"- Frozen source train clusters with at least one legal action: {s['trained_original_shuffle_clusters']}",
+              f"- Legal min-shanten discard overrides across four seats: {s['candidate_legal_minimum_shanten_overrides']}",
+              f"- Official shadow-minus-Challenge actor net, seat-rotated: {s['seat_rotated_seed_cluster_mean_delta_points']}",
+              "- Total five games here are ONE correlated original-shuffle cluster, not five independent matches.",
+              "- Tiny experiment and model from conditional 2-wall action scores; no statistically established strength improvement.",
+              "- Online challenge unchanged; no private tiles/shuffle IDs or trained weights uploaded.",
+          ]
+          note="\n".join(lines)+"\n"
+          print(note)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as fp:
+              fp.write(note)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m436-public-aggregate-real-headtohead-only
+          path: data/selfplay/m436-ci-eval/safe_four_seat_shadow_summary.json
+          if-no-files-found: error

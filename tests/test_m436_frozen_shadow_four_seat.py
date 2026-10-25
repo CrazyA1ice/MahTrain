@@ -1,0 +1,227 @@
+"""M4.36 tests: real official five-game rotated comparison, actor-only model."""
+from __future__ import annotations
+
+from copy import deepcopy
+import json
+from pathlib import Path
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+ROOT=Path(__file__).resolve().parents[1]
+sys.path[:0]=[str(ROOT/"src"),str(ROOT)]
+
+from mahtrain_core.ai_selfplay_local_batch import (
+    BatchPlan, _get_json, run_local_batch
+)
+from mahtrain_core.ai_selfplay_uncertainty import analyze_saved_local_batch
+from mahtrain_core.ai_shadow_headtohead import (
+    PROTOCOL, FrozenShadowAgent, _bounded_weights,
+    _finish_real_full_game, evaluate_frozen_shadow,
+    evaluate_one_seed, load_frozen_local_model,
+)
+
+
+class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.private=tempfile.TemporaryDirectory()
+        cls.root=Path(cls.private.name)
+        cls.training=cls.root/"PRIVATE_completed_batch"
+        cls.plan=BatchPlan(89823,1,1,1)
+        cls.local=run_local_batch(
+            cls.plan,cls.training,workers=1,
+        )
+        analyze_saved_local_batch(cls.training)
+        cls.weights,cls.provenance=load_frozen_local_model(cls.training)
+        cls.output=cls.root/"PRIVATE_real_shadow_eval"
+        cls.result=evaluate_frozen_shadow(
+            training_dir=cls.training,seed_start=90023,
+            seeds=1,out_dir=cls.output,
+        )
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.private.cleanup()
+
+    def test_real_authoritative_payouts_all_four_seat_rotations(self):
+        r=self.result
+        self.assertEqual(r["protocol"],PROTOCOL)
+        self.assertEqual(r["independent_initial_shuffle_seed_clusters"],1)
+        self.assertEqual(r["actual_real_complete_games"],5)
+        self.assertEqual(r["baseline_games"],1)
+        self.assertEqual(r["experimental_shadow_games"],4)
+        self.assertEqual(len(r["per_seat_conditional_net_delta_means"]),4)
+        self.assertTrue(r["official_score_ledger_reconciled"])
+        self.assertFalse(r["no_change_to_online_ai"] is False)
+        self.assertFalse(r["no_generalization_or_strength_proven"] is False)
+        self.assertFalse(
+            r["enough_independent_seeds_for_exploratory_comparison"])
+        self.assertFalse(r["candidate_no_change_to_live_challenge_agent"] is False)
+        self.assertEqual(
+            r["trained_original_shuffle_clusters"],
+            self.provenance["trained_original_shuffle_clusters"],
+        )
+        self.assertTrue(
+            r["evaluation_shuffles_disjoint_from_train_and_original_holdout"],
+        )
+        self.assertEqual(r,_get_json(
+            self.output/"safe_four_seat_shadow_summary.json"
+        ))
+        for secret in ("90023","89823","89824","private_evaluation_shuffle_seed",
+                       "hand","private_original"):
+            self.assertNotIn(secret,json.dumps(r))
+
+    def test_true_private_four_rotations_balanced_one_seed_one_cluster(self):
+        import gzip
+        with gzip.open(
+            self.output/"PRIVATE_four_seat_paired_matches.jsonl.gz",
+            "rt",encoding="utf8"
+        ) as f:
+            rows=[json.loads(x) for x in f]
+        self.assertEqual(len(rows),1)
+        case=rows[0]
+        self.assertEqual(case["private_evaluation_shuffle_seed"],90023)
+        self.assertEqual(case["complete_authoritative_games"],5)
+        self.assertTrue(
+            case["original_natural_shuffle_seed_is_one_statistical_cluster"]
+        )
+        self.assertEqual(
+            [s["seat"] for s in case["seat_rotation_results"]],[0,1,2,3]
+        )
+        for entry in case["seat_rotation_results"]:
+            self.assertEqual(
+                entry["shadow_official_net"]-
+                entry["challenge_baseline_official_net"],
+                entry["delta_shadow_minus_challenge"],
+            )
+            self.assertEqual(
+                entry["real_win_delta"]+entry["real_kong_delta"]+
+                entry["real_exhaustive_delta"],
+                entry["delta_shadow_minus_challenge"],
+            )
+            self.assertLessEqual(
+                entry["shadow_override_count"],
+                entry["shadow_discard_decisions"],
+            )
+        self.assertEqual(
+            sum(s["shadow_override_count"] for s in case["seat_rotation_results"]),
+            self.result["candidate_legal_minimum_shanten_overrides"],
+        )
+
+    def test_no_weights_never_change_true_baseline_all_four_seats(self):
+        one=evaluate_one_seed(90025,None)
+        self.assertEqual(one["complete_authoritative_games"],5)
+        for seat in one["seat_rotation_results"]:
+            self.assertEqual(seat["delta_shadow_minus_challenge"],0)
+            self.assertEqual(seat["shadow_override_count"],0)
+
+    def test_frozen_model_fit_from_train_only_and_tampered_weights_rejected(self):
+        model=_get_json(self.training/"PRIVATE_uncertainty_offline_model.json")
+        self.assertEqual(
+            _bounded_weights(model),self.weights,
+        )
+        self.assertFalse(model["online_policy_promotion_allowed"])
+        bad=deepcopy(model)
+        bad["online_policy_promotion_allowed"]=True
+        with self.assertRaises(ValueError):
+            _bounded_weights(bad)
+        bad=deepcopy(model)
+        bad["weights"]=[float("nan"),.1,.1]
+        with self.assertRaises(ValueError):
+            _bounded_weights(bad)
+        bad=deepcopy(model)
+        bad["weights"]=[.8,.1,.1]
+        with self.assertRaises(ValueError):
+            _bounded_weights(bad)
+        file=self.training/"PRIVATE_uncertainty_offline_model.json"
+        saved=file.read_text(encoding="utf8")
+        try:
+            compromised=deepcopy(model)
+            compromised["train_seed_clusters"]+=1
+            file.write_text(json.dumps(compromised),encoding="utf8")
+            with self.assertRaises(ValueError):
+                load_frozen_local_model(self.training)
+        finally:
+            file.write_text(saved,encoding="utf8")
+
+    def test_reject_same_seed_or_existing_result_dir(self):
+        with self.assertRaises(ValueError):
+            evaluate_frozen_shadow(
+                training_dir=self.training,seed_start=89823,
+                seeds=1,out_dir=self.root/"reject_train",
+            )
+        with self.assertRaises(ValueError):
+            evaluate_frozen_shadow(
+                training_dir=self.training,seed_start=89824,
+                seeds=1,out_dir=self.root/"reject_old_holdout",
+            )
+        with self.assertRaises(ValueError):
+            evaluate_frozen_shadow(
+                training_dir=self.training,seed_start=90024,
+                seeds=1,out_dir=self.output,
+            )
+        with self.assertRaises(ValueError):
+            evaluate_frozen_shadow(
+                training_dir=self.training,seed_start=90024,
+                seeds=1,out_dir=self.training,
+            )
+
+    def test_invalid_seeds_and_online_agent_state_blocked(self):
+        for bad in (0,-1,101,True,1.4):
+            with self.subTest(bad=bad),self.assertRaises(ValueError):
+                evaluate_frozen_shadow(
+                    training_dir=self.training,seed_start=90025,
+                    seeds=bad,out_dir=self.root/"invalid",
+                )
+        with self.assertRaises(ValueError):
+            FrozenShadowAgent(seed=89823,seat=4,weights=None)
+        with self.assertRaises(ValueError):
+            FrozenShadowAgent(seed=89823,seat=0,
+                              weights=(.3,0.,0.))
+
+    def test_own_view_only_override_respects_minimum_shanten(self):
+        # Controlled legal snapshot features; no hidden wall/opponent hands.
+        original="m1"
+        other="m2"
+        view={
+            "seat":0,"phase":"await_discard","hand":["m1","m2"],
+            "own_melds":[],"missing_suits":["s","s","s","s"],
+        }
+        o={
+            "status":"choose_discard","minimum_shanten":1,
+            "candidates":[
+                {"discard":original,"shanten":1,
+                 "effective_tile_count":1,
+                 "next_draw_probability":0.,
+                 "effective_types":[]},
+                {"discard":other,"shanten":1,
+                 "effective_tile_count":39,
+                 "next_draw_probability":1.,
+                 "effective_types":["m3"]},
+                {"discard":"m4","shanten":2,
+                 "effective_tile_count":40,
+                 "next_draw_probability":1.,
+                 "effective_types":["m3"]},
+            ],
+        }
+        shadow=FrozenShadowAgent(
+            seed=90026,seat=0,weights=(.2,.2,.2)
+        )
+        with patch.object(
+            shadow._delegate,"discard",return_value=original
+        ), patch(
+            "mahtrain_core.ai_shadow_headtohead.analyze_discards",
+            return_value=o
+        ), patch(
+            "mahtrain_core.ai_shadow_headtohead.visible_tiles",
+            return_value=[]
+        ):
+            result=shadow.discard(view)
+        self.assertEqual(result,other)
+        self.assertEqual(shadow.override_count,1)
+        self.assertTrue(shadow.last_choice["kept_minimum_shanten"])
+
+if __name__=="__main__":
+    unittest.main()
