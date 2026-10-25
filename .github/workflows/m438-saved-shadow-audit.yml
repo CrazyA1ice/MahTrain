@@ -1,0 +1,38 @@
+name: M4.38 original-shuffle loss audit of saved fully paid M4.37 games
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_shadow_loss_audit.py"
+      - "examples/audit_saved_shadow_loss.py"
+      - "tests/test_m438_saved_shadow_loss_audit.py"
+      - "tests/test_m436_frozen_shadow_four_seat.py"
+      - "docs/MATCH_M438_SAVED_SHADOW_OFFICIAL_LOSS_AUDIT_V1.48.md"
+      - ".github/workflows/m438-saved-shadow-audit.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/mahtrain_core/ai_shadow_loss_audit.py"
+      - "examples/audit_saved_shadow_loss.py"
+      - "tests/test_m438_saved_shadow_loss_audit.py"
+permissions:
+  contents: read
+jobs:
+  saved-ledger-no-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Read-only ledger-shaped fixtures, privacy and corruption checks
+        run: |
+          python -W error::SyntaxWarning -m unittest discover \
+            -s tests -p "test_m438_saved_shadow_loss_audit.py" -v
+      - name: Compile module and Windows-compatible CLI
+        run: |
+          python -W error::SyntaxWarning -m py_compile \
+            src/mahtrain_core/ai_shadow_loss_audit.py \
+            examples/audit_saved_shadow_loss.py
+      - name: Command line help
+        run: python examples/audit_saved_shadow_loss.py --help
