@@ -44,8 +44,8 @@ def main():
         print(json.dumps({
             "protocol":PROTOCOL,"shard":args.shard,
             "constructed_cases":len(data["cases"]),
-            "real_authoritative_rob_stress_count":sum(
-                r["adversarial_rob_branch"]["robbed"] for r in data["cases"]),
+            "constructed_legal_rob_witness_count":sum(
+                r["constructed_same_view_rob_witness_found"] for r in data["cases"]),
             "official_EV_study":False,
         },ensure_ascii=False))
     else:
