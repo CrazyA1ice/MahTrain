@@ -59,7 +59,7 @@ class ChallengeTieProbe(MahjongAgent):
         baseline=super().discard(view)
         stats=self.totals
         stats["discard_decisions"]+=1
-        ranked=self._last_discard_scores
+        ranked=getattr(self,"_last_discard_scores",None)
         # Challenge does not rank anything when exactly ONE eligible
         # minimum-shanten cut exists (including forced missing-suit cuts).
         if ranked is None:
