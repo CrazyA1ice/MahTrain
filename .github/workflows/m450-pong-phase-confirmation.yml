@@ -1,0 +1,35 @@
+name: M4.50 frozen middle versus early pass peng validation
+on:
+  pull_request:
+    paths:
+      - 'src/mahtrain_core/ai_pong_phase_confirmation.py'
+      - 'src/mahtrain_core/ai_pong_phase_confirmation_run.py'
+      - 'tests/test_m450_pong_phase_confirmation.py'
+      - 'examples/run_pong_phase_confirmation.py'
+      - '.github/workflows/m450-pong-phase-confirmation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/mahtrain_core/ai_pong_phase_confirmation.py'
+      - 'src/mahtrain_core/ai_pong_phase_confirmation_run.py'
+permissions:
+  contents: read
+jobs:
+  independent-mid-early-paid-contrast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: Historical M4.49 verification, genuine real engine branch, 48 new seed plan
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m450_pong_phase_confirmation.py' -v
+      - name: Validate Windows CLI and Python syntax
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_pong_phase_confirmation.py src/mahtrain_core/ai_pong_phase_confirmation_run.py examples/run_pong_phase_confirmation.py
+      - name: CLI usage
+        run: python examples/run_pong_phase_confirmation.py --help
