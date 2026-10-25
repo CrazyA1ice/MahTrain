@@ -37,7 +37,7 @@ def fixture()->dict:
                 "win":18.75,"kong":1.25,"exhaustive":0
             },
             "new_candidate_policy_not_fitted_or_promoted":True,
-            "same_original_shuffle_future_worlds_not_independent":True,
+            "same_original_shuffle_future_worlds_not_independent_samples":True,
         },
         "m448":{
             "protocol":SOURCES["m448"],
@@ -131,6 +131,47 @@ def fixture()->dict:
 
 
 class M451SafeEvidenceGateTests(unittest.TestCase):
+    def test_m447_genuine_producer_contract_round_trip(self):
+        """Use the ACTUAL M4.47 safe producer, not invented field names."""
+        from mahtrain_core.ai_pong_pass_branch_rollouts import _aggregate as genuine_m447
+        # Synthetic terminal branch returns (not claims about real outcomes);
+        # 8 original shuffles and 2 correlated future worlds per shuffle.
+        effects=(100,100,100,-50,-50,-40,0,0)
+        cases=[{
+            "private_matched_branches":[{
+                "official_actor_net_delta":delta,
+                "win_actor_delta":delta,
+                "kong_actor_delta":0,
+                "exhaustive_actor_delta":0,
+                "peng_claim_actually_accepted":True,
+            } for _ in range(2)]
+        } for delta in effects]
+        actual_report=genuine_m447(cases)
+        self.assertIn(
+            "same_original_shuffle_future_worlds_not_independent_samples",
+            actual_report,
+        )
+        self.assertNotIn(
+            "same_original_shuffle_future_worlds_not_independent",
+            actual_report,
+        )
+        reports=fixture()
+        reports["m447"]=actual_report
+        audited=audit_safe_reports(reports)
+        self.assertEqual(audited["studies_in_natural_chronological_order"]["m447"][
+            "conditional_peng_minus_pass_mean_points"],20)
+
+    def test_reject_synthetic_incorrect_m447_dependence_key(self):
+        reports=fixture()
+        reports["m447"].pop(
+            "same_original_shuffle_future_worlds_not_independent_samples"
+        )
+        reports["m447"][
+            "same_original_shuffle_future_worlds_not_independent"
+        ]=True
+        with self.assertRaisesRegex(ValueError,"dependence warning: m447"):
+            audit_safe_reports(reports)
+
     def test_four_distinct_real_report_shapes_not_pooled(self):
         result=audit_safe_reports(fixture())
         self.assertEqual(result["protocol"],PROTOCOL)
