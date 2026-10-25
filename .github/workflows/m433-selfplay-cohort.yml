@@ -1,0 +1,133 @@
+name: M4.33 independent-shuffle self-play cohort and privacy audit
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_selfplay_cohort_audit.py"
+      - "examples/run_selfplay_cohort_audit.py"
+      - "tests/test_m433_selfplay_cohort_audit.py"
+      - "docs/MATCH_M433_SELFPLAY_COHORT_AUDIT_V1.43.md"
+      - ".github/workflows/m433-selfplay-cohort.yml"
+permissions:
+  contents: read
+jobs:
+  checked-natural-seed-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: 2 real natural shuffles; reject tampering and fake holdout accuracy
+        run: |
+          python -m unittest discover -s tests -p 'test_m433_selfplay_cohort_audit.py' -v
+  expanded-four-seed-coverage:
+    needs: checked-natural-seed-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Prespecified 2 independent train shuffles and 2 untouched heldout shuffles
+        run: |
+          python examples/run_selfplay_cohort_audit.py \
+            --seed-start 89720 --train-seeds 2 --holdout-seeds 2 \
+            --max-checkpoints 2 --out-dir data/selfplay/m433-ci
+      - name: Verify all real seed-cluster counts and no private source in aggregate
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib,sys
+          sys.path.insert(0,"src")
+          from mahtrain_core.ai_selfplay_cohort_audit import (
+              PROTOCOL, audit_completed_study
+          )
+          from mahtrain_core.ai_selfplay_learning import _assert_public
+          root=pathlib.Path("data/selfplay/m433-ci")
+          a=json.loads((root/"safe_aggregate_audit.json").read_text(encoding="utf8"))
+          public=[json.loads(x) for x in gzip.open(
+              root/"public_four_challenge_replays.jsonl.gz","rt",encoding="utf8")]
+          train=[json.loads(x) for x in gzip.open(
+              root/"PRIVATE_actor_train.jsonl.gz","rt",encoding="utf8")]
+          held=[json.loads(x) for x in gzip.open(
+              root/"PRIVATE_actor_holdout.jsonl.gz","rt",encoding="utf8")]
+          model=json.loads((root/"PRIVATE_offline_model.json").read_text(encoding="utf8"))
+          diagnostics=json.loads((root/"PRIVATE_holdout_diagnostics.json").read_text(encoding="utf8"))
+          assert len(public)==4 and len(train)==len(held)==2
+          assert [x["game_id"] for x in public]==[
+              "game-0000","game-0001","game-0002","game-0003"
+          ]
+          assert all(x["players"]==["challenge"]*4 for x in public)
+          assert all(sum(x["official_final_balances"])==0 for x in public)
+          for p in public: _assert_public(p)
+          assert [x["private_shuffle_seed"] for x in train]==[89720,89721]
+          assert [x["private_shuffle_seed"] for x in held]==[89722,89723]
+          assert a["protocol"]==PROTOCOL
+          assert a["original_natural_full_games"]==4
+          assert a["total_genuine_complete_games"]==(
+              4+a["conditioned_full_terminal_action_branch_games"])
+          assert a["splits"]["train"]["independent_initial_shuffle_clusters"]==2
+          assert a["splits"]["holdout"]["independent_initial_shuffle_clusters"]==2
+          # Full recomputation of public-safe aggregates from actor-owned local
+          # data occurs inside the job; only the safe aggregate is uploaded.
+          src={
+              "protocol":"m432_natural_multicheckpoint_seed_cluster_action_labels_v1",
+              "no_online_ai_change":True,
+              "no_validated_improvement_claim":True,
+              "cluster_independence_unit":"original_natural_shuffle_seed",
+              "train_seed_start":89720,"train_seed_clusters":2,
+              "test_seed_start":89722,"test_seed_clusters":2,
+              "natural_full_games":4,
+              "counterfactual_full_games":
+                  a["conditioned_full_terminal_action_branch_games"],
+              "public_replays":public,"private_train":train,
+              "private_holdout":held,"model":model,"heldout":diagnostics
+          }
+          assert audit_completed_study(src)==a
+          assert a["model_released_to_live_ai"] is False
+          assert a["real_policy_strength_proven"] is False
+          raw=(root/"safe_aggregate_audit.json").read_text(encoding="utf8")
+          assert "89720" not in raw and "89721" not in raw
+          assert "89722" not in raw and "89723" not in raw
+          assert "private_shuffle_seed" not in raw
+          assert "actor_observation" not in raw
+          assert "public_frames" not in raw
+          print("M4.33: 4 independent natural seed clusters / true paid official outcomes / private isolation PASS")
+          PY
+      - name: Publish coverage and abstention without any private tapes or seeds
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          a=json.loads(Path("data/selfplay/m433-ci/safe_aggregate_audit.json").read_text(encoding="utf8"))
+          train=a["splits"]["train"]
+          test=a["splits"]["holdout"]
+          lines=[
+              "## M4.33 four independent natural shuffle seed clusters (real outcomes)",
+              f"- Natural complete four-challenge games: {a['original_natural_full_games']}",
+              f"- Legal physical terminal counterfactual games: {a['conditioned_full_terminal_action_branch_games']}",
+              f"- **Total completed paid games**: {a['total_genuine_complete_games']}",
+              f"- Train/untouched holdout seed clusters: {train['independent_initial_shuffle_clusters']} / {test['independent_initial_shuffle_clusters']}",
+              f"- Natural eligible action points: {train['natural_eligible_decision_points']} train + {test['natural_eligible_decision_points']} held out",
+              f"- Two-wall strictly agreeing action labels: {train['strict_two_world_consensus_labels']} train + {test['strict_two_world_consensus_labels']} held out",
+              f"- Seed clusters with a trainable label: {train['clusters_with_consensus_action_label']}",
+              f"- Holdout scored / correct directions: {a['holdout_scored_consensus_decisions']} / {a['holdout_correct_direction_decisions']}",
+              f"- Accuracy output gated: {a['holdout_accuracy_status']}",
+              "- No independent statistical claims from paired walls; no change to live AI.",
+              "- **No actor hands, shuffle seeds or full unknown walls uploaded.**",
+          ]
+          s="\n".join(lines)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m433-public-cohort-audit-only
+          path: data/selfplay/m433-ci/safe_aggregate_audit.json
+          if-no-files-found: error
