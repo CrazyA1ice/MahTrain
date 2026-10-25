@@ -258,3 +258,254 @@ def _validate_case(case:dict[str,Any],seed:int)->None:
             raise ValueError("an unaccepted peng must not alter the real score")
 
 
+def _private_shard(root:Path,index:int)->Path:
+    return root/SHARD_DIR/f"index-{index:08d}.json"
+
+
+def _read_verified(root:Path,start:int,n:int,model_digest:str)->dict[int,dict[str,Any]]:
+    directory=root/SHARD_DIR
+    if not directory.exists():
+        return {}
+    if not directory.is_dir():
+        raise ValueError("M4.47 per-shuffle private shard directory invalid")
+    stored={}
+    for f in directory.iterdir():
+        if f.is_file() and ".tmp-" in f.name:
+            continue
+        if (not f.is_file() or len(f.name)!=19 or
+                not f.name.startswith("index-") or
+                not f.name.endswith(".json") or
+                not f.name[6:14].isdigit()):
+            raise ValueError("unexpected M4.47 private checkpoint filename")
+        i=int(f.name[6:14])
+        if i>=n or i in stored:
+            raise ValueError("duplicate/out-of-range original shuffle shard")
+        env=_get_json(f)
+        if (type(env) is not dict or
+                set(env)!={"protocol","index","model_sha256","case_sha256","private_case"} or
+                env["protocol"]!=SHARD_PROTOCOL or
+                type(env["index"]) is not int or env["index"]!=i or
+                env["model_sha256"]!=model_digest or
+                type(env["private_case"]) is not dict):
+            raise ValueError("M4.47 private checkpoint header invalid")
+        case=env["private_case"]
+        _validate_case(case,start+i)
+        if env["case_sha256"]!=_paired_digest(case):
+            raise ValueError("M4.47 private checkpoint SHA-256 mismatch")
+        stored[i]=case
+    return stored
+
+
+def _aggregate(cases:list[dict[str,Any]])->dict[str,Any]:
+    counts={
+        "actual_natural_original_challenge_games":len(cases),
+        "original_shuffles_with_legal_peng_after_challenge_pass":0,
+        "original_shuffles_without_such_a_checkpoint":0,
+        "paired_future_wall_worlds":0,
+        "genuine_full_terminal_branch_games":0,
+        "branch_pairs_where_peng_was_actually_claimed":0,
+        "branch_pairs_where_other_calls_preempted_peng":0,
+    }
+    per_seed_delta=[]
+    per_seed_win=[]
+    per_seed_kong=[]
+    per_seed_exhaustive=[]
+    positive=negative=zero=0
+    covered=[]
+    for case in cases:
+        matched=case["private_matched_branches"]
+        found=bool(matched)
+        counts["original_shuffles_with_legal_peng_after_challenge_pass"]+=int(found)
+        counts["original_shuffles_without_such_a_checkpoint"]+=int(not found)
+        counts["paired_future_wall_worlds"]+=len(matched)
+        counts["genuine_full_terminal_branch_games"]+=2*len(matched)
+        counts["branch_pairs_where_peng_was_actually_claimed"]+=sum(
+            row["peng_claim_actually_accepted"] for row in matched)
+        counts["branch_pairs_where_other_calls_preempted_peng"]+=sum(
+            not row["peng_claim_actually_accepted"] for row in matched)
+        cluster_delta=mean(x["official_actor_net_delta"] for x in matched) if found else 0
+        per_seed_delta.append(cluster_delta)
+        per_seed_win.append(mean(x["win_actor_delta"] for x in matched) if found else 0)
+        per_seed_kong.append(mean(x["kong_actor_delta"] for x in matched) if found else 0)
+        per_seed_exhaustive.append(mean(
+            x["exhaustive_actor_delta"] for x in matched) if found else 0)
+        positive+=int(cluster_delta>0)
+        negative+=int(cluster_delta<0)
+        zero+=int(cluster_delta==0)
+        if found:
+            covered.append(cluster_delta)
+    mean_delta=round(mean(per_seed_delta),5)
+    components={
+        "win":round(mean(per_seed_win),5),
+        "kong":round(mean(per_seed_kong),5),
+        "exhaustive":round(mean(per_seed_exhaustive),5),
+    }
+    if abs(sum(components.values())-mean_delta)>0.00002:
+        raise RuntimeError("conditional paired full-ledger components inconsistent")
+    return {
+        "protocol":PROTOCOL,
+        "independent_original_shuffle_clusters":len(cases),
+        **counts,
+        "real_completed_full_games_baseline_plus_branches":
+            len(cases)+counts["genuine_full_terminal_branch_games"],
+        "mean_forced_peng_minus_pass_all_seed_clusters":mean_delta,
+        "mean_official_component_delta_all_seed_clusters":components,
+        "mean_forced_peng_minus_pass_only_covered_seed_clusters_descriptive":
+            round(mean(covered),5) if covered else None,
+        "seed_level_positive_delta":positive,
+        "seed_level_negative_delta":negative,
+        "seed_level_zero_delta":zero,
+        "first_checkpoint_only_without_payout_cherry_picking":True,
+        "matched_full_state_and_rng_for_both_actions_in_each_world":True,
+        "same_original_shuffle_future_worlds_not_independent_samples":True,
+        "rollouts_may_react_differently_to_public_action_changes":True,
+        "counterfactual_engine_hidden_state_not_available_to_any_policy":True,
+        "no_old_m445_or_m446_holdout_outcomes_used_for_training":True,
+        "new_candidate_policy_not_fitted_or_promoted":True,
+        "no_specific_hand_tiles_future_wall_shuffle_seed_or_weights_exported":True,
+        "conditional_on_true_seed_and_first_checkpoint_not_population_ev":True,
+        "no_claim_of_stronger_ai_or_action_ev_calibration":True,
+    }
+
+
+def _source_plan_and_exclusion(*,train:Path,prior:Path,model:dict[str,Any],
+                               start:int,n:int)->dict[str,Any]:
+    old=_get_json(prior/M446_PLAN)
+    old_start=old.get("private_original_shuffle_start")
+    old_n=old.get("private_new_original_shuffle_clusters")
+    sha=model["model_sha256"]
+    if (old.get("protocol")!=M446_PROTOCOL or
+            old.get("private_training_source")!=str(train) or
+            old.get("training_model_sha256_provenance_only")!=sha or
+            old.get("unchanged_m445_source_sha256")!=_m445_policy_digest() or
+            old.get("challenge_live_policy_untouched") is not True or
+            type(old_start) is not int or type(old_n) is not int or
+            old_n!=20 or not 0<=old_start<2**32 or old_start+old_n>2**32 or
+            not (start+n<=old_start or start>=old_start+old_n)):
+        raise ValueError("M4.47 new seed conflicts with completed frozen M4.46 source")
+    m445=Path(old["private_previous_m445_source"])
+    m444=_m445_evidence(
+        prior=_private_location(m445),train=train,model=model,start=start,n=n,
+    )
+    if old.get("private_previous_m444_source")!=str(m444):
+        raise ValueError("M4.46 old evidence source path mismatch")
+    batch=prior/M446_BATCH
+    verified=_m445_saved(batch,old_start,old_n,sha)
+    if len(verified)!=old_n:
+        raise ValueError("M4.46 requires all twenty complete original-seed checkpoints")
+    expected=_m445_summary(
+        [verified[i] for i in range(old_n)],
+        model["trained_original_shuffle_clusters"],
+    )
+    previous_safe=_get_json(prior/M446_SUMMARY)
+    if (not isinstance(previous_safe,dict) or
+            previous_safe.get("protocol")!=M446_PROTOCOL or
+            previous_safe.get("independent_original_shuffle_clusters")!=old_n or
+            previous_safe.get("actor_only_response_counts")!=expected["actor_only_response_counts"] or
+            previous_safe.get("mean_official_net_delta_points")!=expected["mean_official_net_delta_points"] or
+            previous_safe.get("mean_official_component_delta_points")!=expected["mean_official_component_delta_points"] or
+            previous_safe.get("actual_peng_overrides")!=_cluster_metrics(
+                [verified[i] for i in range(old_n)]
+            )["actual_peng_overrides"]):
+        raise ValueError("previous M4.46 safe report does not match original paid data")
+    # Follow exact registered prior-plan chain for M4.37/39/41/42/43/44.
+    private444=_get_json(m444/"PRIVATE_call_frontier_plan.json")
+    path442=Path(private444["private_m442_source"])
+    path443=Path(private444["private_m443_source"])
+    p442=_get_json(path442/"PRIVATE_challenge_tie_probe_plan.json")
+    p443=_get_json(path443/"PRIVATE_safe_tie_policy_plan.json")
+    p437=_get_json(Path(p442["private_prior_m437_dir"])/"PRIVATE_frozen_benchmark_plan.json")
+    p439=_get_json(Path(p442["private_prior_m439_dir"])/"PRIVATE_actor_diagnostic_plan.json")
+    p441=_get_json(Path(p442["private_prior_m441_dir"])/"PRIVATE_guard_trial_plan.json")
+    for plan,startkey,countkey in (
+        (p437,"private_evaluation_seed_start","private_eval_original_shuffle_count"),
+        (p439,"private_eval_seed_start","private_eval_seed_count"),
+        (p441,"private_seed_start","original_shuffle_clusters"),
+        (p442,"private_original_seed_start","independent_seed_clusters"),
+        (p443,"private_new_shuffle_start","private_independent_shuffle_count"),
+        (private444,"private_original_shuffle_start","private_original_shuffle_count"),
+    ):
+        a=plan.get(startkey)
+        size=plan.get(countkey)
+        if (type(a) is not int or type(size) is not int or
+                not 0<=a<2**32 or not 1<=size<=MAX_EVAL_SEEDS or
+                a+size>2**32 or
+                not (start+n<=a or start>=a+size)):
+            raise ValueError("new M4.47 shuffle overlaps registered historical plan")
+    return {"private_m446_source":str(prior),
+            "private_m444_source":str(m444),
+            "private_m445_source":str(m445)}
+
+
+def run_matched_pong_branch_trial(
+    *,training_dir:Path,prior_m446_dir:Path,
+    seed_start:int,seeds:int,out_dir:Path,resume:bool=False,
+)->dict[str,Any]:
+    if (type(seed_start) is not int or type(seeds) is not int or
+            type(resume) is not bool or
+            not 0<=seed_start<2**32 or seed_start+seeds>2**32 or
+            not 1<=seeds<=MAX_EVAL_SEEDS):
+        raise ValueError("invalid independent first-checkpoint rollout seed plan")
+    train=_private_location(Path(training_dir))
+    prior=_private_location(Path(prior_m446_dir))
+    output=_private_location(Path(out_dir))
+    if (len({train,prior,output})!=3 or any(
+        a in b.parents or b in a.parents
+        for a,b in ((train,prior),(train,output),(prior,output))
+    )):
+        raise ValueError("source and output locations must be completely separate")
+    _,model=load_frozen_local_model(train)
+    a=model["source_m434_train_seed_start"]
+    b=model["source_m434_seed_end_exclusive"]
+    if not (seed_start+seeds<=a or seed_start>=b):
+        raise ValueError("new M4.47 shuffle overlaps original training/holdout")
+    sources=_source_plan_and_exclusion(
+        train=train,prior=prior,model=model,start=seed_start,n=seeds,
+    )
+    manifest={
+        "protocol":PROTOCOL,
+        "private_model_source":str(train),
+        **sources,
+        "private_natural_shuffle_start":seed_start,
+        "private_independent_shuffle_count":seeds,
+        "model_sha256_provenance_only":model["model_sha256"],
+        "worlds":list(WORLDS),
+        "max_first_checkpoints_per_shuffle":CHECKPOINTS_PER_SHUFFLE,
+        "no_new_policy_or_refit":True,
+    }
+    if resume:
+        if not output.is_dir() or not (output/PLAN).is_file():
+            raise ValueError("resume requires saved frozen M4.47 experiment plan")
+        if _get_json(output/PLAN)!=manifest:
+            raise ValueError("M4.47 resume parameters or model source changed")
+        if any(p.name not in {PLAN,SHARD_DIR,SUMMARY} and ".tmp-" not in p.name
+               for p in output.iterdir()):
+            raise ValueError("unrecognized M4.47 private output file")
+        cached=_read_verified(output,seed_start,seeds,model["model_sha256"])
+        if (output/SUMMARY).exists() and len(cached)!=seeds:
+            raise ValueError("finished M4.47 safe report has incomplete shards")
+    else:
+        if output.exists() and any(output.iterdir()):
+            raise ValueError("M4.47 requires a newly empty output directory")
+        output.mkdir(parents=True,exist_ok=True)
+        _write_atomic(output/PLAN,manifest)
+        cached={}
+    (output/SHARD_DIR).mkdir(exist_ok=True)
+    cases=[]
+    for i in range(seeds):
+        case=cached.get(i)
+        if case is None:
+            case=one_natural_shuffle(seed_start+i)
+            _validate_case(case,seed_start+i)
+            _write_atomic(_private_shard(output,i),{
+                "protocol":SHARD_PROTOCOL,
+                "index":i,
+                "model_sha256":model["model_sha256"],
+                "case_sha256":_paired_digest(case),
+                "private_case":case,
+            })
+        cases.append(case)
+    safe=_aggregate(cases)
+    safe["verified_original_seed_shards_reused_on_resume"]=len(cached)
+    _write_atomic(output/SUMMARY,safe)
+    return safe
