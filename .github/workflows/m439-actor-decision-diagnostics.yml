@@ -1,0 +1,35 @@
+name: M4.39 new-seed actor-visible discard diagnostics
+on:
+  pull_request:
+    paths:
+      - 'src/mahtrain_core/ai_shadow_headtohead.py'
+      - 'src/mahtrain_core/ai_shadow_action_diagnostics.py'
+      - 'examples/run_actor_discard_diagnostics.py'
+      - 'tests/test_m439_actor_discard_diagnostics.py'
+      - 'tests/test_m436_frozen_shadow_four_seat.py'
+      - '.github/workflows/m439-actor-decision-diagnostics.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/mahtrain_core/ai_shadow_action_diagnostics.py'
+permissions:
+  contents: read
+jobs:
+  actor-only-private-trace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: Actor-view diagnostics and resume regressions
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m439_actor_discard_diagnostics.py' -v
+      - name: Compile modified modules
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_shadow_headtohead.py src/mahtrain_core/ai_shadow_action_diagnostics.py examples/run_actor_discard_diagnostics.py
+      - name: CLI help
+        run: python examples/run_actor_discard_diagnostics.py --help

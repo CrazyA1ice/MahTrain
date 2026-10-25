@@ -151,6 +151,46 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
         )
         self.assertTrue(safe["no_action_level_causal_attribution"])
 
+    def test_m439_real_new_seed_five_paid_games_and_actor_trace(self):
+        # One truly unseen initial shuffle; baseline and four seat rotations
+        # are real authoritative finished games with private actor-only cuts.
+        from mahtrain_core.ai_shadow_action_diagnostics import run_actor_diagnostics
+        output=self.root/"M439_authentic_actor_trace"
+        report=run_actor_diagnostics(
+            training_dir=self.training,prior_evaluation_dir=self.output,
+            seed_start=90034,seeds=1,out_dir=output,
+        )
+        self.assertEqual(report["actual_real_complete_games"],5)
+        self.assertEqual(report["original_shuffle_seed_clusters"],1)
+        self.assertEqual(
+            report["actor_discard_opportunities"],
+            report["actual_model_override_count"]+
+            report["baseline_kept_discard_count"],
+        )
+        self.assertEqual(
+            report["actor_visible_effective_tile_count_lower_on_override"]+
+            report["actor_visible_effective_tile_count_higher_on_override"]+
+            report["actor_visible_effective_tile_count_tied_on_override"],
+            report["actual_model_override_count"],
+        )
+        self.assertTrue(report["online_challenge_unchanged"])
+        self.assertTrue(report[
+            "diagnosed_cuts_are_not_single_action_counterfactual_effects"])
+        self.assertNotIn("90034",json.dumps(report))
+        from mahtrain_core.ai_shadow_action_diagnostics import _case_path
+        shard=_get_json(_case_path(output,0))
+        self.assertEqual(sum(
+            len(r["private_actor_discard_trace"])
+            for r in shard["private_case"]["seat_rotation_results"]
+        ),report["actor_discard_opportunities"])
+        with patch("mahtrain_core.ai_shadow_action_diagnostics.evaluate_one_seed",
+                   side_effect=AssertionError("never replay completed games")):
+            second=run_actor_diagnostics(
+                training_dir=self.training,prior_evaluation_dir=self.output,
+                seed_start=90034,seeds=1,out_dir=output,resume=True,
+            )
+        self.assertEqual(second["reused_completed_original_shuffle_clusters"],1)
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)

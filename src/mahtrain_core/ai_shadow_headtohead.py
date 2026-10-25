@@ -109,7 +109,8 @@ class FrozenShadowAgent:
     """
 
     def __init__(self, *, seed: int, seat: int,
-                 weights: tuple[float,...]|None) -> None:
+                 weights: tuple[float,...]|None,
+                  capture_diagnostics:bool=False) -> None:
         if type(seed) is not int or not 0<=seed<2**32 or (
             type(seat) is not int or seat not in range(4)
         ):
@@ -127,6 +128,10 @@ class FrozenShadowAgent:
         self._delegate=MahjongAgent("challenge",seed=seed,seat=seat)
         self.considered_discards=0
         self.override_count=0
+        if type(capture_diagnostics) is not bool:
+            raise ValueError("capture_diagnostics must be boolean")
+        self.capture_diagnostics=capture_diagnostics
+        self.private_actor_discard_trace:list[dict[str,Any]]=[]
         self.last_choice:dict[str,Any]|None=None
 
     def exchange(self,view:Mapping[str,Any])->list[str]:
@@ -142,12 +147,30 @@ class FrozenShadowAgent:
         return self._delegate.kong(view)
 
     def discard(self,view:Mapping[str,Any])->str:
+        chosen=self._choose_discard(view)
+        if self.capture_diagnostics:
+            if self.last_choice is None:
+                raise RuntimeError("discard analysis unexpectedly missing")
+            self.private_actor_discard_trace.append({
+                "decision_ordinal":self.considered_discards,
+                **self.last_choice,
+                "chosen_discard":chosen,
+            })
+        return chosen
+
+    def _choose_discard(self,view:Mapping[str,Any])->str:
         # Authoritative delegate first, preserving all established
         # deterministic ties/forced missing-suit policy as baseline.
         original=self._delegate.discard(view)
         self.considered_discards+=1
-        self.last_choice={"overrode":False,"kept_minimum_shanten":True}
+        self.last_choice={
+            "overrode":False,"kept_minimum_shanten":True,
+            "baseline_discard":original,
+            "reason":"no_better_frozen_margin",
+            "model_margin":0.,
+        }
         if self.weights is None or not any(self.weights):
+            self.last_choice["reason"]="no_frozen_weights"
             return original
         oracle=analyze_discards(
             view["hand"],view["own_melds"],
@@ -155,6 +178,7 @@ class FrozenShadowAgent:
             visible_tiles=visible_tiles(view)
         )
         if oracle["status"]!="choose_discard":
+            self.last_choice["reason"]="no_eligible_discard_oracle"
             return original
         minimum=oracle["minimum_shanten"]
         candidates=[
@@ -163,9 +187,17 @@ class FrozenShadowAgent:
         if original not in {c["discard"] for c in candidates}:
             raise RuntimeError("live challenge cut outside minimum shanten")
         if len(candidates)<2:
+            self.last_choice["reason"]="only_one_minimum_shanten_cut"
             return original
         base=next(c for c in candidates if c["discard"]==original)
         base_x=_candidate_features(base)
+        self.last_choice.update({
+            "minimum_shanten":minimum,
+            "baseline_effective_tile_count":base["effective_tile_count"],
+            "baseline_next_draw_probability":base["next_draw_probability"],
+            "baseline_effective_types_count":len(base["effective_types"]),
+            "eligible_minimum_shanten_cut_count":len(candidates),
+        })
         scored=[]
         for option in candidates:
             tile=option["discard"]
@@ -184,15 +216,24 @@ class FrozenShadowAgent:
             return original
         scored.sort(key=lambda r:(-r[0],r[1]))
         selected=scored[0][1]
+        selected_row=next(c for c in candidates if c["discard"]==selected)
         if selected not in view["hand"]:
             raise RuntimeError("experimental shadow tried to cut unseen tile")
         self.override_count+=1
-        self.last_choice={"overrode":True,"kept_minimum_shanten":True}
+        self.last_choice.update({
+            "overrode":True,
+            "reason":"positive_frozen_margin",
+            "model_margin":scored[0][0],
+            "chosen_effective_tile_count":selected_row["effective_tile_count"],
+            "chosen_next_draw_probability":selected_row["next_draw_probability"],
+            "chosen_effective_types_count":len(selected_row["effective_types"]),
+        })
         return selected
 
 
 def _finish_real_full_game(seed:int, candidate_seat:int|None,
-                           weights:tuple[float,...]|None) -> dict[str,Any]:
+                           weights:tuple[float,...]|None,
+                           *,capture_diagnostics:bool=False) -> dict[str,Any]:
     if (type(seed) is not int or not 0<=seed<2**32 or
             (candidate_seat is not None and (
                 type(candidate_seat) is not int or candidate_seat not in range(4)
@@ -205,7 +246,8 @@ def _finish_real_full_game(seed:int, candidate_seat:int|None,
     shadow=None
     if candidate_seat is not None:
         shadow=FrozenShadowAgent(
-            seed=seed,seat=candidate_seat,weights=weights
+            seed=seed,seat=candidate_seat,weights=weights,
+            capture_diagnostics=capture_diagnostics
         )
         agents[candidate_seat]=shadow
     frames=[]
@@ -238,16 +280,21 @@ def _finish_real_full_game(seed:int, candidate_seat:int|None,
             shadow.considered_discards if shadow else 0),
         "shadow_override_count":(
             shadow.override_count if shadow else 0),
+        **({"private_actor_discard_trace":shadow.private_actor_discard_trace}
+           if shadow is not None and capture_diagnostics else {}),
     }
 
 
 def evaluate_one_seed(seed:int,
-                      weights:tuple[float,...]|None) -> dict[str,Any]:
+                      weights:tuple[float,...]|None,
+                      *,capture_diagnostics:bool=False) -> dict[str,Any]:
     """Five real complete games share ONE natural shuffle, NOT five samples."""
     baseline=_finish_real_full_game(seed,None,weights)
     comparison=[]
     for seat in range(4):
-        live=_finish_real_full_game(seed,seat,weights)
+        live=_finish_real_full_game(
+            seed,seat,weights,capture_diagnostics=capture_diagnostics
+        )
         original=baseline["official_net_by_seat"][seat]
         after=live["official_net_by_seat"][seat]
         comparison.append({
@@ -257,6 +304,8 @@ def evaluate_one_seed(seed:int,
             "delta_shadow_minus_challenge":after-original,
             "shadow_discard_decisions":live["shadow_discard_decisions"],
             "shadow_override_count":live["shadow_override_count"],
+            **({"private_actor_discard_trace":live["private_actor_discard_trace"]}
+               if capture_diagnostics else {}),
             "challenge_baseline_game_phase":baseline["phase"],
             "shadow_game_phase":live["phase"],
             "real_win_delta":(
