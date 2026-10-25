@@ -21,3 +21,8 @@ data/*.db-wal
 Thumbs.db
 .vscode/
 .idea/
+
+# M4.30 local actor-hand self-play datasets, private seeds/models and replay archives
+# Do not push any training episodes (private own-hand history and exact shuffle seeds).
+data/selfplay/
+selfplay-private/
