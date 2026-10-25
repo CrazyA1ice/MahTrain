@@ -1,0 +1,112 @@
+name: M4.30 private actor-only four-AI self-play learning pilot
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_selfplay_learning.py"
+      - "examples/run_selfplay_learning.py"
+      - "tests/test_m430_selfplay_learning.py"
+      - "docs/MATCH_M430_SELFPLAY_LEARNING_V1.40.md"
+      - ".github/workflows/m430-selfplay-learning.yml"
+      - ".gitignore"
+permissions:
+  contents: read
+jobs:
+  selfplay-learning-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Actor-only privacy and real four-agent paired holdout unit tests
+        run: |
+          python -m unittest discover -s tests -p 'test_m430_selfplay_learning.py' -v
+          python -m unittest discover -s tests -p 'test_m429_bugang_terminal_paired.py' -v
+  full-learning-demo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: selfplay-learning-regression
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 4 real training matches, four-seat challenge rotations + independent holdout games
+        run: |
+          python examples/run_selfplay_learning.py \
+            --seed-start 88500 --train-seeds 1 --holdout-seeds 1 \
+            --out-dir data/selfplay/m430-ci
+      - name: Verify public vs private output contract; never upload private data
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib
+          from sys import path
+          path.insert(0,"src")
+          from mahtrain_core.ai_selfplay_learning import _assert_public,PROTOCOL
+          root=pathlib.Path("data/selfplay/m430-ci")
+          public=[json.loads(s) for s in gzip.open(root/"public_replays.jsonl.gz","rt",encoding="utf8")]
+          private=[json.loads(s) for s in gzip.open(root/"PRIVATE_actor_training.jsonl.gz","rt",encoding="utf8")]
+          summary=json.loads((root/"summary.json").read_text(encoding="utf8"))
+          model=json.loads((root/"pilot_model.json").read_text(encoding="utf8"))
+          heldout=json.loads((root/"holdout_report.json").read_text(encoding="utf8"))
+          assert len(public)==len(private)==4
+          assert all(p["protocol"]==PROTOCOL for p in public)
+          for row in public: _assert_public(row)
+          assert all(x["actor_observations_only"] is True for x in private)
+          assert model["training_seed_clusters"]==1
+          assert model["online_promotion_allowed"] is False
+          assert heldout["heldout_independent_seed_clusters"]==1
+          assert heldout["heldout_complete_games"]==8
+          assert heldout["promoted_to_live_ai"] is False
+          assert summary["training_complete_games"]==4
+          assert summary["heldout_real_complete_games"]==8
+          assert summary["skill_gain_not_yet_proven"] is True
+          print("Actor-only data integrity, seed separation, full official payoff and live-policy isolation: PASS")
+          PY
+      - name: Public summary only (NO archived seeds or private examples in CI artifacts)
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          p=Path("data/selfplay/m430-ci")
+          s=json.loads((p/"summary.json").read_text(encoding="utf8"))
+          e=json.loads((p/"holdout_report.json").read_text(encoding="utf8"))
+          lines=[
+              "## M4.30 actor-only four-AI self-play learning pilot",
+              f"- Actual **training games**: {s['training_complete_games']}.",
+              f"- Public replay archives available locally: {s['public_replay_archives']}.",
+              f"- Independent train/holdout seed clusters: {s['training_independent_seeds']}"
+                f" / {s['heldout_independent_seeds']}.",
+              f"- Holdout complete match arms: {s['heldout_real_complete_games']}.",
+              f"- Learned tiebreak changes in holdout: {e['changed_discard_choices']}.",
+              f"- Exploratory holdout official net delta: "
+                f"{s['heldout_mean_official_score_difference']}.",
+              "- No hand/seed replay disclosure, no upload of private self-play data.",
+              "- **No model promoted**, and a single holdout seed is "
+                "far too little to conclude the learned agent is stronger."
+          ]
+          txt="\n".join(lines)+"\n"
+          print(txt)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(txt)
+          # Publish only safe aggregate counters, not seeded/private data!
+          safe={k:s[k] for k in (
+              "protocol","training_complete_games","public_replay_archives",
+              "training_independent_seeds","heldout_independent_seeds",
+              "heldout_real_complete_games","changed_discard_choices",
+              "heldout_mean_official_score_difference",
+              "policy_automatically_promoted","skill_gain_not_yet_proven",
+          )}
+          Path("m430-ci-aggregate.json").write_text(
+              json.dumps(safe,indent=2,ensure_ascii=False),encoding="utf8")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m430-aggregate-without-hidden-information
+          path: m430-ci-aggregate.json
+          if-no-files-found: error
