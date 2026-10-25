@@ -1,0 +1,115 @@
+name: M4.31 four-challenge natural self-play action-value rollouts
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_selfplay_counterfactual.py"
+      - "tests/test_m431_natural_selfplay_counterfactual.py"
+      - "examples/run_selfplay_counterfactual.py"
+      - "docs/MATCH_M431_NATURAL_SELFPLAY_COUNTERFACTUAL_V1.41.md"
+      - ".github/workflows/m431-selfplay-counterfactual.yml"
+permissions:
+  contents: read
+jobs:
+  natural-game-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Real 4-challenge natural terminal trials; same-stage legal fork and privacy checks
+        run: |
+          python -m unittest discover -s tests -p 'test_m431_natural_selfplay_counterfactual.py' -v
+          python -m unittest discover -s tests -p 'test_m430_selfplay_learning.py' -v
+  frozen-offline-study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: natural-game-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Frozen natural shuffle seeds, no trained-seed overlap
+        run: |
+          python examples/run_selfplay_counterfactual.py \
+            --seed-start 89520 --train-seeds 1 --holdout-seeds 1 \
+            --out-dir data/selfplay/m431-ci
+      - name: Verify 108 tiles, complete official net and exported public replay isolation
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib,sys
+          sys.path.insert(0,"src")
+          from mahtrain_core.ai_selfplay_learning import _assert_public
+          from mahtrain_core.ai_selfplay_counterfactual import PROTOCOL
+          root=pathlib.Path("data/selfplay/m431-ci")
+          summary=json.loads((root/"summary.json").read_text(encoding="utf8"))
+          games=[json.loads(x) for x in gzip.open(
+              root/"public_four_challenge_replays.jsonl.gz","rt",encoding="utf8")]
+          train=[json.loads(x) for x in gzip.open(
+              root/"PRIVATE_train_action_values.jsonl.gz","rt",encoding="utf8")]
+          holdout=[json.loads(x) for x in gzip.open(
+              root/"PRIVATE_holdout_action_values.jsonl.gz","rt",encoding="utf8")]
+          model=json.loads((root/"offline_preference_model.json").read_text(encoding="utf8"))
+          assert len(games)==2 and len(train)==len(holdout)==1
+          assert games[0]["game_id"] != games[1]["game_id"]
+          assert games[0]["policies"]==games[1]["policies"]==["challenge"]*4
+          assert all(x["protocol"]==PROTOCOL for x in games)
+          for public in games: _assert_public(public)
+          assert train[0]["private_seed"]==89520
+          assert holdout[0]["private_seed"]==89521
+          assert summary["all_four_ais_challenge"] is True
+          assert summary["train_seed_clusters"]==summary["holdout_seed_clusters"]==1
+          assert summary["total_complete_games"]==summary["natural_full_games"]+summary["paired_full_terminal_rollout_games"]
+          assert summary["natural_full_games"]==2
+          assert summary["paired_full_terminal_rollout_games"]%4==0
+          assert summary["naturally_found_competing_discard_checkpoints"]<=2
+          assert summary["online_policy_changed"] is False
+          assert summary["strength_improvement_proven"] is False
+          assert model["online_policy_changed"] is False
+          for row in train+holdout:
+              for world in row["paired"]["worlds"]:
+                  assert world["same_actor_observation"] is True
+                  a=world["baseline"];b=world["alternative"]
+                  for v in (a,b):
+                      assert v["terminal_phase"] in ("finished","wall_exhausted")
+                      assert v["physical_tiles"]==108
+                      assert v["official_net"]==v["win_points"]+v["kong_points"]+v["exhaustive_points"]
+                  d=world["alternative_minus_baseline"]
+                  assert d["official_net"]==d["win_points"]+d["kong_points"]+d["exhaustive_points"]
+          print("PASS: true full-game net scores and public-view privacy contract")
+          PY
+      - name: Publish only aggregate CI result, never private learner/wall data
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          x=json.loads(Path("data/selfplay/m431-ci/summary.json").read_text(encoding="utf8"))
+          lines=[
+              "## M4.31 natural four-challenge self-play and full terminal counterfactuals",
+              f"- Full **natural** four-challenge matches: {x['natural_full_games']}",
+              f"- Genuine natural same-stage two-discard checkpoints: {x['naturally_found_competing_discard_checkpoints']}",
+              f"- Real complete-game paired branch rollouts: {x['paired_full_terminal_rollout_games']}",
+              f"- Total full games completed: {x['total_complete_games']}",
+              f"- Training / held-out independent shuffle seeds: {x['train_seed_clusters']} / {x['holdout_seed_clusters']}",
+              f"- Actual fitted decision-value samples: {x['training_action_value_examples']}",
+              f"- Held-out covered cases / model alternative preferences: {x['holdout_natural_decisions']} / {x['holdout_preferred_alternative']}",
+              "- **No model was promoted; no population action EV or strength increase established.**",
+              "- No hidden hands, future wall ordering, or private shuffle seeds uploaded.",
+          ]
+          s="\n".join(lines)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:f.write(s)
+          Path("m431-safe-aggregate.json").write_text(
+              json.dumps(x,ensure_ascii=False,indent=2),encoding="utf8")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m431-public-aggregate-no-private-replay
+          path: m431-safe-aggregate.json
+          if-no-files-found: error
