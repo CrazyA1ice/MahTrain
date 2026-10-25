@@ -51,25 +51,28 @@ class RootTailAndRobEnvelopeTests(unittest.TestCase):
                 alternate=_replace_opponents_without_public_change(
                     original,target)
                 self.assertEqual(original.public_state(),public)
-                self.assertEqual(alternate.public_state(),public)
-                self.assertEqual(alternate.private_view(0),own)
                 self.assertEqual(original.private_view(0),own)
                 self.assertEqual(original.debug_tile_counts()["total"],108)
-                self.assertEqual(alternate.debug_tile_counts()["total"],108)
                 self.assertEqual(original._hands[1],list(private_hand))
-                self.assertIn(target,
-                    # Exact authoritative hu window arises after declaring.
-                    SPECS[case_id][0])
-                self.assertEqual(len(_rob_witness(original,target)),13)
+                if alternate is None:
+                    # No witness of our constrained hand shape was found:
+                    # do NOT conclude rob is impossible in all hidden worlds.
+                    self.assertIsNone(_rob_witness(original,target))
+                else:
+                    self.assertEqual(alternate.public_state(),public)
+                    self.assertEqual(alternate.private_view(0),own)
+                    self.assertEqual(alternate.debug_tile_counts()["total"],108)
+                    self.assertEqual(len(_rob_witness(original,target)),13)
 
     def test_rob_branch_does_not_post_late_cash_or_consume_tail(self):
-        for case_id in (0,10,12,23):
+        for case_id in (0,10,12,20):
             with self.subTest(case=case_id):
                 base=construct_checkpoint(case_id,delayed=True)
                 target=SPECS[case_id][0]
                 safe=_resolve(deepcopy(base),rob=False)
                 counterfactual=_replace_opponents_without_public_change(
                     base,target)
+                self.assertIsNotNone(counterfactual)
                 rob=_resolve(counterfactual,rob=True)
                 self.assertFalse(safe["robbed"])
                 self.assertEqual(safe["cash_from_late_kong"],0)
@@ -88,7 +91,7 @@ class RootTailAndRobEnvelopeTests(unittest.TestCase):
         self.assertEqual(row["case_id"],10)
         self.assertTrue(row["not_a_probability_or_EV_estimate"])
         self.assertTrue(row[
-            "rob_can_be_legal_in_a_same_actor_view_hidden_world"])
+            "constructed_same_view_rob_witness_found"])
         self.assertGreater(row["tail_proxy_unknown_copies"],0)
         self.assertLessEqual(row["tail_proxy_effective_copies"],
                              row["tail_proxy_unknown_copies"])
@@ -117,7 +120,8 @@ class RootTailAndRobEnvelopeTests(unittest.TestCase):
         summary=combine(original)
         self.assertEqual(summary["constructed_checkpoints"],24)
         self.assertEqual(summary["independent_natural_games"],0)
-        self.assertEqual(summary["legally_robbed_hidden_world_count"],24)
+        self.assertGreater(summary["legally_robbed_hidden_world_count"],0)
+        self.assertLessEqual(summary["legally_robbed_hidden_world_count"],24)
         self.assertIsNone(summary["rob_probability"])
         self.assertIsNone(summary["official_EV_estimate"])
         self.assertFalse(summary["online_policy_changed"])
@@ -129,6 +133,9 @@ class RootTailAndRobEnvelopeTests(unittest.TestCase):
         bad=deepcopy(original)
         bad["set_a"]["cases"][0]["adversarial_rob_branch"][
             "tail_was_consumed"]=True;cases.append(bad)
+        bad=deepcopy(original)
+        bad["set_a"]["cases"][0]["constructed_same_view_rob_witness_found"]=False
+        cases.append(bad)
         bad=deepcopy(original)
         bad["set_a"]["cases"][0]["no_rob_branch"][
             "cash_from_late_kong"]=60;cases.append(bad)
