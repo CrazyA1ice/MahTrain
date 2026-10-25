@@ -16,7 +16,7 @@ from statistics import mean
 from time import perf_counter_ns
 from typing import Any, Mapping
 
-from .ai import MahjongAgent
+from .ai import MahjongAgent, visible_tiles
 from .ai_tournament import _take_action, public_replay_frame
 from .ai_selfplay_learning import _assert_public, _snapshot
 from .efficiency import analyze_discards
@@ -73,8 +73,7 @@ def _find_checkpoint(game: FourPlayerOpening,seed: int):
     info=analyze_discards(
         view["hand"],view["own_melds"],
         missing_suit=view["missing_suits"][seat],
-        visible_tiles=__import__("mahtrain_core.ai",fromlist=["visible_tiles"]
-                         ).visible_tiles(view),
+        visible_tiles=visible_tiles(view),
     )
     if info["status"]!="choose_discard":
         return None
@@ -157,7 +156,7 @@ def natural_selfplay(seed: int):
         raise RuntimeError("natural four-challenge game hit action limit")
     final=_ledger(game,0)
     public={
-        "protocol":PROTOCOL, "game_id":f"match-{seed%10000000:07d}",
+        "protocol":PROTOCOL, "game_id":"unassigned-public-id",
         "policies":["challenge"]*4,
         "phase":game.phase,"public_frames":frames,
         "official_final_balances":game.public_state()["settled_balances"],
@@ -334,6 +333,7 @@ def run_experiment(seed_start: int,train_seeds: int,
     for i in range(train_seeds+holdout_seeds):
         seed=seed_start+i
         pub,private=paired_natural_seed(seed)
+        pub["game_id"]=f"game-{i:04d}"
         public.append(pub)
         (train if i<train_seeds else held).append(private)
     model=_train_from_rows(train)
