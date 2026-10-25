@@ -18,7 +18,7 @@ from mahtrain_core.ai_shadow_headtohead import (
     _paired_digest,
 )
 from mahtrain_core.ai_shadow_action_diagnostics import (
-    _case_path, run_actor_diagnostics,
+    _case_path, _read_saved, _aggregate, run_actor_diagnostics,
 )
 from mahtrain_core.ai_shadow_score_geometry import (
     PROTOCOL, SUMMARY, audit_frozen_score_geometry,
@@ -130,6 +130,13 @@ class ScoreGeometryTests(unittest.TestCase):
             "private_actor_discard_trace"][0]["model_margin"]+=0.02
         raw["sha256_case"]=_paired_digest(raw["private_case"])
         path.write_text(json.dumps(raw),encoding="utf8")
+        # Reconcile the redundant public counts too, so the exact
+        # original-weight margin verification independently rejects the edit.
+        saved=_read_saved(self.eval,2,91300,self.meta["model_sha256"])
+        safe_path=self.eval/"safe_actor_decision_diagnostics.json"
+        safe=json.loads(safe_path.read_text(encoding="utf8"))
+        safe.update(_aggregate([saved[0],saved[1]]))
+        safe_path.write_text(json.dumps(safe),encoding="utf8")
         with self.assertRaisesRegex(ValueError,"margin does not match"):
             self._audit()
         self.assertFalse(self.report.exists())
