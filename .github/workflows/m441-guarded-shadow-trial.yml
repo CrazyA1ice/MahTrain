@@ -1,0 +1,34 @@
+name: M4.41 guarded nine-game frozen shadow comparison
+on:
+  pull_request:
+    paths:
+      - 'src/mahtrain_core/ai_shadow_headtohead.py'
+      - 'src/mahtrain_core/ai_shadow_guarded_trial.py'
+      - 'examples/run_local_guarded_shadow_trial.py'
+      - 'tests/test_m441_guarded_shadow_trial.py'
+      - '.github/workflows/m441-guarded-shadow-trial.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/mahtrain_core/ai_shadow_guarded_trial.py'
+permissions:
+  contents: read
+jobs:
+  authentic-independent-seed-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: Historical seed isolation, freeze, guard veto and 9 game checkpoints
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m441_guarded_shadow_trial.py' -v
+      - name: Compile new trial CLI and analysis
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_shadow_headtohead.py src/mahtrain_core/ai_shadow_guarded_trial.py examples/run_local_guarded_shadow_trial.py
+      - name: CLI usage
+        run: python examples/run_local_guarded_shadow_trial.py --help
