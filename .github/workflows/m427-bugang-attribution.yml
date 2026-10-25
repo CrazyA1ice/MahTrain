@@ -1,0 +1,106 @@
+name: M4.27 exact same-view delayed-bugang policy attribution
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_delayed_bugang_attribution.py"
+      - "examples/audit_delayed_bugang_attribution.py"
+      - "tests/test_m427_delayed_bugang_attribution.py"
+      - "docs/MATCH_M427_BUGANG_POLICY_ATTRIBUTION_V1.37.md"
+      - ".github/workflows/m427-bugang-attribution.yml"
+permissions:
+  contents: read
+jobs:
+  precise-attribution-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Exact 75 percent gate / strict guard attribution regression
+        run: |
+          python -m unittest discover -s tests -p 'test_m427_delayed_bugang_attribution.py' -v
+          python -m unittest discover -s tests -p 'test_m426_bugang_targeted.py' -v
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: precise-attribution-unit
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["set_a", "set_b", "set_c", "set_d"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Re-evaluate own authorized view on real 108-tile checkpoint
+        run: |
+          python examples/audit_delayed_bugang_attribution.py \
+            --shard "${{ matrix.shard }}" \
+            --out "m427-${{ matrix.shard }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m427-${{ matrix.shard }}
+          path: m427-${{ matrix.shard }}.json
+          if-no-files-found: error
+  audited-decision-reasons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: shard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m427-*
+          merge-multiple: true
+          path: m427-results
+      - name: Audit exact four-shard scope and guard causality
+        run: |
+          python examples/audit_delayed_bugang_attribution.py \
+            --combine --input-dir m427-results \
+            --out m427-audited-summary.json
+      - name: Publish interpretable evidence, not fabricated EV
+        run: |
+          python - <<'PY'
+          import json,os
+          x=json.load(open("m427-audited-summary.json",encoding="utf8"))
+          assert x["total_constructed_checkpoints"]==24
+          assert x["independent_natural_shuffle_seeds"]==0
+          assert x["completed_natural_games"]==0
+          assert x["policy_changed"] is False
+          assert x["no_ev_conclusion"] is True
+          parts=[
+              "## M4.27: same-view challenged cashless bu-gang explanation",
+              "- Replayed **24 physically legal constructed** checkpoints.",
+              f"- Changed actions on an identical authorized view: "
+                f"**{x['same_view_policy_disagreement_count']} / 24**.",
+              f"- Target choices excluded solely by the strict guard: "
+                f"**{x['strict_guard_rejected_target_count']} / 24**.",
+              "- **Breakdown (counts of constructed scenarios, not observed natural frequency)**:"
+          ]
+          parts.extend(
+              f"  - {reason}: {count}"
+              for reason,count in x["guard_reason_counts"].items()
+              if count
+          )
+          parts+=["- **No live AI parameter change, no EV or win-rate claim.**"]
+          summary="\n".join(parts)+"\n"
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(summary)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m427-verified-decision-reasons
+          path: m427-audited-summary.json
+          if-no-files-found: error
