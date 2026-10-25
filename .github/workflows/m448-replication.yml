@@ -1,0 +1,19 @@
+name: M4.48 Independent Pass/Peng Replication
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  m448-contract:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m448_pong_pass_replication.py' -v
+      - run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_pong_pass_replication.py src/mahtrain_core/ai_pong_pass_replication_run.py examples/run_pong_pass_replication.py
+      - run: python examples/run_pong_pass_replication.py --help
