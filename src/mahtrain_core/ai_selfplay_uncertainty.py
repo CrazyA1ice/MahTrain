@@ -199,7 +199,10 @@ def _update_counts(counters: dict[str,Any],cases: list[dict[str,Any]]) -> None:
 
 
 def _validate_plan(output: Path) -> BatchPlan:
-    manifest=_get_json(output/"PRIVATE_plan.json")
+    path=output/"PRIVATE_plan.json"
+    if not path.is_file():
+        raise ValueError("missing private batch manifest; no guessing or reruns")
+    manifest=_get_json(path)
     raw=manifest.get("private_reproduction_plan")
     if type(raw) is not dict:
         raise ValueError("missing sealed original M4.34 plan")
