@@ -54,8 +54,9 @@ def main()->None:
     output=args.out.resolve()
     sources=[getattr(args,label).resolve()
              for label in ("m447","m448","m449","m450")]
-    if output in sources or any(source==output.parent for source in sources):
+    if output in sources:
         raise ValueError("M4.51 must not overwrite a source SAFE study report")
+    output.parent.mkdir(parents=True,exist_ok=True)
     _write_atomic(output,report)
     print(json.dumps({
         "protocol":report["protocol"],
