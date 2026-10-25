@@ -163,7 +163,7 @@ class FrozenDecisionDiagnosticsTests(unittest.TestCase):
             self._run(seed_start=91101)
         with self.assertRaisesRegex(ValueError,"overlaps training"):
             self._run(seed_start=89801)
-        with self.assertRaisesRegex(ValueError,"new diagnostic output"):
+        with self.assertRaisesRegex(ValueError,"invalid bounded"):
             self._run(seeds=0)
 
     def test_wrong_frozen_weights_manifest_or_resume_is_rejected(self):
