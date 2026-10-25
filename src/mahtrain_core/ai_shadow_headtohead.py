@@ -131,6 +131,7 @@ class FrozenShadowAgent:
         self.override_count=0
         if type(capture_diagnostics) is not bool:
             raise ValueError("capture_diagnostics must be boolean")
+        self.capture_diagnostics=capture_diagnostics
         if type(minimum_ukeire_guard) is not bool:
             raise ValueError("minimum_ukeire_guard must be boolean")
         self.minimum_ukeire_guard=minimum_ukeire_guard
