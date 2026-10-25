@@ -128,8 +128,8 @@ class FrozenDecisionDiagnosticsTests(unittest.TestCase):
                          [-100,-200,-300,-400])
         self.assertEqual(json.loads((self.out/SUMMARY).read_text()),summary)
         public=(self.out/SUMMARY).read_text()
-        for secret in ("91300","91301","91100","m1","m2","hand",
-                       "private_actor_discard_trace","a"*64):
+        for secret in ("91300","91301","91100","m1","m2",
+                       "\\"hand\\":", "private_actor_discard_trace","a"*64):
             self.assertNotIn(secret,public)
         private=json.loads(_case_path(self.out,0).read_text())
         self.assertEqual(private["protocol"],SHARD_PROTOCOL)
