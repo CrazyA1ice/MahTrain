@@ -132,3 +132,148 @@ def _study(name:str,row:Mapping[str,Any])->dict[str,Any]:
     }
 
 
+def _wall_phase(row:Mapping[str,Any],name:str)->dict[str,Any]:
+    if name=="m449":
+        source=_value(row,"pre_action_actor_only_strata",dict)
+        phases=_value(source,"public_wall_segment",dict)
+        mean_key="mean_peng_minus_pass_points_exploratory"
+        size_key="independent_original_shuffles"
+    else:
+        phases=_value(row,"precommitted_public_wall_phase_groups",dict)
+        mean_key="mean_net_peng_minus_pass_points"
+        size_key="independent_original_shuffle_clusters"
+    result={}
+    for name in ("early","middle","late"):
+        phase=_value(phases,name,dict)
+        count=_value(phase,size_key,int)
+        if count<0:
+            raise ValueError("invalid previous wall phase cluster count")
+        value=phase.get(mean_key)
+        if value is None:
+            if count>=8:
+                raise ValueError("missing phase result for adequately covered group")
+            result[name]={"independent_original_shuffles":count,"mean_points":None}
+        else:
+            result[name]={
+                "independent_original_shuffles":count,
+                "mean_points":round(_number(phase,mean_key),5),
+            }
+    return result
+
+
+def audit_safe_reports(reports:Mapping[str,Mapping[str,Any]])->dict[str,Any]:
+    if type(reports) is not dict or set(reports)!=set(SOURCES):
+        raise ValueError("M4.51 requires all four authentic SAFE reports")
+    for label,field in (
+        ("m447","new_candidate_policy_not_fitted_or_promoted"),
+        ("m448","online_challenge_ai_unchanged"),
+        ("m449","original_challenge_agent_unchanged"),
+        ("m450","no_training_no_threshold_selection_no_online_challenge_change"),
+    ):
+        if reports[label].get(field) is not True:
+            raise ValueError("cannot verify unchanged Challenge in "+label)
+    for label,field in (
+        ("m447","same_original_shuffle_future_worlds_not_independent"),
+        ("m448","same_shuffle_two_future_worlds_not_independent"),
+        ("m449","two_worlds_not_independent_original_shuffles"),
+        ("m450","future_wall_worlds_are_correlated_within_original_shuffle"),
+    ):
+        if reports[label].get(field) is not True:
+            raise ValueError("missing same-original-shuffle dependence warning: "+label)
+    studies={name:_study(name,reports[name]) for name in SOURCES}
+    phases449=_wall_phase(reports["m449"],"m449")
+    phases450=_wall_phase(reports["m450"],"m450")
+    confirmed=_value(reports["m450"],"comparison_status",str)
+    comparison=_number(reports["m450"],"middle_minus_early_mean_net_points") if (
+        confirmed=="exploratory_independent_replication_complete"
+    ) else None
+    interval=reports["m450"].get(
+        "cluster_bootstrap_middle_minus_early_95_percentile_interval"
+    )
+    supported=reports["m450"].get(
+        "direction_supported_in_new_independent_shuffles"
+    )
+    if confirmed=="exploratory_independent_replication_complete":
+        if (type(interval) is not list or len(interval)!=2 or
+            any(type(x) not in (int,float) or not isfinite(x) for x in interval) or
+            type(supported) is not bool or
+            interval[0]>interval[1] or
+            supported!=(interval[0]>0)):
+            raise ValueError("invalid M4.50 predeclared bootstrap comparison")
+        if (phases450["middle"]["mean_points"] is None or
+            phases450["early"]["mean_points"] is None or
+            phases450["middle"]["independent_original_shuffles"]<8 or
+            phases450["early"]["independent_original_shuffles"]<8 or
+            abs(comparison-(phases450["middle"]["mean_points"]-
+                            phases450["early"]["mean_points"]))>0.00007):
+            raise ValueError("M4.50 wall-phase official-net contrast does not reconcile")
+    elif confirmed=="insufficient_group_support":
+        if (comparison is not None or interval is not None or supported is not None or
+            (phases450["middle"]["independent_original_shuffles"]>=8 and
+             phases450["early"]["independent_original_shuffles"]>=8)):
+            raise ValueError("M4.50 falsely reports incomplete evidence")
+    else:
+        raise ValueError("unsupported final M4.50 comparison status")
+    if (sum(phases449[x]["independent_original_shuffles"] for x in
+            ("early","middle","late"))!=studies["m449"]["first_eligible_pass_peng_shuffles"] or
+        sum(phases450[x]["independent_original_shuffles"] for x in
+            ("early","middle","late"))!=studies["m450"]["first_eligible_pass_peng_shuffles"]):
+        raise ValueError("wall-phase categories do not cover eligible first decisions")
+    means=[studies[k]["conditional_peng_minus_pass_mean_points"]
+           for k in SOURCES]
+    flips=sum((a>0)!=(b>0) for a,b in zip(means,means[1:])
+              if a!=0 and b!=0)
+    return {
+        "protocol":PROTOCOL,
+        "source_protocols_verified":list(SOURCES.values()),
+        "studies_in_natural_chronological_order":studies,
+        "mean_effect_sign_reversals_between_consecutive_studies":flips,
+        "actor_only_wall_phase": {
+            "m449_exploratory":phases449,
+            "m450_fresh_independent_validation":phases450,
+        },
+        "m450_predeclared_middle_minus_early_points":(
+            round(comparison,5) if comparison is not None else None
+        ),
+        "m450_predeclared_direction_supported":supported,
+        "m450_exploratory_interval":interval,
+        "m449_midwall_claim_not_independently_supported":
+            confirmed=="exploratory_independent_replication_complete"
+            and supported is False,
+        "formal_candidate_full_game_ab_evaluation_provided":False,
+        "recommendation":"HOLD_CURRENT_CHALLENGE_POLICY_NO_PROMOTION",
+        "next_research_method":"PREDECLARE_FULL_GAME_POLICY_VS_POLICY_HEAD_TO_HEAD_WITH_UNSEEN_SHUFFLE_CLUSTERS",
+        "all_past_conditional_rollout_outcomes_excluded_from_training":True,
+        "previous_report_counts_reconciled_not_private_seed_provenance_reverified":True,
+        "no_statistical_independence_claim_for_wall_worlds_or_seat_rotations":True,
+        "no_causal_population_ev_or_pong_always_bad_claim":True,
+        "no_original_seed_cards_hidden_wall_or_private_plan_paths_exported":True,
+    }
+
+
+def _no_duplicate_keys(pairs:list[tuple[str,Any]])->dict[str,Any]:
+    obj={}
+    for k,value in pairs:
+        if k in obj:
+            raise ValueError("duplicate field in SAFE evidence JSON: "+k)
+        obj[k]=value
+    return obj
+
+
+def load_safe_json(path:Path)->dict[str,Any]:
+    path=Path(path)
+    if path.stat().st_size>250_000:
+        raise ValueError("SAFE evidence JSON exceeds aggregate-only size limit")
+    text=path.read_text(encoding="utf8")
+    for token in NO_PRIVATE:
+        if token in text:
+            raise ValueError("unsafe private data marker in nominal SAFE report")
+    data=json.loads(
+        text,object_pairs_hook=_no_duplicate_keys,
+        parse_constant=lambda _: (_ for _ in ()).throw(
+            ValueError("nonfinite SAFE JSON number")
+        ),
+    )
+    if type(data) is not dict:
+        raise ValueError("SAFE study must be a JSON object")
+    return data
