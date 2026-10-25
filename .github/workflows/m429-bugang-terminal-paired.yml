@@ -1,0 +1,120 @@
+name: M4.29 frozen cashless bu-gang full-game conditional paired study
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_delayed_bugang_terminal_paired.py"
+      - "examples/audit_delayed_bugang_terminal_paired.py"
+      - "tests/test_m429_bugang_terminal_paired.py"
+      - "docs/MATCH_M429_BUGANG_CONDITIONAL_TERMINAL_V1.39.md"
+      - ".github/workflows/m429-bugang-terminal-paired.yml"
+permissions:
+  contents: read
+jobs:
+  strict-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Paired terminal official score, real legal cashless intervention, privacy regression
+        run: |
+          python -m unittest discover -s tests -p 'test_m429_bugang_terminal_paired.py' -v
+          python -m unittest discover -s tests -p 'test_m428_bugang_risk_envelope.py' -v
+          python -m unittest discover -s tests -p 'test_m423_bugang_draw_turn_cash.py' -v
+  full-physical-case:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: strict-test
+    strategy:
+      fail-fast: false
+      matrix:
+        case_shard: ["case_10", "case_12", "case_18", "case_20", "case_22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 3 frozen hidden-wall replicas by 2 counterfactual real full-game branches
+        run: |
+          python examples/audit_delayed_bugang_terminal_paired.py \
+            --shard "${{ matrix.case_shard }}" \
+            --out "m429-${{ matrix.case_shard }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m429-${{ matrix.case_shard }}
+          path: m429-${{ matrix.case_shard }}.json
+          if-no-files-found: error
+  audited-official-components:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: full-physical-case
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: m429-*
+          path: m429-results
+          merge-multiple: true
+      - name: Require five case IDs and 3 real terminal paired trials each
+        run: |
+          python examples/audit_delayed_bugang_terminal_paired.py \
+            --combine --input-dir m429-results \
+            --out m429-audited-conditional-terminal.json
+      - name: Publish all actual official score components and limitations
+        run: |
+          python - <<'PY'
+          import json,os
+          a=json.load(open("m429-audited-conditional-terminal.json",encoding="utf8"))
+          assert a["selected_conditional_case_clusters"]==5
+          assert a["paired_conditional_worlds"]==15
+          assert a["complete_terminal_games"]==30
+          assert a["independent_natural_shuffle_seeds"]==0
+          assert a["online_policy_changed"] is False
+          assert a["natural_game_EV_estimate"] is None
+          d=a["weighted_difference_means_for_constructed_cases"]
+          assert abs(d["official_net"]-(d["win_points"]+
+              d["kong_points"]+d["exhaustive_points"]))<1e-4
+          lines=[
+              "## M4.29 forced cashless bu-gang vs normal cut, actual terminal ledger",
+              "- **5 previously selected constructed checkpoints**, "
+                "3 prespecified future-wall replicas each; 2 full games per world = 30.",
+              f"- Mean paired **official net delta** (forced bu-gang minus hold): "
+                f"**{d['official_net']}** experimental scoring units.",
+              f"- Hu component: {d['win_points']}; kong money: "
+                f"{d['kong_points']}; exhaustive: {d['exhaustive_points']}.",
+              f"- Constructed paired worlds with positive/negative/tied deltas: "
+                f"{a['positive_conditional_world_deltas']}/"
+                f"{a['negative_conditional_world_deltas']}/"
+                f"{a['tied_conditional_world_deltas']}.",
+              "- Per-case conditional means:"
+          ]
+          for row in a["per_case"]:
+              lines.append(
+                  f"  - Case {row['case_id']}: "
+                  f"{row['mean_three_conditional_world_net_difference']}, "
+                  f"per-wall differences "
+                  f"{row['conditional_world_net_differences']}."
+              )
+          lines+=["- **These are NOT 15 independent natural shuffles or "
+                  "a generalizable expected-score advantage.**",
+                  "- Intervention changes who draws which wall tile later. "
+                  "No live AI change or automatic threshold promotion."]
+          s="\n".join(lines)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m429-verified-real-terminal-score-ledger
+          path: m429-audited-conditional-terminal.json
+          if-no-files-found: error
