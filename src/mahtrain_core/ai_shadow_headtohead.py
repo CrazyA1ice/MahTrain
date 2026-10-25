@@ -285,10 +285,115 @@ def evaluate_one_seed(seed:int,
     }
 
 
+
+# M4.37: interruption-safe immutable per-original-shuffle result shards.
+# The SHA below catches accidental truncation and inconsistent edits; it is
+# NOT a cryptographic signature against an adversary who controls this folder.
+SHARD_PROTOCOL="m437_frozen_shadow_resumable_seed_v1"
+SHARD_DIR="PRIVATE_eval_seed_clusters"
+
+
+def _paired_digest(case:dict[str,Any]) -> str:
+    raw=json.dumps(case,sort_keys=True,separators=(",",":"),
+                   ensure_ascii=False,allow_nan=False)
+    return sha256(raw.encode("utf8")).hexdigest()
+
+
+def _audit_paired_case(case:dict[str,Any],seed:int) -> None:
+    """Reject a partial, wrong-seed or non-reconciled finished comparison."""
+    if (type(case) is not dict or
+            type(case.get("private_evaluation_shuffle_seed")) is not int or
+            case["private_evaluation_shuffle_seed"]!=seed or
+            case.get("complete_authoritative_games")!=5 or
+            case.get("original_natural_shuffle_seed_is_one_statistical_cluster") is not True or
+            case.get("same_opening_seed_per_comparison") is not True or
+            case.get("no_real_skill_claim") is not True):
+        raise ValueError("incomplete or mismatched paired shuffle result")
+    rows=case.get("seat_rotation_results")
+    if type(rows) is not list or len(rows)!=4:
+        raise ValueError("paired result must contain all four rotated seats")
+    for seat,row in enumerate(rows):
+        if type(row) is not dict or type(row.get("seat")) is not int or row["seat"]!=seat:
+            raise ValueError("wrong or repeated paired evaluation seat")
+        names=("challenge_baseline_official_net","shadow_official_net",
+               "delta_shadow_minus_challenge","shadow_discard_decisions",
+               "shadow_override_count","real_win_delta","real_kong_delta",
+               "real_exhaustive_delta")
+        if any(type(row.get(k)) is not int for k in names):
+            raise ValueError("invalid true official comparison ledger fields")
+        if (row["shadow_discard_decisions"]<0 or
+                not 0<=row["shadow_override_count"]<=row["shadow_discard_decisions"] or
+                row["shadow_official_net"]-row["challenge_baseline_official_net"]!=
+                    row["delta_shadow_minus_challenge"] or
+                row["delta_shadow_minus_challenge"]!=
+                    sum(row[k] for k in ("real_win_delta","real_kong_delta",
+                                         "real_exhaustive_delta")) or
+                row.get("challenge_baseline_game_phase") not in ("finished","wall_exhausted") or
+                row.get("shadow_game_phase") not in ("finished","wall_exhausted")):
+            raise ValueError("unbalanced, unfinished or impossible saved paired game")
+        if row["shadow_override_count"]==0 and row["delta_shadow_minus_challenge"]!=0:
+            raise ValueError("unchanged candidate must exactly match live baseline")
+
+
+def _cluster_path(output:Path,index:int) -> Path:
+    return output/SHARD_DIR/f"index-{index:08d}.json"
+
+
+def _resume_cases(output:Path,seeds:int,seed_start:int,
+                  model_hash:str) -> dict[int,dict[str,Any]]:
+    """Read every completed shard BEFORE launching any new CPU-heavy game."""
+    folder=output/SHARD_DIR
+    if not folder.exists():
+        return {}
+    if not folder.is_dir():
+        raise ValueError("private resume shard path is not a directory")
+    loaded={}
+    for path in folder.iterdir():
+        # A crash can leave an incomplete atomic temp. Never load it.
+        if ".tmp-" in path.name and path.is_file():
+            continue
+        if (not path.is_file() or len(path.name)!=19 or
+                not path.name.startswith("index-") or
+                not path.name.endswith(".json") or
+                not path.name[6:14].isdigit()):
+            raise ValueError("unexpected file in private resume cluster folder")
+        index=int(path.name[6:14])
+        if not 0<=index<seeds or index in loaded:
+            raise ValueError("out-of-plan or duplicate evaluation seed shard")
+        envelope=_get_json(path)
+        if (set(envelope)!={"protocol","index","model_sha256",
+                            "sha256_paired_seed","private_case"} or
+                envelope["protocol"]!=SHARD_PROTOCOL or
+                type(envelope["index"]) is not int or envelope["index"]!=index or
+                envelope["model_sha256"]!=model_hash or
+                type(envelope["private_case"]) is not dict):
+            raise ValueError("resume shard comes from another benchmark plan/model")
+        case=envelope["private_case"]
+        _audit_paired_case(case,seed_start+index)
+        if envelope["sha256_paired_seed"]!=_paired_digest(case):
+            raise ValueError("private paired seed shard checksum mismatch")
+        loaded[index]=case
+    return loaded
+
+
+def _save_cluster(output:Path,index:int,case:dict[str,Any],
+                  model_hash:str) -> None:
+    _audit_paired_case(case,case["private_evaluation_shuffle_seed"])
+    _write_atomic(_cluster_path(output,index),{
+        "protocol":SHARD_PROTOCOL,
+        "index":index,
+        "model_sha256":model_hash,
+        "sha256_paired_seed":_paired_digest(case),
+        "private_case":case,
+    })
+
+
 def evaluate_frozen_shadow(
     *,training_dir:Path,seed_start:int,seeds:int,
-    out_dir:Path
+    out_dir:Path,resume:bool=False
 ) -> dict[str,Any]:
+    if type(resume) is not bool:
+        raise ValueError("resume must be a boolean")
     if (type(seed_start) is not int or type(seeds) is not int or
             not 0<=seed_start<2**32 or
             not 1<=seeds<=MAX_EVAL_SEEDS or
@@ -303,11 +408,16 @@ def evaluate_frozen_shadow(
     prior_end=provenance["source_m434_seed_end_exclusive"]
     if not (seed_start+seeds<=prior_start or seed_start>=prior_end):
         raise ValueError("evaluation shuffles overlap original TRAIN or holdout")
-    if output.exists() and any(output.iterdir()):
+    if not resume and output.exists() and any(output.iterdir()):
         raise ValueError("evaluation output must be new/empty: no silent overwrite")
-    output.mkdir(parents=True,exist_ok=True)
+    if resume and (not output.is_dir() or not
+                   (output/"PRIVATE_frozen_benchmark_plan.json").is_file()):
+        raise ValueError("resume requires an existing M4.37 private benchmark plan")
+    if not resume:
+        output.mkdir(parents=True,exist_ok=True)
     source={
         "protocol":PROTOCOL,
+        "resumable_shards_protocol":SHARD_PROTOCOL,
         "private_source_training_directory":str(training),
         "private_frozen_model_sha256":provenance["model_sha256"],
         "private_evaluation_seed_start":seed_start,
@@ -315,14 +425,41 @@ def evaluate_frozen_shadow(
         "training_from_original_only":True,
         "online_policy_unchanged":True,
     }
-    _write_atomic(output/"PRIVATE_frozen_benchmark_plan.json",source)
+    plan_path=output/"PRIVATE_frozen_benchmark_plan.json"
+    if resume:
+        if _get_json(plan_path)!=source:
+            raise ValueError("resume plan differs: model, seeds or training folder changed")
+        allowed={plan_path.name,SHARD_DIR,
+                 "PRIVATE_four_seat_paired_matches.jsonl.gz",
+                 "safe_four_seat_shadow_summary.json"}
+        if any(p.name not in allowed and ".tmp-" not in p.name
+               for p in output.iterdir()):
+            raise ValueError("unexpected files in evaluation resume directory")
+        completed=_resume_cases(
+            output,seeds,seed_start,provenance["model_sha256"]
+        )
+        # Final reports mean a previous run had reached the aggregation
+        # phase. Missing saved clusters in that state are corruption, not
+        # unfinished work: never silently recompute/overwrite past outcomes.
+        has_final=(output/"PRIVATE_four_seat_paired_matches.jsonl.gz").exists() or (
+            output/"safe_four_seat_shadow_summary.json").exists()
+        if has_final and len(completed)!=seeds:
+            raise ValueError("final report present but complete seed shards missing")
+    else:
+        _write_atomic(plan_path,source)
+        completed={}
+    (output/SHARD_DIR).mkdir(exist_ok=True)
     values=[]
     wins=[0]*4
     deltas_by_seat=[[] for _ in range(4)]
     overrides=0
     considered=0
     for offset in range(seeds):
-        game=evaluate_one_seed(seed_start+offset,weights)
+        game=completed.get(offset)
+        if game is None:
+            game=evaluate_one_seed(seed_start+offset,weights)
+            _audit_paired_case(game,seed_start+offset)
+            _save_cluster(output,offset,game,provenance["model_sha256"])
         values.append(game)
         for row in game["seat_rotation_results"]:
             seat=row["seat"]
@@ -345,6 +482,9 @@ def evaluate_frozen_shadow(
         "seat_rotations_per_original_seed":4,
         "baseline_games":seeds,
         "experimental_shadow_games":4*seeds,
+        "interruption_safe_completed_seed_shards":seeds,
+        "reused_prior_completed_seed_shards":len(completed),
+        "partial_or_corrupt_shards_never_trusted":True,
         "official_score_ledger_reconciled":True,
         "candidate_discard_opportunities":considered,
         "candidate_legal_minimum_shanten_overrides":overrides,

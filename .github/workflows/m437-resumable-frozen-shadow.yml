@@ -1,0 +1,39 @@
+name: M4.37 resumable frozen shadow benchmark regression
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_shadow_headtohead.py"
+      - "examples/run_local_shadow_headtohead.py"
+      - "tests/test_m437_resumable_shadow_benchmark.py"
+      - "docs/MATCH_M437_RESUMABLE_SHADOW_FIVE_GAME_CLUSTERS_V1.47.md"
+      - ".github/workflows/m437-resumable-frozen-shadow.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src/mahtrain_core/ai_shadow_headtohead.py"
+      - "examples/run_local_shadow_headtohead.py"
+      - "tests/test_m437_resumable_shadow_benchmark.py"
+permissions:
+  contents: read
+jobs:
+  crash-resume-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Crash simulation / all four seats / locked evaluation plan
+        run: |
+          python -W error::SyntaxWarning -m unittest discover \
+            -s tests -p "test_m437_resumable_shadow_benchmark.py" -v
+      - name: Compile changed Python and CLI
+        run: |
+          python -W error::SyntaxWarning -m py_compile \
+            src/mahtrain_core/ai_shadow_headtohead.py \
+            examples/run_local_shadow_headtohead.py \
+            tests/test_m437_resumable_shadow_benchmark.py
+      - name: Make sure resume is a deliberate opt-in
+        run: |
+          python examples/run_local_shadow_headtohead.py --help | grep -F -- "--resume"
