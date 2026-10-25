@@ -304,6 +304,26 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
                 if sample["accepted_overrides"]==0:
                     self.assertEqual(sample["official_net_delta"],0)
 
+    def test_m444_real_call_frontier_census_preserves_challenge_outcome(self):
+        from mahtrain_core.ai_challenge_call_frontier import (
+            play_challenge_call_frontier_seed, _validate_case, _summary,
+        )
+        seed=90353
+        observed=play_challenge_call_frontier_seed(seed)
+        baseline=_finish_real_full_game(seed,None,None)
+        self.assertEqual(observed["official_net_by_seat"],
+                         baseline["official_net_by_seat"])
+        self.assertEqual(observed["terminal_phase"],baseline["phase"])
+        _validate_case(observed,seed)
+        public=_summary([observed])
+        self.assertEqual(public["real_finished_four_player_challenge_games"],1)
+        self.assertEqual(public["independent_original_shuffle_clusters"],1)
+        self.assertTrue(public["unchanged_challenge_policy"])
+        self.assertEqual(public["counts"]["own_self_win_opportunities"]+
+                         public["counts"]["own_kong_checks"],
+                         public["counts"]["own_discard_stage_visits"])
+        self.assertNotIn(str(seed),json.dumps(public))
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
