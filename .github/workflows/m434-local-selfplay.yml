@@ -1,0 +1,114 @@
+name: M4.34 local Windows-safe parallel self-play and strict resume
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_selfplay_local_batch.py"
+      - "examples/run_local_selfplay_batch.py"
+      - "tests/test_m434_local_selfplay_batch.py"
+      - "docs/MATCH_M434_LOCAL_BATCH_TRAINING_V1.44.md"
+      - ".github/workflows/m434-local-selfplay.yml"
+permissions:
+  contents: read
+jobs:
+  live-game-unit-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Real natural games; resume replay shards and privacy/mutation defenses
+        run: |
+          python -m unittest discover -s tests -p 'test_m434_local_selfplay_batch.py' -v
+  spawn-style-parallel-and-restart:
+    needs: live-game-unit-and-privacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run two independent original shuffles on two CPU workers
+        run: |
+          python examples/run_local_selfplay_batch.py \
+            --seed-start 89840 --train-seeds 1 --holdout-seeds 1 \
+            --max-checkpoints 1 --workers 2 \
+            --out-dir data/selfplay/m434-ci
+      - name: Resume identical batch, no duplicate seed games
+        run: |
+          python examples/run_local_selfplay_batch.py \
+            --seed-start 89840 --train-seeds 1 --holdout-seeds 1 \
+            --max-checkpoints 1 --workers 2 --resume \
+            --out-dir data/selfplay/m434-ci
+      - name: Audit true official ending, counts, frozen model and private isolation
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib,sys
+          sys.path.insert(0,"src")
+          from mahtrain_core.ai_selfplay_local_batch import BatchPlan, _audit_record, _get_json, _shard, PROTOCOL
+          from mahtrain_core.ai_selfplay_learning import _assert_public
+          out=pathlib.Path("data/selfplay/m434-ci")
+          summary=_get_json(out/"safe_aggregate_summary.json")
+          plan=BatchPlan(89840,1,1,1)
+          records=[_get_json(_shard(out,i)) for i in range(2)]
+          audits=[_audit_record(records[i],plan,i) for i in range(2)]
+          assert summary["protocol"]==PROTOCOL
+          assert summary["natural_full_games"]==2
+          assert summary["natural_original_seed_clusters"]==2
+          assert summary["train_independent_seed_clusters"]==1
+          assert summary["holdout_independent_seed_clusters"]==1
+          assert summary["terminal_paired_branch_games"]==sum(a["terminal_counterfactual_games"] for a in audits)
+          assert summary["total_true_completed_games"]==2+summary["terminal_paired_branch_games"]
+          assert summary["paired_world_delta_count"]==summary["natural_legal_decision_points"]
+          assert summary["online_policy_promoted"] is False
+          assert summary["proof_of_increased_ai_strength"] is False
+          model=_get_json(out/"PRIVATE_offline_model.json")
+          assert model["online_promotion_allowed"] is False
+          for r in records: _assert_public(r["public"])
+          public=[json.loads(x) for x in gzip.open(out/"public_four_challenge_replays.jsonl.gz","rt",encoding="utf8")]
+          train=[json.loads(x) for x in gzip.open(out/"PRIVATE_actor_train.jsonl.gz","rt",encoding="utf8")]
+          held=[json.loads(x) for x in gzip.open(out/"PRIVATE_actor_holdout.jsonl.gz","rt",encoding="utf8")]
+          assert len(public)==2 and len(train)==len(held)==1
+          assert [g["game_id"] for g in public]==["game-00000000","game-00000001"]
+          safe=(out/"safe_aggregate_summary.json").read_text(encoding="utf8")
+          for term in ("89840","89841","actor_observation","private_shuffle_seed","public_frames"):
+              assert term not in safe,term
+          assert (out/"PRIVATE_plan.json").is_file()
+          print("PASS genuine four-AI terminal payouts; 2 original shuffles; Windows-spawn-safe process pool; resumable and redacted")
+          PY
+      - name: Report public aggregate ONLY, no actor hand or secret shuffle plan
+        run: |
+          python - <<'PY'
+          import json,os
+          from pathlib import Path
+          a=json.loads(Path("data/selfplay/m434-ci/safe_aggregate_summary.json").read_text(encoding="utf8"))
+          lines=[
+              "## M4.34 real CPU-parallel local batch, crash-safe seed shards",
+              f"- Independent original shuffles: {a['natural_original_seed_clusters']}",
+              f"- Natural terminal games: {a['natural_full_games']}",
+              f"- Real conditioned terminal action branch games: {a['terminal_paired_branch_games']}",
+              f"- Total complete official games: {a['total_true_completed_games']}",
+              f"- Legal natural decision points: {a['natural_legal_decision_points']}",
+              f"- Strict two-wall consensus labels: {a['training_consensus_labels']} training, {a['holdout_consensus_labels']} holdout",
+              f"- Two-wall mixed or tied conditional rewards: {a['two_wall_mixed_or_tied_points']}",
+              f"- Heldout scored direction comparisons: {a['holdout_scored_directions']}",
+              f"- Population variance claim prohibited: {not a['uncertainty_estimate_valid_for_population']}",
+              "- Private original shuffle IDs, own concealed hands and true physical worlds NOT uploaded.",
+              "- No online policy promotion or claim of strength increase.",
+          ]
+          s="\n".join(lines)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m434-only-safe-aggregate-no-private-shards
+          path: data/selfplay/m434-ci/safe_aggregate_summary.json
+          if-no-files-found: error
