@@ -61,7 +61,7 @@ def _reference_root_score(target: str, fan_cap: int) -> dict[str, Any]:
     }
 
 
-def _rob_witness(g: FourPlayerOpening, target: str) -> list[str]:
+def _rob_witness(g: FourPlayerOpening, target: str) -> list[str] | None:
     """Build a legal 13-tile robbing hand from the actually unseen tile pool.
 
     Research-only. The actor view cannot distinguish this completed witness
@@ -102,16 +102,20 @@ def _rob_witness(g: FourPlayerOpening, target: str) -> list[str]:
         witness=[*wait,*meld_tiles,pair,pair]
         if len(witness)==13 and is_legal_win([*witness,target],[],"p"):
             return witness
-    raise RuntimeError("registered case has no physical alternative rob witness")
+    # Not finding this PARTICULAR witness shape does not prove that no
+    # possible opponent hand could rob. Never invent unavailable tiles.
+    return None
 
 
 def _replace_opponents_without_public_change(
     g: FourPlayerOpening, target: str,
-) -> FourPlayerOpening:
-    """Swap ONLY unknown hands and wall for an adversarial rob-legal world."""
+) -> FourPlayerOpening | None:
+    """Swap ONLY unknown hands and wall for a physically valid robber witness."""
     counterfactual=deepcopy(g)
     prior=g.private_view(0)
     witness=_rob_witness(counterfactual,target)
+    if witness is None:
+        return None
     pool=Counter(counterfactual._wall)
     for seat in (1,2,3):
         pool.update(counterfactual._hands[seat])
@@ -200,9 +204,10 @@ def evaluate_case(case_id: int) -> dict[str, Any]:
     before=g.private_view(0)
     safe=_resolve(deepcopy(g),rob=False)
     risk_world=_replace_opponents_without_public_change(g,target)
-    if risk_world.private_view(0)!=before:
+    if risk_world is not None and risk_world.private_view(0)!=before:
         raise RuntimeError("rob counterfactual changes authorized player view")
-    robbed=_resolve(risk_world,rob=True)
+    robbed=(_resolve(risk_world,rob=True)
+            if risk_world is not None else None)
     if g.private_view(0)!=before or g.debug_tile_counts()["total"]!=108:
         raise RuntimeError("research experiment changed actual game")
     return {
@@ -214,7 +219,7 @@ def evaluate_case(case_id: int) -> dict[str, Any]:
         "tail_proxy_unknown_copies":proxy["unknown_tile_count"],
         "tail_proxy_effective_fraction":round(
             proxy["effective_tile_count"]/proxy["unknown_tile_count"],7),
-        "rob_can_be_legal_in_a_same_actor_view_hidden_world":True,
+        "constructed_same_view_rob_witness_found":risk_world is not None,
         "no_rob_branch":safe,
         "adversarial_rob_branch":robbed,
         "physical_tiles":g.debug_tile_counts()["total"],
@@ -260,7 +265,7 @@ def combine(shards: Mapping[str, Any]) -> dict[str, Any]:
                     row.get("shape_family")!=SPECS[id][1] or
                     row.get("physical_tiles")!=108 or
                     row.get("not_a_probability_or_EV_estimate") is not True or
-                    row.get("rob_can_be_legal_in_a_same_actor_view_hidden_world") is not True or
+                    type(row.get("constructed_same_view_rob_witness_found")) is not bool or
                     type(ref) is not dict or
                     any(type(ref.get(k)) is not int for k in (
                         "fan_cap","before_raw_fan","after_raw_fan",
@@ -278,17 +283,19 @@ def combine(shards: Mapping[str, Any]) -> dict[str, Any]:
                         row["tail_proxy_effective_copies"]/
                         row["tail_proxy_unknown_copies"])>1e-6 or
                     type(safe) is not dict or
-                    type(risk) is not dict or
+                    (risk is not None and type(risk) is not dict) or
+                    (row["constructed_same_view_rob_witness_found"] !=
+                        (risk is not None)) or
                     safe.get("cash_from_late_kong")!=0 or
-                    risk.get("cash_from_late_kong")!=0 or
+                    (risk is not None and risk.get("cash_from_late_kong")!=0) or
                     safe.get("kong_was_completed") is not True or
                     safe.get("tail_was_consumed") is not True or
-                    risk.get("robbed") is not True or
-                    risk.get("kong_was_completed") is not False or
-                    risk.get("tail_was_consumed") is not False or
-                    risk.get("rob_winner_count")!=1 or
-                    safe.get("physical_count")!=108 or
-                    risk.get("physical_count")!=108):
+                    (risk is not None and (risk.get("robbed") is not True or
+                       risk.get("kong_was_completed") is not False or
+                       risk.get("tail_was_consumed") is not False or
+                       risk.get("rob_winner_count")!=1 or
+                       risk.get("physical_count")!=108)) or
+                    safe.get("physical_count")!=108):
                 raise ValueError("invalid authoritative cashless/rob/tail record")
             cases.append(row)
     return {
@@ -299,7 +306,7 @@ def combine(shards: Mapping[str, Any]) -> dict[str, Any]:
             row["conditional_completed_hand_root"]["capped_multiplier_gain"]
             for row in cases)),
         "legally_robbed_hidden_world_count":sum(
-            row["adversarial_rob_branch"]["robbed"] is True for row in cases),
+            row["constructed_same_view_rob_witness_found"] for row in cases),
         "rob_probability":None,
         "future_tail_known_to_actor":False,
         "official_EV_estimate":None,
@@ -308,7 +315,8 @@ def combine(shards: Mapping[str, Any]) -> dict[str, Any]:
         "limitations":[
             "Reference completed hands are hypothetical examples, NOT projected outcomes of the actual checkpoint.",
             "Tail effective-copy fraction assumes exchangeable unseen physical copies; the genuine future wall is not exposed.",
-            "Adversarial robber is one intentionally constructed alternative hidden world with identical actor observations.",
+            "Rob witnesses use only one selected hand-shape family; no witness found is NOT proof of zero rob risk.",
+            "When a witness exists, it is a constructed alternative hidden world with identical actor observations.",
             "No observed rob probability, win rate, realized strategy EV, or long-run AI improvement is established.",
         ],
     }
