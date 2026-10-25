@@ -81,8 +81,7 @@ class M432NaturalMultiCheckpointTests(unittest.TestCase):
         public,private=run_natural_seed(89605)
         _assert_public(public)
         self.assertEqual(public["protocol"],PROTOCOL)
-        self.assertEqual(public["players"] if "players" in public else
-                         public["official_final_balances"] is not None,True)
+        self.assertEqual(public["players"],["challenge"]*4)
         self.assertEqual(public["terminal_phase"] in
                          ("finished","wall_exhausted"),True)
         self.assertEqual(sum(public["official_final_balances"]),0)
@@ -147,9 +146,7 @@ class M432NaturalMultiCheckpointTests(unittest.TestCase):
         self.assertEqual(result["total_action_labels"],0)
         self.assertIsNone(result["weights"])
         held=evaluate_unseen_seed_clusters([a],result)
-        self.assertEqual(held["natural_covered_decisions"],2 if
-                         "natural_covered_decisions" in held else
-                         held["total_natural_checkpoints"],2)
+        self.assertEqual(held["total_natural_checkpoints"],2)
         self.assertEqual(held["scored_decisions"],0)
         self.assertFalse(held["evidence_of_population_strength"])
 
