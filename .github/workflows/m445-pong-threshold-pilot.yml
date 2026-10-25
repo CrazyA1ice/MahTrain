@@ -1,0 +1,34 @@
+name: M4.45 fresh original shuffle safe peng threshold research
+on:
+  pull_request:
+    paths:
+      - 'src/mahtrain_core/ai_pong_threshold_trial.py'
+      - 'examples/run_pong_threshold_trial.py'
+      - 'tests/test_m445_pong_threshold_trial.py'
+      - 'tests/test_m436_frozen_shadow_four_seat.py'
+      - '.github/workflows/m445-pong-threshold-pilot.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/mahtrain_core/ai_pong_threshold_trial.py'
+permissions:
+  contents: read
+jobs:
+  frozen-threshold-five-game-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: Legal same-shanten +1/+2 peng, paid game shards and train isolation
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m445_pong_threshold_trial.py' -v
+      - name: Syntax check
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_pong_threshold_trial.py examples/run_pong_threshold_trial.py
+      - name: CLI help
+        run: python examples/run_pong_threshold_trial.py --help
