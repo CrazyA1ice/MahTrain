@@ -1,0 +1,106 @@
+name: M4.35 offline conditional action uncertainty from saved local data
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_selfplay_uncertainty.py"
+      - "examples/run_local_uncertainty_analysis.py"
+      - "examples/run_local_selfplay_batch.py"
+      - "tests/test_m435_local_uncertainty.py"
+      - "docs/MATCH_M435_LOCAL_CONDITIONAL_ACTION_UNCERTAINTY_V1.45.md"
+      - ".github/workflows/m435-local-uncertainty.yml"
+permissions:
+  contents: read
+jobs:
+  genuine-payout-offline-unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Test true paid games, mixed worlds retained, deterministic train/holdout
+        run: |
+          python -W error::SyntaxWarning -m unittest discover \
+            -s tests -p 'test_m435_local_uncertainty.py' -v
+  real-existing-local-dataset-reuse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: genuine-payout-offline-unit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Create only two REAL original-seed challenge matches and forked terminals
+        run: |
+          python -W error::SyntaxWarning examples/run_local_selfplay_batch.py \
+            --seed-start 89823 --train-seeds 1 --holdout-seeds 1 \
+            --workers 2 --max-checkpoints 1 \
+            --out-dir data/selfplay/m435-ci
+      - name: Analyze same stored data without running any extra games
+        run: |
+          python -W error::SyntaxWarning examples/run_local_uncertainty_analysis.py \
+            --out-dir data/selfplay/m435-ci
+      - name: Audit new all-action offline training, holdout and safe aggregate
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib,sys
+          sys.path.insert(0,"src")
+          from mahtrain_core.ai_selfplay_uncertainty import analyze_saved_local_batch
+          from mahtrain_core.ai_selfplay_local_batch import _get_json
+          out=pathlib.Path("data/selfplay/m435-ci")
+          s=_get_json(out/"safe_uncertainty_summary.json")
+          original=_get_json(out/"safe_aggregate_summary.json")
+          model=_get_json(out/"PRIVATE_uncertainty_offline_model.json")
+          assert s==analyze_saved_local_batch(out)
+          assert s["train"]["all_natural_legal_actions"]==original["training_legal_decision_points"]
+          assert s["holdout"]["all_natural_legal_actions"]==original["holdout_legal_decision_points"]
+          assert s["train_points_excluded_due_to_world_sign_disagreement"]==0
+          assert s["new_offline_train_points"]==s["train"]["all_natural_legal_actions"]
+          assert s["train"]["world_signs_conflict_or_tie"]==1
+          assert model["strict_sign_mixed_or_tied_but_retained"]==1
+          assert model["online_policy_promotion_allowed"] is False
+          assert s["original_natural_seed_clusters"]==2
+          assert s["online_ai_modified"] is False
+          assert s["population_effect_or_q_value_established"] is False
+          assert s["heldout_direction_accuracy_if_at_least_five"] is None
+          redacted=(out/"safe_uncertainty_summary.json").read_text(encoding="utf8")
+          for k in ("89823","89824","private_shuffle_seed","actor_observation","paired_conditional_deltas"):
+              assert k not in redacted,k
+          with gzip.open(out/"PRIVATE_uncertainty_holdout_diagnostics.jsonl.gz","rt",encoding="utf8") as f:
+              entries=[json.loads(x) for x in f]
+          assert len(entries)==1
+          print("M4.35 PASS: real terminal action values; conflicting walls retained; seed-cluster train only; zero private aggregate leakage")
+          PY
+      - name: Publish summary without raw training/hands/wall/shuffle seeds
+        run: |
+          python - <<'PY'
+          import json,os,pathlib
+          s=json.loads(pathlib.Path("data/selfplay/m435-ci/safe_uncertainty_summary.json").read_text(encoding="utf8"))
+          train=s["train"]
+          test=s["holdout"]
+          note="\n".join([
+              "## M4.35 authentic paired-action two-world uncertainty attenuation",
+              f"- Original shuffled train/holdout seeds: {train['independent_original_shuffle_seeds']}/{test['independent_original_shuffle_seeds']}",
+              f"- Train legal choices ALL retained: {s['new_offline_train_points']}",
+              f"- Mixed or tied two-wall train choices retained: {train['world_signs_conflict_or_tie']}",
+              f"- Heldout true natural legal actions: {test['all_natural_legal_actions']}",
+              f"- Heldout mean-direction scored / correct: {s['heldout_scored_directions']}/{s['heldout_correct_conditional_mean_directions']}",
+              f"- Heldout accuracy gate: {s['heldout_accuracy_status']}",
+              "- Opposing-world paired scores remain measured; uncertainty attenuation is heuristic, NOT a causal or population reward estimate.",
+              "- **No real policy skill proof, no deploy, no new games simulated by M4.35.**",
+          ])+"\n"
+          print(note)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(note)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m435-safe-aggregate-no-private-trained-data
+          path: data/selfplay/m435-ci/safe_uncertainty_summary.json
+          if-no-files-found: error
