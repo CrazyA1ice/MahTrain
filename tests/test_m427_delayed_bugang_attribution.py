@@ -107,17 +107,25 @@ class M427GuardAttributionTests(unittest.TestCase):
                 self.assertEqual(game.public_state(),state)
                 self.assertEqual(game.debug_tile_counts()["total"],108)
 
-    def test_structural_rejection_is_not_mislabeled_as_strict_guard(self):
-        with patch("mahtrain_core.ai_delayed_bugang_attribution._outlook_better_than_baseline",
+    def test_old_75pct_rejection_cannot_be_called_strict_guard(self):
+        # Freeze a genuine legal physical view but supply deterministic
+        # same-stage proxy measurements; the prior gate must reject before
+        # anyone can assign a new, guard-only causal reason.
+        view=construct_checkpoint(1,delayed=True).private_view(0)
+        def outlook(hand, melds, missing, public, cap, tian, **kwargs):
+            number=9 if any(m["type"]=="bu_gang" for m in melds) else 10
+            return {"shanten":1,"ukeire":number,
+                    "value":number,"tian_kept":False}
+        with patch("mahtrain_core.ai_delayed_bugang_attribution._cut_shanten",
+                   return_value=1), \
+             patch("mahtrain_core.ai_delayed_bugang_attribution.shanten_13",
+                   return_value=1), \
+             patch("mahtrain_core.ai_delayed_bugang_attribution._call_outlook",
+                   side_effect=outlook), \
+             patch("mahtrain_core.ai_delayed_bugang_attribution._outlook_better_than_baseline",
                    return_value=False):
-            # A deliberately tampered historical scorer must cause a
-            # mismatch if the strict guard label is internally inconsistent.
-            # This check exercises the existing prohibition on invented
-            # "guard effect" under an old-floor rejection.
             with self.assertRaises(RuntimeError):
-                diagnose_view(
-                    construct_checkpoint(1,delayed=True).private_view(0),
-                    target=SPECS[1][0])
+                diagnose_view(view,target=SPECS[1][0])
 
     def test_complete_constructed_grid_has_no_population_claim(self):
         with patch("mahtrain_core.ai_delayed_bugang_attribution.diagnose_case",
