@@ -175,16 +175,25 @@ class M447NewSourceContractTests(unittest.TestCase):
         # True FourPlayerOpening, not a fake fixture; at the first naturally
         # eligible Challenge PASS, both actions settle against identical state
         # and RNG. If no checkpoint occurs, report accurately without one.
-        seed=90411
-        real=one_natural_shuffle(seed)
-        _validate_case(real,seed)
+        # Fixed deterministic test-only seed range, no terminal-profit
+        # selection: stop at the FIRST legal original Challenge pass/peng
+        # checkpoint and REQUIRE the complete four genuine paid branches.
+        found=None
+        for seed in range(90411,90431):
+            trial=one_natural_shuffle(seed)
+            _validate_case(trial,seed)
+            if trial["first_natural_challenge_pass_with_peng_found"]:
+                found=(seed,trial)
+                break
+        self.assertIsNotNone(found,"no genuine PASS/PENG checkpoint in fixed test seed range")
+        seed,real=found
         original=_finish_real_full_game(seed,None,None)
         self.assertEqual(real["natural_terminal_baseline"]["official_net"],
                          original["official_net_by_seat"])
         self.assertEqual(real["natural_terminal_baseline"]["phase"],
                          original["phase"])
-        self.assertEqual(len(real["private_matched_branches"]),
-                         2 if real["first_natural_challenge_pass_with_peng_found"] else 0)
+        self.assertEqual(len(real["private_matched_branches"]),2)
+        self.assertEqual(_aggregate([real])["genuine_full_terminal_branch_games"],4)
         self.assertTrue(_aggregate([real])[
             "no_specific_hand_tiles_future_wall_shuffle_seed_or_weights_exported"])
 
