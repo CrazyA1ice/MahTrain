@@ -34,7 +34,7 @@ def _check_previous(*,old:Path,train:Path,model:dict[str,Any],
         p.get("private_model_source")!=str(train) or
         p.get("model_sha256")!=model["model_sha256"] or
         p.get("m447_source_sha256")!=_frozen_m447_sha256() or
-        p.get("no_policy_tuning_or_live_promotion") is not True or
+        p.get("no_policy_training_or_promotion") is not True or
         type(earlier) is not str or not earlier or
         type(old_start) is not int or type(old_n) is not int or
         old_n!=N448 or not 0<=old_start<2**32 or
