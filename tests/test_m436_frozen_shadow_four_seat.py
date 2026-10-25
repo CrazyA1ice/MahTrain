@@ -283,6 +283,27 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
             public["sampled_actor_discard_opportunities"])
         self.assertNotIn(str(seed),json.dumps(public))
 
+    def test_m443_authentic_nine_game_same_ukeire_two_policy_trial(self):
+        from mahtrain_core.ai_safe_tie_policy_trial import _one_seed, _audit_case
+        # Nine authoritative games, one genuine natural shuffle: Challenge
+        # + four risk-first + four fan-first rotations.
+        seed=90319
+        game=_one_seed(seed)
+        _audit_case(game,seed)
+        self.assertEqual(game["real_completed_games"],9)
+        vanilla=_finish_real_full_game(seed,None,None)
+        self.assertEqual(game["official_baseline_by_seat"],
+                         vanilla["official_net_by_seat"])
+        for seat in game["seat_rotation_results"]:
+            for mode in ("risk_first","fan_first"):
+                sample=seat["policies"][mode]
+                self.assertEqual(sample["official_net_delta"],
+                                 sum(sample["real_paid_component_delta"].values()))
+                self.assertLessEqual(sample["accepted_overrides"],
+                                     sample["safe_tie_opportunities"])
+                if sample["accepted_overrides"]==0:
+                    self.assertEqual(sample["official_net_delta"],0)
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
