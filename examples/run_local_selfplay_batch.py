@@ -1,4 +1,4 @@
-"""M4.34 local Windows CPU self-play batch: parallel, resume, independent seeds.
+r"""M4.34 local Windows CPU self-play batch: parallel, resume, independent seeds.
 
 PowerShell example (from repo root):
   .\.venv\Scripts\python.exe examples\run_local_selfplay_batch.py --seed-start 89800 --train-seeds 4 --holdout-seeds 4 --workers 4
