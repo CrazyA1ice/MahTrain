@@ -84,7 +84,7 @@ class M450NewIndependentTests(unittest.TestCase):
         self.assertEqual(safe["middle_minus_early_mean_net_points"],200)
         self.assertEqual(safe["cluster_bootstrap_middle_minus_early_95_percentile_interval"],
                          [200,200])
-        self.assertEqual(safe["precommitted_cluster_bootstrap_resamples"],RESAMPLES)
+        self.assertEqual(safe["prespecified_cluster_bootstrap_resamples"],RESAMPLES)
         self.assertTrue(safe["direction_supported_in_new_independent_shuffles"])
         self.assertEqual(safe["precommitted_public_wall_phase_groups"]["early"]
                          ["independent_original_shuffle_clusters"],24)
