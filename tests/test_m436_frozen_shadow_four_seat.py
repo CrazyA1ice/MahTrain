@@ -190,6 +190,21 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
                 seed_start=90034,seeds=1,out_dir=output,resume=True,
             )
         self.assertEqual(second["reused_completed_original_shuffle_clusters"],1)
+        from mahtrain_core.ai_shadow_score_geometry import audit_frozen_score_geometry
+        with patch("mahtrain_core.ai_shadow_action_diagnostics.evaluate_one_seed",
+                   side_effect=AssertionError("M4.40 must never replay matches")):
+            geometry=audit_frozen_score_geometry(
+                training_dir=self.training,
+                actor_evaluation_dir=output,
+                report_dir=self.root/"M440_authentic_frozen_geometry",
+            )
+        self.assertEqual(geometry["real_finished_games_already_reused"],5)
+        self.assertEqual(
+            geometry["overrides_verified_against_exact_frozen_weights"],
+            report["actual_model_override_count"],
+        )
+        self.assertTrue(geometry["no_new_matches"])
+        self.assertTrue(geometry["raw_frozen_weights_hidden"])
 
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
