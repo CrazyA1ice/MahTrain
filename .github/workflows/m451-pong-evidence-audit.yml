@@ -1,0 +1,33 @@
+name: M4.51 safe four-study evidence gate and falsification audit
+on:
+  pull_request:
+    paths:
+      - 'src/mahtrain_core/ai_pong_evidence_gate.py'
+      - 'examples/audit_pong_research_evidence.py'
+      - 'tests/test_m451_pong_evidence_gate.py'
+      - '.github/workflows/m451-pong-evidence-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/mahtrain_core/ai_pong_evidence_gate.py'
+permissions:
+  contents: read
+jobs:
+  safe-report-conservation-and-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11','3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: No-pooling M4.47-50 source ledger and no-promotion tests
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m451_pong_evidence_gate.py' -v
+      - name: Compile reader and Windows CLI
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_pong_evidence_gate.py examples/audit_pong_research_evidence.py
+      - name: CLI help
+        run: python examples/audit_pong_research_evidence.py --help
