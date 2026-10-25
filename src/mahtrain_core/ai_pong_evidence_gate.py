@@ -181,6 +181,13 @@ def audit_safe_reports(reports:Mapping[str,Mapping[str,Any]])->dict[str,Any]:
     ):
         if reports[label].get(field) is not True:
             raise ValueError("missing same-original-shuffle dependence warning: "+label)
+    for label,field in (
+        ("m448","previous_m447_original_shuffles_audited_but_not_pooled"),
+        ("m449","old_m447_m448_outcomes_not_fitted_or_pooled"),
+        ("m450","previous_m449_twenty_four_shuffles_verified_but_not_pooled"),
+    ):
+        if reports[label].get(field) is not True:
+            raise ValueError("missing historical holdout non-pooling evidence: "+label)
     studies={name:_study(name,reports[name]) for name in SOURCES}
     phases449=_wall_phase(reports["m449"],"m449")
     phases450=_wall_phase(reports["m450"],"m450")
