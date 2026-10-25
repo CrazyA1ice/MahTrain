@@ -1,0 +1,123 @@
+name: M4.32 multi-checkpoint natural four-challenge self-play
+on:
+  pull_request:
+    paths:
+      - "src/mahtrain_core/ai_selfplay_multicheckpoint.py"
+      - "examples/run_selfplay_multicheckpoint.py"
+      - "tests/test_m432_selfplay_multicheckpoint.py"
+      - "docs/MATCH_M432_MULTICHECKPOINT_CLUSTER_TRAINING_V1.42.md"
+      - ".github/workflows/m432-selfplay-multicheckpoint.yml"
+permissions:
+  contents: read
+jobs:
+  official-stress-and-privacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - name: Frozen sample clusters and physical legal multi-decision 108-tile rollouts
+        run: |
+          python -m unittest discover -s tests -p 'test_m432_selfplay_multicheckpoint.py' -v
+          python -m unittest discover -s tests -p 'test_m431_natural_selfplay_counterfactual.py' -v
+  tiny-real-data-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: official-stress-and-privacy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: 1 original train seed and 1 untouched holdout seed; max 2 decision forks per seed
+        run: |
+          python examples/run_selfplay_multicheckpoint.py \
+            --seed-start 89600 --train-seeds 1 --holdout-seeds 1 \
+            --max-checkpoints 2 --out-dir data/selfplay/m432-ci
+      - name: Assert privacy, 4 challenges, legal paired terminal components and independent clustering
+        run: |
+          python - <<'PY'
+          import gzip,json,pathlib,sys
+          sys.path.insert(0,"src")
+          from mahtrain_core.ai_selfplay_learning import _assert_public
+          from mahtrain_core.ai_selfplay_multicheckpoint import (
+              PROTOCOL,_safe_seed_labels
+          )
+          root=pathlib.Path("data/selfplay/m432-ci")
+          pub=[json.loads(s) for s in gzip.open(
+              root/"public_challenge_replays.jsonl.gz","rt",encoding="utf8")]
+          train=[json.loads(s) for s in gzip.open(
+              root/"PRIVATE_train_action_labels.jsonl.gz","rt",encoding="utf8")]
+          held=[json.loads(s) for s in gzip.open(
+              root/"PRIVATE_holdout_action_labels.jsonl.gz","rt",encoding="utf8")]
+          model=json.loads((root/"offline_consensus_model.json").read_text(encoding="utf8"))
+          summary=json.loads((root/"summary.json").read_text(encoding="utf8"))
+          assert len(pub)==2 and len(train)==len(held)==1
+          assert [x["game_id"] for x in pub]==["game-0000","game-0001"]
+          assert all(p["players"]==["challenge"]*4 for p in pub)
+          for p in pub: _assert_public(p)
+          assert train[0]["private_shuffle_seed"]==89600
+          assert held[0]["private_shuffle_seed"]==89601
+          assert len(set([train[0]["private_shuffle_seed"],held[0]["private_shuffle_seed"]]))==2
+          for cluster in train+held:
+              labels=_safe_seed_labels(cluster)
+              assert len(labels)<=2
+              assert len({x["seat"] for x in cluster["checkpoints"]})==cluster["captured_decisions"]
+          assert summary["natural_games"]==2
+          assert summary["natural_distinct_seat_checkpoints"]<=4
+          assert summary["terminal_real_legal_counterfactual_games"]==4*summary["natural_distinct_seat_checkpoints"]
+          assert summary["total_complete_games"]==2+summary["terminal_real_legal_counterfactual_games"]
+          assert summary["model_training_independent_seed_clusters"]<=1
+          assert model["online_promotion_allowed"] is False
+          assert summary["strength_increase_proven"] is False
+          assert summary["no_population_ev_or_significance_claim"] is True
+          print("PASS: physically valid, fully accounted, truly separate shuffle seed clusters")
+          PY
+      - name: Safe aggregate experiment summary (never upload private seeded data)
+        run: |
+          python - <<'PY'
+          import json,os,pathlib
+          x=json.loads(pathlib.Path("data/selfplay/m432-ci/summary.json").read_text(encoding="utf8"))
+          keys=[
+              "protocol","natural_games","four_ais_challenge",
+              "train_independent_shuffle_seeds","holdout_independent_shuffle_seeds",
+              "max_checkpoints_per_seed","natural_distinct_seat_checkpoints",
+              "two_wall_strict_consensus_checkpoints",
+              "terminal_real_legal_counterfactual_games","total_complete_games",
+              "model_training_action_labels","model_training_independent_seed_clusters",
+              "holdout_checkpoints","holdout_consensus_decisions",
+              "holdout_scored_decisions","holdout_correct_conditional_directions",
+              "no_online_ai_change","strength_increase_proven",
+              "no_population_ev_or_significance_claim",
+          ]
+          safe={k:x[k] for k in keys}
+          pathlib.Path("m432-safe-aggregate.json").write_text(
+              json.dumps(safe,ensure_ascii=False,indent=2),encoding="utf8")
+          lines=[
+              "## M4.32 natural distinct-seat checkpoint learning (actual verified outcomes)",
+              f"- Four-challenge natural games: {x['natural_games']}",
+              f"- Natural eligible checkpoints (at most 2 per shuffle, distinct seats): {x['natural_distinct_seat_checkpoints']}",
+              f"- Same-sign terminal reward across both wall worlds: {x['two_wall_strict_consensus_checkpoints']}",
+              f"- Official terminal paired branch games: {x['terminal_real_legal_counterfactual_games']}",
+              f"- Total actual complete games: {x['total_complete_games']}",
+              f"- Training usable actions / independent seed clusters: {x['model_training_action_labels']} / {x['model_training_independent_seed_clusters']}",
+              f"- Holdout eligible/consensus/scored/correct: {x['holdout_checkpoints']}/{x['holdout_consensus_decisions']}/{x['holdout_scored_decisions']}/{x['holdout_correct_conditional_directions']}",
+              "- Researcher-only future wall permutations never enter AI; no private hands, seeds or wall released.",
+              "- **No demonstrated improvement; no policy promotion.**",
+          ]
+          s="\n".join(lines)+"\n"
+          print(s)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
+              f.write(s)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: m432-public-aggregate-no-private-data
+          path: m432-safe-aggregate.json
+          if-no-files-found: error
