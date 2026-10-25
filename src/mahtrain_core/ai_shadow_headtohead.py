@@ -417,6 +417,7 @@ def evaluate_frozen_shadow(
         output.mkdir(parents=True,exist_ok=True)
     source={
         "protocol":PROTOCOL,
+        "resumable_shards_protocol":SHARD_PROTOCOL,
         "private_source_training_directory":str(training),
         "private_frozen_model_sha256":provenance["model_sha256"],
         "private_evaluation_seed_start":seed_start,
@@ -437,6 +438,13 @@ def evaluate_frozen_shadow(
         completed=_resume_cases(
             output,seeds,seed_start,provenance["model_sha256"]
         )
+        # Final reports mean a previous run had reached the aggregation
+        # phase. Missing saved clusters in that state are corruption, not
+        # unfinished work: never silently recompute/overwrite past outcomes.
+        has_final=(output/"PRIVATE_four_seat_paired_matches.jsonl.gz").exists() or (
+            output/"safe_four_seat_shadow_summary.json").exists()
+        if has_final and len(completed)!=seeds:
+            raise ValueError("final report present but complete seed shards missing")
     else:
         _write_atomic(plan_path,source)
         completed={}
