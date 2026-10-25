@@ -324,6 +324,30 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
                          public["counts"]["own_discard_stage_visits"])
         self.assertNotIn(str(seed),json.dumps(public))
 
+    def test_m445_authentic_five_game_equal_stage_pong_trial(self):
+        from mahtrain_core.ai_pong_threshold_trial import _one_cluster, _verify_case
+        seed=90391
+        case=_one_cluster(seed)
+        _verify_case(case,seed)
+        self.assertEqual(case["real_complete_official_games"],5)
+        baseline=_finish_real_full_game(seed,None,None)
+        self.assertEqual(case["challenge_baseline_net_by_seat"],
+                         baseline["official_net_by_seat"])
+        for row in case["seat_rotation_results"]:
+            c=row["actor_counts"]
+            self.assertEqual(row["paired_net_delta"],
+                             sum(row["real_component_delta"].values()))
+            self.assertEqual(
+                c["baseline_challenge_pass_with_peng"],
+                c["pass_with_ming_gang_offered_excluded"]+
+                c["pass_with_tian_ting_excluded"]+
+                c["pass_in_tenpai_or_regressing_shanten_excluded"]+
+                c["pass_with_no_one_or_two_extra_effective_copies"]+
+                c["actual_peng_overrides"],
+            )
+            if c["actual_peng_overrides"]==0:
+                self.assertEqual(row["paired_net_delta"],0)
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
