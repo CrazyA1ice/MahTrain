@@ -266,9 +266,10 @@ def _load_saved(out:Path,start:int,n:int,digest:str)->dict[int,dict[str,Any]]:
     for f in directory.iterdir():
         if f.is_file() and ".tmp-" in f.name:
             continue
-        if (not f.is_file() or f.name!=f"index-{int(f.name[6:14]):08d}.json"
-                if f.name.startswith("index-") and len(f.name)==19 and
-                f.name[6:14].isdigit() else True):
+        if (not f.is_file() or len(f.name)!=19 or
+                not f.name.startswith("index-") or
+                not f.name.endswith(".json") or
+                not f.name[6:14].isdigit()):
             raise ValueError("unexpected original-shuffle shard filename")
         i=int(f.name[6:14])
         if i>=n or i in saved:
