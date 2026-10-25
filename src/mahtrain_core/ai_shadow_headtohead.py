@@ -110,7 +110,8 @@ class FrozenShadowAgent:
 
     def __init__(self, *, seed: int, seat: int,
                  weights: tuple[float,...]|None,
-                  capture_diagnostics:bool=False) -> None:
+                  capture_diagnostics:bool=False,
+                 minimum_ukeire_guard:bool=False) -> None:
         if type(seed) is not int or not 0<=seed<2**32 or (
             type(seat) is not int or seat not in range(4)
         ):
@@ -130,7 +131,10 @@ class FrozenShadowAgent:
         self.override_count=0
         if type(capture_diagnostics) is not bool:
             raise ValueError("capture_diagnostics must be boolean")
-        self.capture_diagnostics=capture_diagnostics
+        if type(minimum_ukeire_guard) is not bool:
+            raise ValueError("minimum_ukeire_guard must be boolean")
+        self.minimum_ukeire_guard=minimum_ukeire_guard
+        self.rejected_ukeire_regressions=0
         self.private_actor_discard_trace:list[dict[str,Any]]=[]
         self.last_choice:dict[str,Any]|None=None
 
@@ -219,6 +223,11 @@ class FrozenShadowAgent:
         selected_row=next(c for c in candidates if c["discard"]==selected)
         if selected not in view["hand"]:
             raise RuntimeError("experimental shadow tried to cut unseen tile")
+        if (self.minimum_ukeire_guard and
+                selected_row["effective_tile_count"]<base["effective_tile_count"]):
+            self.rejected_ukeire_regressions+=1
+            self.last_choice["reason"]="blocked_lower_effective_tiles"
+            return original
         self.override_count+=1
         self.last_choice.update({
             "overrode":True,
@@ -233,7 +242,8 @@ class FrozenShadowAgent:
 
 def _finish_real_full_game(seed:int, candidate_seat:int|None,
                            weights:tuple[float,...]|None,
-                           *,capture_diagnostics:bool=False) -> dict[str,Any]:
+                           *,capture_diagnostics:bool=False,
+                           minimum_ukeire_guard:bool=False) -> dict[str,Any]:
     if (type(seed) is not int or not 0<=seed<2**32 or
             (candidate_seat is not None and (
                 type(candidate_seat) is not int or candidate_seat not in range(4)
@@ -247,7 +257,8 @@ def _finish_real_full_game(seed:int, candidate_seat:int|None,
     if candidate_seat is not None:
         shadow=FrozenShadowAgent(
             seed=seed,seat=candidate_seat,weights=weights,
-            capture_diagnostics=capture_diagnostics
+            capture_diagnostics=capture_diagnostics,
+            minimum_ukeire_guard=minimum_ukeire_guard,
         )
         agents[candidate_seat]=shadow
     frames=[]
@@ -282,6 +293,8 @@ def _finish_real_full_game(seed:int, candidate_seat:int|None,
             shadow.override_count if shadow else 0),
         **({"private_actor_discard_trace":shadow.private_actor_discard_trace}
            if shadow is not None and capture_diagnostics else {}),
+        **({"shadow_guard_blocked_count":shadow.rejected_ukeire_regressions}
+           if shadow is not None and minimum_ukeire_guard else {}),
     }
 
 
