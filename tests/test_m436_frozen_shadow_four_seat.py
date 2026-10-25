@@ -255,6 +255,34 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
             )
         self.assertEqual(repeat["completed_seed_shards_reused_on_resume"],1)
 
+    def test_m442_real_challenge_baseline_tie_probe_is_strategy_identical(self):
+        # Genuine terminal game, all four Challenge seats, immutable seed.
+        # The probe uses original Challenge ranking and never chooses a cut.
+        from mahtrain_core.ai_challenge_tie_opportunities import (
+            _aggregate as safe_aggregate, play_one_challenge_baseline,
+            _verify_case,
+        )
+        seed=90244
+        probed=play_one_challenge_baseline(seed)
+        vanilla=_finish_real_full_game(seed,None,None)
+        self.assertEqual(probed["official_net_by_seat"],
+                         vanilla["official_net_by_seat"])
+        self.assertEqual(probed["terminal_phase"],vanilla["phase"])
+        _verify_case(probed,seed)
+        public=safe_aggregate(
+            [probed],self.provenance["trained_original_shuffle_clusters"]
+        )
+        self.assertEqual(public["actual_complete_four_challenge_games"],1)
+        self.assertEqual(public["independent_original_shuffle_clusters"],1)
+        self.assertTrue(public["original_challenge_policy_unmodified"])
+        self.assertEqual(public["counts"]["discard_decisions"],
+                         public["sampled_actor_discard_opportunities"])
+        self.assertEqual(public["counts"][
+            "single_policy_choice_decisions"]+
+            public["counts"]["multichoice_minimum_shanten_decisions"],
+            public["sampled_actor_discard_opportunities"])
+        self.assertNotIn(str(seed),json.dumps(public))
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
