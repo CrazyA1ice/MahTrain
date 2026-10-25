@@ -113,19 +113,18 @@ def _phase_metrics(rows:list[tuple[str|None,float]])->dict[str,Any]:
     }
     statistics={}
     for name,group in by_phase.items():
-        entry={
-            "independent_original_shuffle_clusters":len(group),
-            "positive":sum(x>0 for x in group),
-            "negative":sum(x<0 for x in group),
-            "equal":sum(x==0 for x in group),
-        }
+        entry={"independent_original_shuffle_clusters":len(group)}
         if len(group)>=MIN_PER_GROUP:
             entry.update({
+                "positive":sum(x>0 for x in group),
+                "negative":sum(x<0 for x in group),
+                "equal":sum(x==0 for x in group),
                 "mean_net_peng_minus_pass_points":round(mean(group),5),
                 "median_net_peng_minus_pass_points":round(median(group),5),
             })
         else:
             entry["mean_and_median_suppressed_insufficient_support"]=True
+            entry["direction_counts_suppressed_insufficient_support"]=True
         statistics[name]=entry
     return statistics
 
