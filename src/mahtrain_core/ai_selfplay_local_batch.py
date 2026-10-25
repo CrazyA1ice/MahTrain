@@ -357,7 +357,8 @@ def _atomic_stream_outputs(
                 decisions=audited["natural_decisions"]
                 labels=audited["strict_consensus_labels"]
                 summary["natural_legal_decision_points"]+=decisions
-                summary[f"{split if split=='train' else 'holdout'}ing_legal_decision_points" if split=="train" else "holdout_legal_decision_points"]+=decisions
+                summary["training_legal_decision_points" if split=="train"
+                        else "holdout_legal_decision_points"]+=decisions
                 summary["training_consensus_labels" if split=="train"
                         else "holdout_consensus_labels"]+=labels
                 if labels:
