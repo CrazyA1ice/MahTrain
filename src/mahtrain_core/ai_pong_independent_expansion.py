@@ -92,3 +92,100 @@ def _cluster_metrics(cases:list[dict[str,Any]])->dict[str,Any]:
     }
 
 
+def run_independent_pong_expansion(
+    *,training_dir:Path,prior_m445_dir:Path,
+    seed_start:int,seeds:int,out_dir:Path,resume:bool=False,
+)->dict[str,Any]:
+    # Sample size is deliberately precommitted to 20 independent original
+    # shuffle clusters; four rotated seat matches are correlated.
+    if (type(seed_start) is not int or type(seeds) is not int or
+            type(resume) is not bool or seeds!=FROZEN_SEED_COUNT or
+            not 0<=seed_start<2**32 or seed_start+seeds>2**32):
+        raise ValueError("M4.46 requires exactly 20 independent new shuffle seeds")
+    train=_private_location(Path(training_dir))
+    prior=_private_location(Path(prior_m445_dir))
+    output=_private_location(Path(out_dir))
+    if (len({train,prior,output})!=3 or
+            any(a in b.parents or b in a.parents
+                for a,b in ((train,prior),(train,output),(prior,output)))):
+        raise ValueError("sources and evaluation output must not overlap")
+    _,model=load_frozen_local_model(train)
+    t0=model["source_m434_train_seed_start"]
+    t1=model["source_m434_seed_end_exclusive"]
+    if not (seed_start+seeds<=t0 or seed_start>=t1):
+        raise ValueError("M4.46 evaluation overlaps original train/holdout seeds")
+    m444=_original_evidence(
+        prior=prior,train=train,model=model,start=seed_start,n=seeds,
+    )
+    plan={
+        "protocol":PROTOCOL,
+        "private_training_source":str(train),
+        "private_previous_m445_source":str(prior),
+        "private_previous_m444_source":str(m444),
+        "private_original_shuffle_start":seed_start,
+        "private_new_original_shuffle_clusters":seeds,
+        "training_model_sha256_provenance_only":model["model_sha256"],
+        "unchanged_m445_source_sha256":_policy_digest(),
+        "precommitted_min_extra_ukeire":LOWER_EXTRA_COPIES,
+        "precommitted_max_extra_ukeire":UPPER_EXTRA_COPIES,
+        "challenge_live_policy_untouched":True,
+    }
+    batch=output/PRIVATE_BATCH
+    if resume:
+        if not output.is_dir() or not (output/PLAN).is_file():
+            raise ValueError("resume requires the original M4.46 frozen plan")
+        if _get_json(output/PLAN)!=plan:
+            raise ValueError("M4.46 frozen source, seeds, or plan changed")
+        if any(p.name not in {PLAN,PRIVATE_BATCH,SUMMARY} and
+               ".tmp-" not in p.name for p in output.iterdir()):
+            raise ValueError("unknown file in M4.46 expansion report folder")
+        batch_resume=batch.exists()
+    else:
+        if output.exists() and any(output.iterdir()):
+            raise ValueError("M4.46 requires a new empty output directory")
+        output.mkdir(parents=True,exist_ok=True)
+        _write_atomic(output/PLAN,plan)
+        batch_resume=False
+    # Existing M4.45 engine performs the real 5-game shuffle batches,
+    # complete score reconciliation, immutable shard validation and resume.
+    old_result=run_pong_threshold_trial(
+        training_dir=train,prior_m444_dir=m444,
+        seed_start=seed_start,seeds=seeds,
+        out_dir=batch,resume=batch_resume,
+    )
+    verified=_load_saved(batch,seed_start,seeds,model["model_sha256"])
+    if len(verified)!=seeds:
+        raise RuntimeError("reported complete batch is missing paid-game shards")
+    result={
+        "protocol":PROTOCOL,
+        "frozen_original_m445_policy_used_without_retraining":True,
+        "old_pilot_not_pooled_with_new_evaluation":True,
+        "independent_original_shuffle_clusters":seeds,
+        "real_complete_paid_games":seeds*5,
+        "baseline_challenge_games":seeds,
+        "candidate_four_seat_rotated_games":seeds*4,
+        "precommitted_equal_shanten_peng_extra_ukeire_range":[
+            LOWER_EXTRA_COPIES,UPPER_EXTRA_COPIES,
+        ],
+        "actor_only_response_counts":old_result["actor_only_response_counts"],
+        "mean_official_net_delta_points":
+            old_result["mean_official_net_delta_points"],
+        "mean_official_component_delta_points":
+            old_result["mean_official_component_delta_points"],
+        "per_seat_mean_official_net_delta_points":
+            old_result["per_seat_mean_official_net_delta_points"],
+        "independent_shuffles_positive":old_result["clusters_positive"],
+        "independent_shuffles_negative":old_result["clusters_negative"],
+        "independent_shuffles_equal":old_result["clusters_equal"],
+        **_cluster_metrics([verified[i] for i in range(seeds)]),
+        "same_shuffle_seat_rotations_not_independent":True,
+        "experimental_intervention_not_promoted_to_online_challenge":True,
+        "no_parameter_tuning_using_old_or_new_test_outcomes":True,
+        "no_private_seed_tiles_model_weights_or_wall_data_in_safe_report":True,
+        "not_single_action_causal_impact":True,
+        "no_general_strength_or_significance_claim":True,
+        "completed_original_shuffles_reused_on_resume":
+            old_result["reused_completed_original_shuffle_clusters"],
+    }
+    _write_atomic(output/SUMMARY,result)
+    return result
