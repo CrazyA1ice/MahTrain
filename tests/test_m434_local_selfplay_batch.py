@@ -46,7 +46,7 @@ class M434LocalBatchTests(unittest.TestCase):
         self.assertFalse(data["online_policy_promoted"])
         self.assertFalse(data["proof_of_increased_ai_strength"])
         self.assertFalse(data["uncertainty_estimate_valid_for_population"])
-        self.assertFalse(data["private_shuffle_seed_exported"])
+        self.assertFalse(data["private_seed_ids_exported"])
         self.assertIsNone(data["holdout_accuracy_if_at_least_five"])
         for i in range(2):
             raw=_get_json(_shard(self.out,i))
