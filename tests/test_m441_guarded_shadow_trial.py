@@ -142,7 +142,7 @@ class GuardedFrozenTrialTests(unittest.TestCase):
     def test_no_historical_seed_overlap_and_no_plan_mutations(self):
         for seed in (89801,91100,91101,91300,91301):
             with self.subTest(seed=seed):
-                with self.assertRaisesRegex(ValueError,"overlaps"):
+                with self.assertRaisesRegex(ValueError,"overlap"):
                     self._run(seed_start=seed,seeds=1)
         self.assertFalse(self.out.exists())
         self._run()
