@@ -1,0 +1,23 @@
+name: M4.49 genuine first pass peng actor-only diagnosis
+on: [pull_request, push]
+permissions:
+  contents: read
+jobs:
+  actor-only-peng-strata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: Prior completed M4.48 proof, new actor-only strata and genuine branches
+        run: python -W error::SyntaxWarning -m unittest discover -s tests -p 'test_m449_pong_actor_strata.py' -v
+      - name: Compile modules
+        run: python -W error::SyntaxWarning -m py_compile src/mahtrain_core/ai_pong_actor_strata.py src/mahtrain_core/ai_pong_actor_strata_run.py examples/run_pong_actor_strata.py
+      - name: CLI synopsis
+        run: python examples/run_pong_actor_strata.py --help
