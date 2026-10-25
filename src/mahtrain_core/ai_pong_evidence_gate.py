@@ -174,7 +174,7 @@ def audit_safe_reports(reports:Mapping[str,Mapping[str,Any]])->dict[str,Any]:
         if reports[label].get(field) is not True:
             raise ValueError("cannot verify unchanged Challenge in "+label)
     for label,field in (
-        ("m447","same_original_shuffle_future_worlds_not_independent"),
+        ("m447","same_original_shuffle_future_worlds_not_independent_samples"),
         ("m448","same_shuffle_two_future_worlds_not_independent"),
         ("m449","two_worlds_not_independent_original_shuffles"),
         ("m450","future_wall_worlds_are_correlated_within_original_shuffle"),
