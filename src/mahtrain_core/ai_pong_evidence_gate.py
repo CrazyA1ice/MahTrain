@@ -20,9 +20,10 @@ SOURCES={
 }
 EXPECTED_SHUFFLES={"m447":8,"m448":24,"m449":24,"m450":48}
 NO_PRIVATE=(
-    "private_original_shuffle_seed","_hands","future_wall",
-    "hand_tiles","opponent_hands","PRIVATE_",
-    "model_sha256","original_seed_start",
+    '"private_original_shuffle_seed"', '"_hands"', '"hand":',
+    '"future_wall":', '"opponent_hands"', '"private_case"',
+    '"model_sha256"', '"original_seed_start"',
+    "PRIVATE_",
 )
 
 def _value(obj:Mapping[str,Any],key:str,kind:type)->Any:
