@@ -53,7 +53,7 @@ def _ranked_peer_cuts(ranked:list[dict[str,Any]],base:dict[str,Any])->list[dict[
         if (not isinstance(r,dict) or any(k not in r for k in keys) or
                 any(type(r[k]) not in (int,float) or not isfinite(r[k]) for k in keys) or
                 r["effective_tile_count"]<0 or
-                not 0<=r["table_threat_index"]<=1):
+                not 0<=r["table_threat_index"]<=3):
             raise ValueError("invalid acting-agent public legal cut ranking")
     return [
         r for r in ranked
