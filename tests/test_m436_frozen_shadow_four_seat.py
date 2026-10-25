@@ -110,6 +110,23 @@ class M436FrozenFourSeatBenchmarkTests(unittest.TestCase):
             self.result["candidate_legal_minimum_shanten_overrides"],
         )
 
+    def test_resume_reuses_genuine_paid_five_game_cluster_without_replay(self):
+        # The setUpClass fixture above created and audited five REAL
+        # authoritative paid games; a restart must not invoke any new game.
+        with patch("mahtrain_core.ai_shadow_headtohead.evaluate_one_seed",
+                   side_effect=AssertionError("must not replay genuine games")):
+            resumed=evaluate_frozen_shadow(
+                training_dir=self.training,seed_start=90023,
+                seeds=1,out_dir=self.output,resume=True,
+            )
+        self.assertEqual(resumed["reused_prior_completed_seed_shards"],1)
+        self.assertEqual(resumed["interruption_safe_completed_seed_shards"],1)
+        self.assertEqual(resumed["actual_real_complete_games"],5)
+        self.assertEqual(
+            resumed["seat_rotated_seed_cluster_mean_delta_points"],
+            self.result["seat_rotated_seed_cluster_mean_delta_points"],
+        )
+
     def test_no_weights_never_change_true_baseline_all_four_seats(self):
         one=evaluate_one_seed(90025,None)
         self.assertEqual(one["complete_authoritative_games"],5)
